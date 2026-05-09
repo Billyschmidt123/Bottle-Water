@@ -323,7 +323,7 @@
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
             const thead = document.getElementById('custTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</div>';
             
             globalCustomers = [];
             routeDataMap = {};
@@ -360,7 +360,7 @@
                             if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
                         } else {
                             rowObj._routes = [f.name];
-                            rowObj._status = "Active"; // ========== ADDITIVE FIX: Add status field ==========
+                            rowObj._status = "Active";
                             globalCustomers.push(rowObj);
                         }
                     }
@@ -381,8 +381,8 @@
                     <td>
                         <button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openCustomerEditModal(${idx})">Edit</button>
                         <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
-                    </td>`;
-                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
+                    </div>`;
+                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</div>`);
                 tbody.innerHTML += row + '</tr>';
             });
         }
@@ -403,7 +403,7 @@
             currentProductFile = fileName;
             const tbody = document.getElementById('prodTableBody');
             const theadRow = document.getElementById('prodTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10">Gathering items...</div>';
             
             try {
                 const fileInfo = await ghGet(`Products/${fileName}`);
@@ -433,7 +433,7 @@
                     renderProdTable();
                 }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</div>';
             }
         };
 
@@ -836,18 +836,18 @@
                         ${deliveryCart.map(item => `
                             <tr style="height: 28px;">
                                 <td style="border: 1px solid #000; text-align: center; font-size: 12px; font-weight: bold;">${item.qty}</td>
-                                <td style="border: 1px solid #000; padding: 0 8px; font-size: 11px;">${item.name} (${item.units})</td>
-                                <td style="border: 1px solid #000;"></td>
-                                <td style="border: 1px solid #000;"></td>
-                            </tr>
+                                <td style="border: 1px solid #000; padding: 0 8px; font-size: 11px;">${item.name} (${item.units})</div>
+                                <td style="border: 1px solid #000;"></div>
+                                <td style="border: 1px solid #000;"></div>
+                            </div>
                         `).join('')}
                         ${Array(Math.max(0, 10 - deliveryCart.length)).fill(0).map(() => `
                             <tr style="height: 28px;">
-                                <td style="border: 1px solid #000;"></td>
-                                <td style="border: 1px solid #000;"></td>
-                                <td style="border: 1px solid #000;"></td>
-                                <td style="border: 1px solid #000;"></td>
-                            </tr>
+                                <td style="border: 1px solid #000;"></div>
+                                <td style="border: 1px solid #000;"></div>
+                                <td style="border: 1px solid #000;"></div>
+                                <td style="border: 1px solid #000;"></div>
+                            </div>
                         `).join('')}
                     </tbody>
                     <tfoot>
@@ -861,9 +861,9 @@
                                     <span>INTERAC [ ]</span>
                                 </div>
                                 <div style="font-size: 6px; margin-top: 4px;">White: Office Copy | Canary: Office Copy | Pink: Customer Copy</div>
-                            </td>
-                            <td style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px;">TOTAL</td>
-                            <td style="border: 2px solid #000;"></td>
+                            </div>
+                            <td style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px;">TOTAL</div>
+                            <td style="border: 2px solid #000;"></div>
                         </tr>
                     </tfoot>
                 </table>
@@ -951,15 +951,15 @@
         function renderDeliveryCart() {
             const body = document.getElementById('cartItemsBody');
             if (deliveryCart.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.乳</div>';
+                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</div>';
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
                 <tr>
-                    <td>${item.name}</td>
-                    <td>${item.qty}</td>
-                    <td>${item.units}</td>
-                    <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+                    <td>${item.name}</div>
+                    <td>${item.qty}</div>
+                    <td>${item.units}</div>
+                    <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></div>
                 </tr>
             `).join('');
         }
@@ -1170,7 +1170,7 @@
                 currentProductFile = fileName;
                 const tbody = document.getElementById('prodTableBody');
                 const theadRow = document.getElementById('prodTableHead');
-                tbody.innerHTML = '<tr><td colspan="10">Loading products...乳</div>';
+                tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
                 
                 try {
                     const fileInfo = await window.ghGet('Products/' + fileName);
@@ -1244,11 +1244,11 @@
                         // Call the new render function
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file乳</div>';
+                        tbody.innerHTML = '</table><td colspan="10">No valid data found in file</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
-                    tbody.innerHTML = '<tr><td colspan="10">Error loading: ' + e.message + '乳</div>';
+                    tbody.innerHTML = '<tr><td colspan="10">Error loading: ' + e.message + '</div>';
                 }
             };
             
@@ -1258,7 +1258,7 @@
                 tbody.innerHTML = '';
                 
                 if (!currentProdList || currentProdList.length === 0) {
-                    tbody.innerHTML = '</table><td colspan="10">No products found in this file乳</div>';
+                    tbody.innerHTML = '</table><td colspan="10">No products found in this file</div>';
                     return;
                 }
                 
@@ -1405,7 +1405,8 @@
             window.currentEditingProductIndex = -1;
         };
         
-        // Function to toggle product status from modal        window.toggleProductStatusFromModal = function() {
+        // Function to toggle product status from modal
+        window.toggleProductStatusFromModal = function() {
             if (window.currentEditingProductIndex !== -1) {
                 toggleStatus(window.currentEditingProductIndex);
                 // Refresh the modal fields after status change
