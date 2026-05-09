@@ -39,6 +39,30 @@
         .driver-nav-bar { background: #e9ecef; padding: 10px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #dee2e6; }
         .info-bar { background: #fff; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #495057; }
         .btn-nav { padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; }
+        
+        /* ========== ADDITIVE FIX: Toast notification style ========== */
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 2000;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            animation: fadeOut 3s ease-in-out forwards;
+        }
+        .toast-error {
+            background: #dc3545;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        /* ========== END OF ADDITIVE FIX ========== */
     </style>
 </head>
 <body>
@@ -328,7 +352,7 @@
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
             const thead = document.getElementById('custTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</div>';
+            tbody.innerHTML = '<table><td colspan="10">Scanning files...</div>';
             
             globalCustomers = [];
             routeDataMap = {};
@@ -345,7 +369,7 @@
 
                 if (csvHeaders.length === 0) {
                     csvHeaders = lines[0].split(',').map(h => h.trim());
-                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</table>`;
                 }
 
                 lines.slice(1).forEach(line => {
@@ -388,7 +412,7 @@
                         <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
                     </div>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</div>`);
-                tbody.innerHTML += row + '</tr>';
+                tbody.innerHTML += row + '</table>';
             });
         }
         window.renderCustTable = renderCustTable;
@@ -1153,7 +1177,7 @@
         function managerUserMgmt() { alert("Loading User Management Panel..."); }
     </script>
 
-    <!-- ========== ADDITIVE FIX: Override loadProductFile and renderProdTable for CSV compatibility ========== -->
+    <!-- ========== ADDITIVE FIX: Override loadProductFile and renderProdTable for CSV compatibility with local save fallback ========== -->
     <script>
     (function fixProductManagement() {
         setTimeout(function() {
@@ -1167,6 +1191,18 @@
             
             const originalLoadProductFile = window.loadProductFile;
             const originalRenderProdTable = window.renderProdTable;
+            
+            // Function to show toast notification
+            function showToast(message, isError) {
+                var toast = document.createElement('div');
+                toast.className = 'toast-notification';
+                if (isError) toast.classList.add('toast-error');
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(function() {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 3000);
+            }
             
             window.loadProductFile = async function(fileName) {
                 currentProductFile = fileName;
@@ -1236,7 +1272,7 @@
                         editingIndex = -1;
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file</div>';
+                        tbody.innerHTML = '<table><td colspan="10">No valid data found in file</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
@@ -1275,6 +1311,7 @@
                 }
             };
             
+            // ========== ADDITIVE FIX: Override updateRow with local save fallback ==========
             window.updateRow = async function(idx) {
                 var data = currentProdList[idx];
                 for (var h = 0; h < currentProdHeaders.length; h++) {
@@ -1305,26 +1342,42 @@
                     csvContent += row.join(',') + '\n';
                 }
 
-                var response = await fetch('https://api.github.com/repos/' + window.repo + '/contents/Products/' + currentProductFile, {
-                    method: 'PUT',
-                    headers: { 'Authorization': 'token ' + window.token, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: 'Update ' + currentProductFile,
-                        content: btoa(unescape(encodeURIComponent(csvContent))),
-                        sha: currentProductSHA
-                    })
-                });
+                try {
+                    var response = await fetch('https://api.github.com/repos/' + window.repo + '/contents/Products/' + currentProductFile, {
+                        method: 'PUT',
+                        headers: { 'Authorization': 'token ' + window.token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: 'Update ' + currentProductFile,
+                            content: btoa(unescape(encodeURIComponent(csvContent))),
+                            sha: currentProductSHA
+                        })
+                    });
 
-                if (response.ok) {
-                    window.loadProductFile(currentProductFile);
-                    alert("Product updated successfully!");
-                } else {
-                    var error = await response.json();
-                    alert("Error saving to GitHub: " + (error.message || "Unknown error"));
+                    if (response.ok) {
+                        window.loadProductFile(currentProductFile);
+                        showToast("Product saved to GitHub successfully!", false);
+                    } else {
+                        var error = await response.json();
+                        if (error.message && error.message.includes("Resource not accessible")) {
+                            // Fallback: save to localStorage and refresh display
+                            localStorage.setItem('product_backup_' + currentProductFile, csvContent);
+                            window.renderProdTable();
+                            showToast("⚠️ GitHub save failed (token permission). Product saved locally. To permanently save, update GitHub token with 'repo' scope.", true);
+                        } else {
+                            showToast("Error saving: " + (error.message || "Unknown error"), true);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Network error:", err);
+                    // Fallback: save to localStorage
+                    localStorage.setItem('product_backup_' + currentProductFile, csvContent);
+                    window.renderProdTable();
+                    showToast("⚠️ Network error. Product saved locally. Changes will persist in this browser session.", true);
                 }
             };
+            // ========== END OF ADDITIVE FIX ==========
             
-            console.log("Product management fix applied - CSV compatibility added");
+            console.log("Product management fix applied - CSV compatibility added with local save fallback");
         }, 100);
     })();
     </script>
@@ -1433,7 +1486,6 @@
     <!-- ========== ADDITIVE FIX: Simple Customer Edit (uses existing openEdit) ========== -->
     <script>
     (function() {
-        // Override any existing openCustomerEditModal to use the working openEdit
         window.openCustomerEditModal = function(customerIndex) {
             console.log("Opening customer edit via openEdit for index:", customerIndex);
             if (typeof window.openEdit === 'function') {
