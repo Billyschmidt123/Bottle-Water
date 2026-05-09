@@ -259,7 +259,7 @@
     </div>
     <!-- ========== END OF ADDITIVE FIX ========== -->
 
-    <!-- ========== ADDITIVE FIX: Customer Deactivate Modal ========== -->
+    <!-- ========== ADDITIVE FIX: Customer Edit Modal (simple version) ========== -->
     <div id="customerEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 600px;">
             <div style="display:flex; justify-content: space-between; align-items:center;">
@@ -313,10 +313,15 @@
             return r.ok ? await r.json() : [];
         }
 
-        // ========== ADDITIVE FIX: Expose ghGet and repo to global scope ==========
+        // ========== ADDITIVE FIX: Expose ghGet, repo, and openEdit to global scope ==========
         window.ghGet = ghGet;
         window.repo = repo;
         window.token = token;
+        window.openEditGlobal = function(idx, type) {
+            if (type === 'cust') {
+                window.openEdit(idx, type);
+            }
+        };
         // ========== END OF ADDITIVE FIX ==========
 
         async function loadAllCustomers() {
@@ -379,11 +384,11 @@
                 let rowClass = isDeactivated ? 'deactivated-row' : '';
                 let row = `<tr class="${rowClass}">
                     <td>
-                        <button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openCustomerEditModal(${idx})">Edit</button>
+                        <button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="window.openEdit(${idx}, 'cust')">Edit</button>
                         <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
                     </div>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</div>`);
-                tbody.innerHTML += row + '</table>';
+                tbody.innerHTML += row + '</tr>';
             });
         }
         window.renderCustTable = renderCustTable;
@@ -955,7 +960,7 @@
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
-                </table>
+                <tr>
                     <td>${item.name}</div>
                     <td>${item.qty}</div>
                     <td>${item.units}</div>
@@ -1151,7 +1156,6 @@
     <!-- ========== ADDITIVE FIX: Override loadProductFile and renderProdTable for CSV compatibility ========== -->
     <script>
     (function fixProductManagement() {
-        // Wait for main script to expose ghGet
         setTimeout(function() {
             if (typeof window.ghGet !== 'undefined') {
                 console.log("ghGet found, applying product management fix");
@@ -1161,11 +1165,9 @@
                 return;
             }
             
-            // Store original functions if needed (preserved, not modified)
             const originalLoadProductFile = window.loadProductFile;
             const originalRenderProdTable = window.renderProdTable;
             
-            // Override loadProductFile with improved version that handles your CSV structure
             window.loadProductFile = async function(fileName) {
                 currentProductFile = fileName;
                 const tbody = document.getElementById('prodTableBody');
@@ -1181,30 +1183,24 @@
                     const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.includes(','));
                     
                     if (lines.length > 0) {
-                        // Parse headers from first line
                         const rawHeaders = lines[0].split(',').map(h => h.trim());
-                        // Filter out empty headers and ensure we have valid column names
                         currentProdHeaders = rawHeaders.filter(h => h !== "");
                         
-                        // Ensure Status column exists for toggle functionality
                         if (currentProdHeaders.indexOf('Status') === -1) {
                             currentProdHeaders.push('Status');
                         }
                         
-                        // Build table header with Action column
                         let headerHtml = '<th>Action</th>';
                         for (var h = 0; h < currentProdHeaders.length; h++) {
                             headerHtml += '<th>' + currentProdHeaders[h] + '</th>';
                         }
                         theadRow.innerHTML = headerHtml;
                         
-                        // Parse product rows
                         currentProdList = [];
                         for (var i = 1; i < lines.length; i++) {
                             var line = lines[i];
                             if (!line) continue;
                             
-                            // Handle quoted values properly
                             var values = [];
                             var inQuote = false;
                             var currentValue = '';
@@ -1222,7 +1218,6 @@
                             values.push(currentValue.trim());
                             
                             var productObj = {};
-                            // Map values to headers (excluding Status header which we added)
                             for (var hIdx = 0; hIdx < currentProdHeaders.length - 1; hIdx++) {
                                 if (hIdx < values.length) {
                                     productObj[currentProdHeaders[hIdx]] = values[hIdx] || "";
@@ -1230,10 +1225,8 @@
                                     productObj[currentProdHeaders[hIdx]] = "";
                                 }
                             }
-                            // Add Status field
                             productObj.Status = "Active";
                             
-                            // Only add if product has a name/description
                             var firstHeader = currentProdHeaders[0];
                             if (productObj[firstHeader] && productObj[firstHeader] !== "" && productObj[firstHeader].toLowerCase() !== "not delivered") {
                                 currentProdList.push(productObj);
@@ -1241,10 +1234,9 @@
                         }
                         
                         editingIndex = -1;
-                        // Call the new render function
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '<td><td colspan="10">No valid data found in file</div>';
+                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
@@ -1252,7 +1244,6 @@
                 }
             };
             
-            // Override renderProdTable with improved version that includes Edit with Modal button
             window.renderProdTable = function() {
                 var tbody = document.getElementById('prodTableBody');
                 tbody.innerHTML = '';
@@ -1268,13 +1259,11 @@
                     var tr = document.createElement('tr');
                     if (isDeactivated) tr.className = 'deactivated-row';
                     
-                    // Action cell - MODIFIED to use modal edit with Deactivate button
                     var tdAction = document.createElement('td');
                     tdAction.innerHTML = '<button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button>' +
                         '<button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleStatus(' + idx + ')">' + (productObj.Status === "Active" ? "Deactivate" : "Activate") + '</button>';
                     tr.appendChild(tdAction);
                     
-                    // Data cells for each header
                     for (var hIdx = 0; hIdx < currentProdHeaders.length; hIdx++) {
                         var header = currentProdHeaders[hIdx];
                         var td = document.createElement('td');
@@ -1286,10 +1275,8 @@
                 }
             };
             
-            // Override updateRow to work with new structure
             window.updateRow = async function(idx) {
                 var data = currentProdList[idx];
-                // Save edited values from modal
                 for (var h = 0; h < currentProdHeaders.length; h++) {
                     var header = currentProdHeaders[h];
                     if (header !== 'Status') {
@@ -1298,7 +1285,6 @@
                     }
                 }
 
-                // Build CSV content
                 var visibleHeaders = [];
                 for (var vh = 0; vh < currentProdHeaders.length; vh++) {
                     if (currentProdHeaders[vh] !== 'Status') {
@@ -1347,7 +1333,6 @@
     <!-- ========== ADDITIVE FIX: Product Edit Modal Functions ========== -->
     <script>
     (function() {
-        // Wait for the DOM and product list to be ready
         var readyCheck = setInterval(function() {
             if (typeof currentProdList !== 'undefined' && typeof currentProdHeaders !== 'undefined') {
                 clearInterval(readyCheck);
@@ -1355,10 +1340,8 @@
             }
         }, 500);
         
-        // Global variable to track which product is being edited
         window.currentEditingProductIndex = -1;
         
-        // Function to open the product edit modal
         window.openProductEditModal = function(productIndex) {
             console.log("Opening edit modal for product index:", productIndex);
             if (typeof currentProdList === 'undefined' || !currentProdList[productIndex]) {
@@ -1379,13 +1362,11 @@
             }
             container.innerHTML = '';
             
-            // Create form fields for each header (excluding Status)
             for (var i = 0; i < currentProdHeaders.length; i++) {
                 var header = currentProdHeaders[i];
                 if (header === 'Status') continue;
                 
                 var value = product[header] || '';
-                // Escape HTML special characters
                 var safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                 var safeHeader = header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 container.innerHTML += '<div class="form-group">' +
@@ -1398,30 +1379,25 @@
             if (modal) modal.style.display = 'flex';
         };
         
-        // Function to close the product edit modal
         window.closeProductEditModal = function() {
             var modal = document.getElementById('productEditModal');
             if (modal) modal.style.display = 'none';
             window.currentEditingProductIndex = -1;
         };
         
-        // Function to toggle product status from modal
         window.toggleProductStatusFromModal = function() {
             if (window.currentEditingProductIndex !== -1) {
                 toggleStatus(window.currentEditingProductIndex);
-                // Refresh the modal fields after status change
                 openProductEditModal(window.currentEditingProductIndex);
             }
         };
         
-        // Function to save product edits
         window.saveProductEdit = function() {
             if (window.currentEditingProductIndex === -1) {
                 alert("No product selected for editing.");
                 return;
             }
             
-            // Map the modal input values back to the data object
             for (var i = 0; i < currentProdHeaders.length; i++) {
                 var header = currentProdHeaders[i];
                 if (header === 'Status') continue;
@@ -1432,7 +1408,6 @@
                 }
             }
             
-            // Call the existing updateRow function
             if (typeof window.updateRow === 'function') {
                 window.updateRow(window.currentEditingProductIndex);
             } else {
@@ -1443,16 +1418,11 @@
             window.closeProductEditModal();
         };
         
-        // Add click handler for close buttons
         document.addEventListener('click', function(e) {
             if (e.target.classList && e.target.classList.contains('modal-overlay')) {
                 var modal = document.getElementById('productEditModal');
                 if (modal && e.target === modal) {
                     window.closeProductEditModal();
-                }
-                var custModal = document.getElementById('customerEditModal');
-                if (custModal && e.target === custModal) {
-                    window.closeCustomerEditModal();
                 }
             }
         });
@@ -1460,64 +1430,34 @@
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
 
-    <!-- ========== ADDITIVE FIX: Customer Edit Modal Functions (using openEdit) ========== -->
+    <!-- ========== ADDITIVE FIX: Simple Customer Edit (uses existing openEdit) ========== -->
     <script>
     (function() {
-        // Intercept the Edit button clicks and use the existing openEdit function
-        var originalOpenCustomerEditModal = window.openCustomerEditModal;
-        
-        // Override openCustomerEditModal to use the existing openEdit function
+        // Override any existing openCustomerEditModal to use the working openEdit
         window.openCustomerEditModal = function(customerIndex) {
-            console.log("Opening customer edit modal for index via openEdit:", customerIndex);
-            // Use the existing openEdit function from the main script
+            console.log("Opening customer edit via openEdit for index:", customerIndex);
             if (typeof window.openEdit === 'function') {
                 window.openEdit(customerIndex, 'cust');
             } else {
-                alert("Edit function not available. Please refresh and try again.");
+                alert("Edit function not ready yet. Please wait a moment and try again.");
             }
         };
         
-        // Function to close the customer edit modal
         window.closeCustomerEditModal = function() {
             var modal = document.getElementById('customerEditModal');
             if (modal) modal.style.display = 'none';
-            window.currentEditingCustomerIndex = -1;
         };
         
-        // Function to toggle customer status from modal (will use the table button)
         window.toggleCustomerStatusFromModal = function() {
-            if (window.currentEditingCustomerIndex !== -1 && typeof window.toggleCustomerStatus === 'function') {
-                window.toggleCustomerStatus(window.currentEditingCustomerIndex);
-            } else {
-                alert("Please use the Deactivate button in the customer table to toggle status.");
-            }
+            alert("Please use the Deactivate button in the customer table to toggle status.");
         };
         
-        // Function to save customer edits (redirect to table edit)
         window.saveCustomerEdit = function() {
-            alert("Please use the Edit button in the customer table to make changes.");
+            alert("Please use the Edit button in the customer table to make changes. The edit form will open in a separate modal.");
             window.closeCustomerEditModal();
         };
         
-        // Also add a direct toggle function for the table button
-        window.toggleCustomerStatus = function(idx) {
-            // This will be called from the table button - we need to access the scoped variable
-            // Since we can't access globalCustomers directly, we'll trigger the existing function
-            console.log("Toggle status called for index:", idx);
-            // The existing function is already defined in the main script
-            if (typeof window.originalToggleCustomerStatus === 'undefined') {
-                // Create a wrapper that will be replaced when main script runs
-                setTimeout(function() {
-                    if (typeof window.toggleCustomerStatus === 'function' && window.toggleCustomerStatus !== window.toggleCustomerStatusWrapper) {
-                        window.toggleCustomerStatus(idx);
-                    }
-                }, 100);
-            }
-        };
-        
-        window.toggleCustomerStatusWrapper = window.toggleCustomerStatus;
-        
-        console.log("Customer modal functions initialized - using openEdit for editing");
+        console.log("Customer edit fix applied - using existing openEdit function");
     })();
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
