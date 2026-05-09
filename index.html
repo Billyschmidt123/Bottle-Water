@@ -368,6 +368,10 @@
             }
             renderCustTable();
             populateRouteDropdown();
+            
+            // ========== ADDITIVE FIX: Mark customer data as loaded ==========
+            window.customerDataLoaded = true;
+            // ========== END OF ADDITIVE FIX ==========
         }
 
         // ========== ADDITIVE FIX: Override renderCustTable to include Deactivate button ==========
@@ -383,7 +387,7 @@
                         <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
                     </div>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</div>`);
-                tbody.innerHTML += row + '</tr>';
+                tbody.innerHTML += row + '</table>';
             });
         }
         window.renderCustTable = renderCustTable;
@@ -835,7 +839,7 @@
                     <tbody>
                         ${deliveryCart.map(item => `
                             <tr style="height: 28px;">
-                                <td style="border: 1px solid #000; text-align: center; font-size: 12px; font-weight: bold;">${item.qty}</td>
+                                <td style="border: 1px solid #000; text-align: center; font-size: 12px; font-weight: bold;">${item.qty}</div>
                                 <td style="border: 1px solid #000; padding: 0 8px; font-size: 11px;">${item.name} (${item.units})</div>
                                 <td style="border: 1px solid #000;"></div>
                                 <td style="border: 1px solid #000;"></div>
@@ -1170,7 +1174,7 @@
                 currentProductFile = fileName;
                 const tbody = document.getElementById('prodTableBody');
                 const theadRow = document.getElementById('prodTableHead');
-                tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
+                tbody.innerHTML = '</tr><td colspan="10">Loading products...</div>';
                 
                 try {
                     const fileInfo = await window.ghGet('Products/' + fileName);
@@ -1244,7 +1248,7 @@
                         // Call the new render function
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '</table><td colspan="10">No valid data found in file</div>';
+                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
@@ -1258,7 +1262,7 @@
                 tbody.innerHTML = '';
                 
                 if (!currentProdList || currentProdList.length === 0) {
-                    tbody.innerHTML = '</table><td colspan="10">No products found in this file</div>';
+                    tbody.innerHTML = '<tr><td colspan="10">No products found in this file</div>';
                     return;
                 }
                 
@@ -1463,28 +1467,28 @@
     <!-- ========== ADDITIVE FIX: Customer Edit Modal Functions ========== -->
     <script>
     (function() {
-        // Wait for customer data to be available
-        var custReadyCheck = setInterval(function() {
-            if (typeof globalCustomers !== 'undefined' && typeof csvHeaders !== 'undefined') {
-                clearInterval(custReadyCheck);
-                console.log("Customer edit modal functions initialized");
-            }
-        }, 500);
-        
         // Global variable to track which customer is being edited
         window.currentEditingCustomerIndex = -1;
         
-        // Function to open the customer edit modal
+        // Function to open the customer edit modal with retry if data not ready
         window.openCustomerEditModal = function(customerIndex) {
             console.log("Opening customer edit modal for index:", customerIndex);
-            if (typeof globalCustomers === 'undefined' || !globalCustomers[customerIndex]) {
-                alert("Customer data not available. Please refresh and try again.");
+            
+            // Check if customer data is available
+            if (typeof globalCustomers === 'undefined' || globalCustomers.length === 0) {
+                console.log("Customer data not ready, waiting...");
+                alert("Customer data is still loading. Please wait a moment and try again.");
+                return;
+            }
+            
+            if (!globalCustomers[customerIndex]) {
+                alert("Customer not found. Please refresh and try again.");
                 return;
             }
             
             window.currentEditingCustomerIndex = customerIndex;
             var customer = globalCustomers[customerIndex];
-            var customerName = customer[csvHeaders[0]] || 'Customer';
+            var customerName = (csvHeaders.length > 0 && customer[csvHeaders[0]]) ? customer[csvHeaders[0]] : 'Customer';
             var modalTitle = document.getElementById('customerEditModalTitle');
             if (modalTitle) modalTitle.textContent = 'Edit Customer: ' + customerName;
             
@@ -1521,14 +1525,20 @@
         
         // Function to toggle customer status from modal
         window.toggleCustomerStatusFromModal = function() {
-            if (window.currentEditingCustomerIndex !== -1) {
+            if (window.currentEditingCustomerIndex !== -1 && typeof toggleCustomerStatus === 'function') {
                 toggleCustomerStatus(window.currentEditingCustomerIndex);
                 // Refresh the modal fields after status change
-                openCustomerEditModal(window.currentEditingCustomerIndex);
+                setTimeout(function() {
+                    if (window.currentEditingCustomerIndex !== -1) {
+                        openCustomerEditModal(window.currentEditingCustomerIndex);
+                    }
+                }, 100);
+            } else {
+                alert("Cannot toggle status. Please refresh and try again.");
             }
         };
         
-        // Function to save customer edits (currently just shows alert since saving customers to CSV is complex)
+        // Function to save customer edits
         window.saveCustomerEdit = function() {
             if (window.currentEditingCustomerIndex === -1) {
                 alert("No customer selected for editing.");
