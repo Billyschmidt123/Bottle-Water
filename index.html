@@ -156,7 +156,7 @@
                             <th>Qty</th>
                             <th>Unit</th>
                             <th>Action</th>
-                        </tr>
+                         </tr>
                     </thead>
                     <tbody id="cartItemsBody"></tbody>
                 </table>
@@ -336,7 +336,7 @@
             currentProductFile = fileName;
             const tbody = document.getElementById('prodTableBody');
             const theadRow = document.getElementById('prodTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
+            tbody.innerHTML = '<td><td colspan="10">Gathering items...</td></tr>';
             
             try {
                 const fileInfo = await ghGet(`Products/${fileName}`);
@@ -537,26 +537,49 @@
             const coffeeDropdown = document.getElementById('stopCoffeeDropdown');
             coffeeDropdown.innerHTML = '<option value="">Loading...</option>';
 
+            // ========== FIX START: Updated populateProd to handle CSV structure ==========
             async function populateProd(fileName, targetId) {
                 try {
                     const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
                     const text = await resp.text();
-                    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                    const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.includes(','));
                     const target = document.getElementById(targetId);
                     if (lines.length > 1) {
-                        const h = lines[0].split(',');
-                        const dIdx = h.findIndex(col => col.toLowerCase().includes('desc') || col.toLowerCase().includes('item'));
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        // Look for product description column - try multiple possible header names
+                        let descIdx = headers.findIndex(col => 
+                            col.toLowerCase().includes('item') || 
+                            col.toLowerCase().includes('product') ||
+                            col.toLowerCase() === 'description'
+                        );
+                        
+                        // If no description column found, use first column
+                        if (descIdx === -1) descIdx = 0;
+                        
                         target.innerHTML = `<option value="">Choose ${fileName.replace('.csv','')} product...</option>`;
-                        lines.slice(1).forEach(l => {
-                            const v = l.split(',');
-                            const o = document.createElement('option');
-                            o.value = v[dIdx] || v[0]; 
-                            o.textContent = v[dIdx] || v[0];
-                            target.appendChild(o);
+                        
+                        lines.slice(1).forEach(line => {
+                            const values = line.split(',').map(v => v.trim());
+                            // Skip empty lines or lines where the product name is empty
+                            if (values[descIdx] && values[descIdx] !== "") {
+                                // Skip "NOT DELIVERED" entries
+                                if (values[descIdx].toLowerCase() !== "not delivered") {
+                                    const option = document.createElement('option');
+                                    option.value = values[descIdx];
+                                    option.textContent = values[descIdx];
+                                    target.appendChild(option);
+                                }
+                            }
                         });
+                    } else {
+                        target.innerHTML = '<option>No products found</option>';
                     }
-                } catch(e) { document.getElementById(targetId).innerHTML = '<option>Error</option>'; }
+                } catch(e) { 
+                    console.error("Error loading", fileName, e);
+                    document.getElementById(targetId).innerHTML = '<option>Error loading products</option>';
+                }
             }
+            // ========== FIX END ==========
 
             populateProd('Water.csv', 'stopProductDropdown');
             populateProd('Coffee.csv', 'stopCoffeeDropdown');
