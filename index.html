@@ -368,10 +368,6 @@
             }
             renderCustTable();
             populateRouteDropdown();
-            
-            // ========== ADDITIVE FIX: Mark customer data as loaded ==========
-            window.customerDataLoaded = true;
-            // ========== END OF ADDITIVE FIX ==========
         }
 
         // ========== ADDITIVE FIX: Override renderCustTable to include Deactivate button ==========
@@ -959,7 +955,7 @@
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
-                <tr>
+                </table>
                     <td>${item.name}</div>
                     <td>${item.qty}</div>
                     <td>${item.units}</div>
@@ -1174,7 +1170,7 @@
                 currentProductFile = fileName;
                 const tbody = document.getElementById('prodTableBody');
                 const theadRow = document.getElementById('prodTableHead');
-                tbody.innerHTML = '</tr><td colspan="10">Loading products...</div>';
+                tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
                 
                 try {
                     const fileInfo = await window.ghGet('Products/' + fileName);
@@ -1248,7 +1244,7 @@
                         // Call the new render function
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file</div>';
+                        tbody.innerHTML = '<td><td colspan="10">No valid data found in file</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
@@ -1464,56 +1460,21 @@
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
 
-    <!-- ========== ADDITIVE FIX: Customer Edit Modal Functions ========== -->
+    <!-- ========== ADDITIVE FIX: Customer Edit Modal Functions (using openEdit) ========== -->
     <script>
     (function() {
-        // Global variable to track which customer is being edited
-        window.currentEditingCustomerIndex = -1;
+        // Intercept the Edit button clicks and use the existing openEdit function
+        var originalOpenCustomerEditModal = window.openCustomerEditModal;
         
-        // Function to open the customer edit modal with retry if data not ready
+        // Override openCustomerEditModal to use the existing openEdit function
         window.openCustomerEditModal = function(customerIndex) {
-            console.log("Opening customer edit modal for index:", customerIndex);
-            
-            // Check if customer data is available
-            if (typeof globalCustomers === 'undefined' || globalCustomers.length === 0) {
-                console.log("Customer data not ready, waiting...");
-                alert("Customer data is still loading. Please wait a moment and try again.");
-                return;
+            console.log("Opening customer edit modal for index via openEdit:", customerIndex);
+            // Use the existing openEdit function from the main script
+            if (typeof window.openEdit === 'function') {
+                window.openEdit(customerIndex, 'cust');
+            } else {
+                alert("Edit function not available. Please refresh and try again.");
             }
-            
-            if (!globalCustomers[customerIndex]) {
-                alert("Customer not found. Please refresh and try again.");
-                return;
-            }
-            
-            window.currentEditingCustomerIndex = customerIndex;
-            var customer = globalCustomers[customerIndex];
-            var customerName = (csvHeaders.length > 0 && customer[csvHeaders[0]]) ? customer[csvHeaders[0]] : 'Customer';
-            var modalTitle = document.getElementById('customerEditModalTitle');
-            if (modalTitle) modalTitle.textContent = 'Edit Customer: ' + customerName;
-            
-            var container = document.getElementById('customerEditFormFields');
-            if (!container) {
-                console.error("Customer edit form container not found");
-                return;
-            }
-            container.innerHTML = '';
-            
-            // Create form fields for each header
-            for (var i = 0; i < csvHeaders.length; i++) {
-                var header = csvHeaders[i];
-                var value = customer[header] || '';
-                // Escape HTML special characters
-                var safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                var safeHeader = header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                container.innerHTML += '<div class="form-group">' +
-                    '<label>' + safeHeader + '</label>' +
-                    '<input type="text" id="customer_edit_' + header.replace(/ /g, '_') + '" value="' + safeValue + '">' +
-                    '</div>';
-            }
-            
-            var modal = document.getElementById('customerEditModal');
-            if (modal) modal.style.display = 'flex';
         };
         
         // Function to close the customer edit modal
@@ -1523,46 +1484,40 @@
             window.currentEditingCustomerIndex = -1;
         };
         
-        // Function to toggle customer status from modal
+        // Function to toggle customer status from modal (will use the table button)
         window.toggleCustomerStatusFromModal = function() {
-            if (window.currentEditingCustomerIndex !== -1 && typeof toggleCustomerStatus === 'function') {
-                toggleCustomerStatus(window.currentEditingCustomerIndex);
-                // Refresh the modal fields after status change
-                setTimeout(function() {
-                    if (window.currentEditingCustomerIndex !== -1) {
-                        openCustomerEditModal(window.currentEditingCustomerIndex);
-                    }
-                }, 100);
+            if (window.currentEditingCustomerIndex !== -1 && typeof window.toggleCustomerStatus === 'function') {
+                window.toggleCustomerStatus(window.currentEditingCustomerIndex);
             } else {
-                alert("Cannot toggle status. Please refresh and try again.");
+                alert("Please use the Deactivate button in the customer table to toggle status.");
             }
         };
         
-        // Function to save customer edits
+        // Function to save customer edits (redirect to table edit)
         window.saveCustomerEdit = function() {
-            if (window.currentEditingCustomerIndex === -1) {
-                alert("No customer selected for editing.");
-                return;
-            }
-            
-            // Map the modal input values back to the customer object
-            for (var i = 0; i < csvHeaders.length; i++) {
-                var header = csvHeaders[i];
-                var inputId = 'customer_edit_' + header.replace(/ /g, '_');
-                var input = document.getElementById(inputId);
-                if (input && globalCustomers[window.currentEditingCustomerIndex]) {
-                    globalCustomers[window.currentEditingCustomerIndex][header] = input.value;
-                }
-            }
-            
-            // Refresh the customer table
-            if (typeof window.renderCustTable === 'function') {
-                window.renderCustTable();
-            }
-            
-            alert("Customer information updated locally. Note: To save to GitHub permanently, implement CSV update in Manager panel.");
+            alert("Please use the Edit button in the customer table to make changes.");
             window.closeCustomerEditModal();
         };
+        
+        // Also add a direct toggle function for the table button
+        window.toggleCustomerStatus = function(idx) {
+            // This will be called from the table button - we need to access the scoped variable
+            // Since we can't access globalCustomers directly, we'll trigger the existing function
+            console.log("Toggle status called for index:", idx);
+            // The existing function is already defined in the main script
+            if (typeof window.originalToggleCustomerStatus === 'undefined') {
+                // Create a wrapper that will be replaced when main script runs
+                setTimeout(function() {
+                    if (typeof window.toggleCustomerStatus === 'function' && window.toggleCustomerStatus !== window.toggleCustomerStatusWrapper) {
+                        window.toggleCustomerStatus(idx);
+                    }
+                }, 100);
+            }
+        };
+        
+        window.toggleCustomerStatusWrapper = window.toggleCustomerStatus;
+        
+        console.log("Customer modal functions initialized - using openEdit for editing");
     })();
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
