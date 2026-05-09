@@ -248,9 +248,32 @@
             </div>
             <hr>
             <div id="productEditFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
-            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="closeProductEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="btnSaveProductRecord" class="btn-top" style="background:#28a745;" onclick="saveProductEdit()">SAVE CHANGES</button>
+            <div style="margin-top:20px; display:flex; justify-content:space-between; gap:10px;">
+                <button id="productDeactivateBtn" class="btn-top" style="background:#ffc107;" onclick="toggleProductStatusFromModal()">TOGGLE STATUS</button>
+                <div>
+                    <button onclick="closeProductEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                    <button id="btnSaveProductRecord" class="btn-top" style="background:#28a745;" onclick="saveProductEdit()">SAVE CHANGES</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ========== END OF ADDITIVE FIX ========== -->
+
+    <!-- ========== ADDITIVE FIX: Customer Deactivate Modal ========== -->
+    <div id="customerEditModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display:flex; justify-content: space-between; align-items:center;">
+                <h2 id="customerEditModalTitle" style="margin:0;">Edit Customer</h2>
+                <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+            </div>
+            <hr>
+            <div id="customerEditFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
+            <div style="margin-top:20px; display:flex; justify-content:space-between; gap:10px;">
+                <button id="customerDeactivateBtn" class="btn-top" style="background:#ffc107;" onclick="toggleCustomerStatusFromModal()">TOGGLE STATUS</button>
+                <div>
+                    <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                    <button id="btnSaveCustomerRecord" class="btn-top" style="background:#28a745;" onclick="saveCustomerEdit()">SAVE CHANGES</button>
+                </div>
             </div>
         </div>
     </div>
@@ -337,6 +360,7 @@
                             if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
                         } else {
                             rowObj._routes = [f.name];
+                            rowObj._status = "Active"; // ========== ADDITIVE FIX: Add status field ==========
                             globalCustomers.push(rowObj);
                         }
                     }
@@ -346,15 +370,34 @@
             populateRouteDropdown();
         }
 
+        // ========== ADDITIVE FIX: Override renderCustTable to include Deactivate button ==========
         function renderCustTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
             globalCustomers.forEach((c, idx) => {
-                let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx}, 'cust')">Edit</button></td>`;
+                const isDeactivated = c._status === "Deactivated";
+                let rowClass = isDeactivated ? 'deactivated-row' : '';
+                let row = `<tr class="${rowClass}">
+                    <td>
+                        <button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openCustomerEditModal(${idx})">Edit</button>
+                        <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
+                    </td>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
                 tbody.innerHTML += row + '</tr>';
             });
         }
+        window.renderCustTable = renderCustTable;
+        
+        // ========== ADDITIVE FIX: Toggle customer status ==========
+        window.toggleCustomerStatus = function(idx) {
+            if (globalCustomers[idx]._status === "Active") {
+                globalCustomers[idx]._status = "Deactivated";
+            } else {
+                globalCustomers[idx]._status = "Active";
+            }
+            renderCustTable();
+        };
+        // ========== END OF ADDITIVE FIX ==========
 
         window.loadProductFile = async function(fileName) {
             currentProductFile = fileName;
@@ -390,7 +433,7 @@
                     renderProdTable();
                 }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.乳';
+                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</td></tr>';
             }
         };
 
@@ -908,7 +951,7 @@
         function renderDeliveryCart() {
             const body = document.getElementById('cartItemsBody');
             if (deliveryCart.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added. </td></tr>';
+                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.乳</div>';
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
@@ -1127,7 +1170,7 @@
                 currentProductFile = fileName;
                 const tbody = document.getElementById('prodTableBody');
                 const theadRow = document.getElementById('prodTableHead');
-                tbody.innerHTML = '<tr><td colspan="10">Loading products...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10">Loading products...乳</div>';
                 
                 try {
                     const fileInfo = await window.ghGet('Products/' + fileName);
@@ -1201,11 +1244,11 @@
                         // Call the new render function
                         window.renderProdTable();
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="10">No valid data found in file乳</div>';
                     }
                 } catch (e) {
                     console.error("Error loading product file:", e);
-                    tbody.innerHTML = '<tr><td colspan="10">Error loading: ' + e.message + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10">Error loading: ' + e.message + '乳</div>';
                 }
             };
             
@@ -1215,7 +1258,7 @@
                 tbody.innerHTML = '';
                 
                 if (!currentProdList || currentProdList.length === 0) {
-                    tbody.innerHTML = '<td><td colspan="10">No products found in this file</td></tr>';
+                    tbody.innerHTML = '</table><td colspan="10">No products found in this file乳</div>';
                     return;
                 }
                 
@@ -1225,7 +1268,7 @@
                     var tr = document.createElement('tr');
                     if (isDeactivated) tr.className = 'deactivated-row';
                     
-                    // Action cell - MODIFIED to use modal edit
+                    // Action cell - MODIFIED to use modal edit with Deactivate button
                     var tdAction = document.createElement('td');
                     tdAction.innerHTML = '<button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button>' +
                         '<button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleStatus(' + idx + ')">' + (productObj.Status === "Active" ? "Deactivate" : "Activate") + '</button>';
@@ -1250,7 +1293,7 @@
                 for (var h = 0; h < currentProdHeaders.length; h++) {
                     var header = currentProdHeaders[h];
                     if (header !== 'Status') {
-                        var input = document.getElementById('product_edit_' + header);
+                        var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
                         if (input) data[header] = input.value;
                     }
                 }
@@ -1344,8 +1387,9 @@
                 var value = product[header] || '';
                 // Escape HTML special characters
                 var safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                var safeHeader = header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 container.innerHTML += '<div class="form-group">' +
-                    '<label>' + header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</label>' +
+                    '<label>' + safeHeader + '</label>' +
                     '<input type="text" id="product_edit_' + header.replace(/ /g, '_') + '" value="' + safeValue + '">' +
                     '</div>';
             }
@@ -1359,6 +1403,14 @@
             var modal = document.getElementById('productEditModal');
             if (modal) modal.style.display = 'none';
             window.currentEditingProductIndex = -1;
+        };
+        
+        // Function to toggle product status from modal        window.toggleProductStatusFromModal = function() {
+            if (window.currentEditingProductIndex !== -1) {
+                toggleStatus(window.currentEditingProductIndex);
+                // Refresh the modal fields after status change
+                openProductEditModal(window.currentEditingProductIndex);
+            }
         };
         
         // Function to save product edits
@@ -1397,8 +1449,109 @@
                 if (modal && e.target === modal) {
                     window.closeProductEditModal();
                 }
+                var custModal = document.getElementById('customerEditModal');
+                if (custModal && e.target === custModal) {
+                    window.closeCustomerEditModal();
+                }
             }
         });
+    })();
+    </script>
+    <!-- ========== END OF ADDITIVE FIX ========== -->
+
+    <!-- ========== ADDITIVE FIX: Customer Edit Modal Functions ========== -->
+    <script>
+    (function() {
+        // Wait for customer data to be available
+        var custReadyCheck = setInterval(function() {
+            if (typeof globalCustomers !== 'undefined' && typeof csvHeaders !== 'undefined') {
+                clearInterval(custReadyCheck);
+                console.log("Customer edit modal functions initialized");
+            }
+        }, 500);
+        
+        // Global variable to track which customer is being edited
+        window.currentEditingCustomerIndex = -1;
+        
+        // Function to open the customer edit modal
+        window.openCustomerEditModal = function(customerIndex) {
+            console.log("Opening customer edit modal for index:", customerIndex);
+            if (typeof globalCustomers === 'undefined' || !globalCustomers[customerIndex]) {
+                alert("Customer data not available. Please refresh and try again.");
+                return;
+            }
+            
+            window.currentEditingCustomerIndex = customerIndex;
+            var customer = globalCustomers[customerIndex];
+            var customerName = customer[csvHeaders[0]] || 'Customer';
+            var modalTitle = document.getElementById('customerEditModalTitle');
+            if (modalTitle) modalTitle.textContent = 'Edit Customer: ' + customerName;
+            
+            var container = document.getElementById('customerEditFormFields');
+            if (!container) {
+                console.error("Customer edit form container not found");
+                return;
+            }
+            container.innerHTML = '';
+            
+            // Create form fields for each header
+            for (var i = 0; i < csvHeaders.length; i++) {
+                var header = csvHeaders[i];
+                var value = customer[header] || '';
+                // Escape HTML special characters
+                var safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                var safeHeader = header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                container.innerHTML += '<div class="form-group">' +
+                    '<label>' + safeHeader + '</label>' +
+                    '<input type="text" id="customer_edit_' + header.replace(/ /g, '_') + '" value="' + safeValue + '">' +
+                    '</div>';
+            }
+            
+            var modal = document.getElementById('customerEditModal');
+            if (modal) modal.style.display = 'flex';
+        };
+        
+        // Function to close the customer edit modal
+        window.closeCustomerEditModal = function() {
+            var modal = document.getElementById('customerEditModal');
+            if (modal) modal.style.display = 'none';
+            window.currentEditingCustomerIndex = -1;
+        };
+        
+        // Function to toggle customer status from modal
+        window.toggleCustomerStatusFromModal = function() {
+            if (window.currentEditingCustomerIndex !== -1) {
+                toggleCustomerStatus(window.currentEditingCustomerIndex);
+                // Refresh the modal fields after status change
+                openCustomerEditModal(window.currentEditingCustomerIndex);
+            }
+        };
+        
+        // Function to save customer edits (currently just shows alert since saving customers to CSV is complex)
+        window.saveCustomerEdit = function() {
+            if (window.currentEditingCustomerIndex === -1) {
+                alert("No customer selected for editing.");
+                return;
+            }
+            
+            // Map the modal input values back to the customer object
+            for (var i = 0; i < csvHeaders.length; i++) {
+                var header = csvHeaders[i];
+                var inputId = 'customer_edit_' + header.replace(/ /g, '_');
+                var input = document.getElementById(inputId);
+                if (input && globalCustomers[window.currentEditingCustomerIndex]) {
+                    globalCustomers[window.currentEditingCustomerIndex][header] = input.value;
+                }
+            }
+            
+            // Refresh the customer table
+            if (typeof window.renderCustTable === 'function') {
+                window.renderCustTable();
+            }
+            
+            alert("Customer information updated locally. Note: To save to GitHub permanently, implement CSV update in Manager panel.");
+            window.closeCustomerEditModal();
+        };
     })();
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
