@@ -352,7 +352,7 @@
             globalCustomers.forEach((c, idx) => {
                 let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx}, 'cust')">Edit</button></td>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
-                tbody.innerHTML += row + '<tr>';
+                tbody.innerHTML += row + '</tr>';
             });
         }
 
@@ -390,7 +390,7 @@
                     renderProdTable();
                 }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.乳';
             }
         };
 
@@ -908,7 +908,7 @@
         function renderDeliveryCart() {
             const body = document.getElementById('cartItemsBody');
             if (deliveryCart.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added. </td></tr>';
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
@@ -1215,7 +1215,7 @@
                 tbody.innerHTML = '';
                 
                 if (!currentProdList || currentProdList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10">No products found in this file</td></tr>';
+                    tbody.innerHTML = '<td><td colspan="10">No products found in this file</td></tr>';
                     return;
                 }
                 
@@ -1303,62 +1303,103 @@
 
     <!-- ========== ADDITIVE FIX: Product Edit Modal Functions ========== -->
     <script>
-    // Global variable to track which product is being edited
-    var currentEditingProductIndex = -1;
-    
-    // Function to open the product edit modal
-    window.openProductEditModal = function(productIndex) {
-        currentEditingProductIndex = productIndex;
-        var product = currentProdList[productIndex];
-        var modalTitle = document.getElementById('productEditModalTitle');
-        modalTitle.textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
+    (function() {
+        // Wait for the DOM and product list to be ready
+        var readyCheck = setInterval(function() {
+            if (typeof currentProdList !== 'undefined' && typeof currentProdHeaders !== 'undefined') {
+                clearInterval(readyCheck);
+                console.log("Product edit modal functions initialized");
+            }
+        }, 500);
         
-        var container = document.getElementById('productEditFormFields');
-        container.innerHTML = '';
+        // Global variable to track which product is being edited
+        window.currentEditingProductIndex = -1;
         
-        // Create form fields for each header (excluding Status)
-        for (var i = 0; i < currentProdHeaders.length; i++) {
-            var header = currentProdHeaders[i];
-            if (header === 'Status') continue;
+        // Function to open the product edit modal
+        window.openProductEditModal = function(productIndex) {
+            console.log("Opening edit modal for product index:", productIndex);
+            if (typeof currentProdList === 'undefined' || !currentProdList[productIndex]) {
+                alert("Product data not available. Please refresh and try again.");
+                return;
+            }
             
-            var value = product[header] || '';
-            container.innerHTML += '<div class="form-group">' +
-                '<label>' + header + '</label>' +
-                '<input type="text" id="product_edit_' + header + '" value="' + escapeHtml(value) + '">' +
-                '</div>';
-        }
+            window.currentEditingProductIndex = productIndex;
+            var product = currentProdList[productIndex];
+            var productName = product[currentProdHeaders[0]] || 'Product';
+            var modalTitle = document.getElementById('productEditModalTitle');
+            if (modalTitle) modalTitle.textContent = 'Edit Product: ' + productName;
+            
+            var container = document.getElementById('productEditFormFields');
+            if (!container) {
+                console.error("Product edit form container not found");
+                return;
+            }
+            container.innerHTML = '';
+            
+            // Create form fields for each header (excluding Status)
+            for (var i = 0; i < currentProdHeaders.length; i++) {
+                var header = currentProdHeaders[i];
+                if (header === 'Status') continue;
+                
+                var value = product[header] || '';
+                // Escape HTML special characters
+                var safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                container.innerHTML += '<div class="form-group">' +
+                    '<label>' + header.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</label>' +
+                    '<input type="text" id="product_edit_' + header.replace(/ /g, '_') + '" value="' + safeValue + '">' +
+                    '</div>';
+            }
+            
+            var modal = document.getElementById('productEditModal');
+            if (modal) modal.style.display = 'flex';
+        };
         
-        document.getElementById('productEditModal').style.display = 'flex';
-    };
-    
-    // Function to close the product edit modal
-    window.closeProductEditModal = function() {
-        document.getElementById('productEditModal').style.display = 'none';
-        currentEditingProductIndex = -1;
-    };
-    
-    // Function to save product edits
-    window.saveProductEdit = function() {
-        if (currentEditingProductIndex === -1) {
-            alert("No product selected for editing.");
-            return;
-        }
+        // Function to close the product edit modal
+        window.closeProductEditModal = function() {
+            var modal = document.getElementById('productEditModal');
+            if (modal) modal.style.display = 'none';
+            window.currentEditingProductIndex = -1;
+        };
         
-        // Call the existing updateRow function
-        updateRow(currentEditingProductIndex);
-        closeProductEditModal();
-    };
-    
-    // Helper function to escape HTML
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
+        // Function to save product edits
+        window.saveProductEdit = function() {
+            if (window.currentEditingProductIndex === -1) {
+                alert("No product selected for editing.");
+                return;
+            }
+            
+            // Map the modal input values back to the data object
+            for (var i = 0; i < currentProdHeaders.length; i++) {
+                var header = currentProdHeaders[i];
+                if (header === 'Status') continue;
+                var inputId = 'product_edit_' + header.replace(/ /g, '_');
+                var input = document.getElementById(inputId);
+                if (input && currentProdList[window.currentEditingProductIndex]) {
+                    currentProdList[window.currentEditingProductIndex][header] = input.value;
+                }
+            }
+            
+            // Call the existing updateRow function
+            if (typeof window.updateRow === 'function') {
+                window.updateRow(window.currentEditingProductIndex);
+            } else {
+                console.error("updateRow function not found");
+                alert("Error: Could not save changes.");
+            }
+            
+            window.closeProductEditModal();
+        };
+        
+        // Add click handler for close buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList && e.target.classList.contains('modal-overlay')) {
+                var modal = document.getElementById('productEditModal');
+                if (modal && e.target === modal) {
+                    window.closeProductEditModal();
+                }
+            }
         });
-    }
+    })();
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
