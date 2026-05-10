@@ -797,6 +797,230 @@ init();
     attachHandler();
 })();
 </script>
+<!-- ========== SIMPLE WORKING MANAGER BUTTON ========== -->
+<div id="simpleManagerOverlay" style="position: fixed; bottom: 80px; right: 20px; z-index: 999999;">
+    <button id="simpleOpenManagerBtn" style="background: #28a745; color: white; border: none; padding: 16px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+        📋 OPEN MANAGER
+    </button>
+</div>
 
+<script>
+(function ultimateManagerFix() {
+    console.log('Ultimate manager fix loading...');
+    
+    // Create a brand new modal from scratch
+    var newModal = document.createElement('div');
+    newModal.id = 'ultimateManagerModal';
+    newModal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center; z-index:999999;';
+    newModal.innerHTML = `
+        <div style="background:white; width:90%; max-width:1000px; max-height:85vh; border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#004a99; color:white;">
+                <h2 style="margin:0;">Manager Control Panel</h2>
+                <button id="ultimateCloseBtn" style="background:#dc3545; color:white; border:none; padding:8px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">Close</button>
+            </div>
+            <div style="padding:15px; border-bottom:1px solid #ddd; display:flex; gap:10px;">
+                <button id="ultimateCustBtn" style="padding:8px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer;">Customer Maintenance</button>
+                <button id="ultimateProdBtn" style="padding:8px 20px; background:#6c757d; color:white; border:none; border-radius:5px; cursor:pointer;">Product Maintenance</button>
+            </div>
+            <div id="ultimateCustPanel" style="padding:15px; overflow-y:auto; flex:1;">
+                <div id="ultimateCustLoading" style="text-align:center; padding:40px;">Loading customers from Google Sheets...</div>
+                <div id="ultimateCustTable" style="display:none; overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead id="ultimateCustHead"></thead>
+                        <tbody id="ultimateCustBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="ultimateProdPanel" style="padding:15px; overflow-y:auto; flex:1; display:none;">
+                <div style="margin-bottom:15px;">
+                    <button id="ultimateLoadProdBtn" style="background:#28a745; color:white; border:none; padding:8px 16px; border-radius:5px; cursor:pointer;">Load Products</button>
+                </div>
+                <div id="ultimateProdLoading" style="text-align:center; padding:40px; display:none;">Loading products...</div>
+                <div id="ultimateProdTable" style="display:none; overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead id="ultimateProdHead"></thead>
+                        <tbody id="ultimateProdBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(newModal);
+    
+    // Get elements
+    var modal = document.getElementById('ultimateManagerModal');
+    var closeBtn = document.getElementById('ultimateCloseBtn');
+    var custBtn = document.getElementById('ultimateCustBtn');
+    var prodBtn = document.getElementById('ultimateProdBtn');
+    var custPanel = document.getElementById('ultimateCustPanel');
+    var prodPanel = document.getElementById('ultimateProdPanel');
+    var custLoading = document.getElementById('ultimateCustLoading');
+    var custTable = document.getElementById('ultimateCustTable');
+    var prodLoading = document.getElementById('ultimateProdLoading');
+    var prodTable = document.getElementById('ultimateProdTable');
+    var loadProdBtn = document.getElementById('ultimateLoadProdBtn');
+    
+    // Open modal function
+    function openUltimateModal() {
+        console.log('Opening manager modal');
+        modal.style.display = 'flex';
+        // Load customers automatically
+        loadUltimateCustomers();
+    }
+    
+    function closeUltimateModal() {
+        modal.style.display = 'none';
+    }
+    
+    // Load customers
+    async function loadUltimateCustomers() {
+        custLoading.style.display = 'block';
+        custTable.style.display = 'none';
+        
+        if (!accessToken) {
+            custLoading.innerHTML = 'Please sign in with Google first. Click the "Sign in with Google" button in the header.';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load');
+            
+            var data = await response.json();
+            var values = data.values;
+            
+            if (!values || values.length === 0) {
+                custLoading.innerHTML = 'No customer data found in Google Sheets.';
+                return;
+            }
+            
+            var headers = values[0];
+            var thead = document.getElementById('ultimateCustHead');
+            var tbody = document.getElementById('ultimateCustBody');
+            
+            var headerHtml = '</tr>';
+            for (var i = 0; i < headers.length; i++) {
+                headerHtml += '<th style="border:1px solid #ddd; padding:8px; background:#f8f9fa;">' + (headers[i] || '') + '</th>';
+            }
+            headerHtml += '</table>';
+            thead.innerHTML = headerHtml;
+            
+            tbody.innerHTML = '';
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var rowHtml = '<tr>';
+                for (var j = 0; j < headers.length; j++) {
+                    rowHtml += '<td style="border:1px solid #ddd; padding:8px;">' + (row[j] || '') + '</td>';
+                }
+                rowHtml += '</tr>';
+                tbody.innerHTML += rowHtml;
+            }
+            
+            custLoading.style.display = 'none';
+            custTable.style.display = 'block';
+            console.log('Loaded ' + (values.length - 1) + ' customers');
+        } catch (err) {
+            custLoading.innerHTML = 'Error loading customers: ' + err.message;
+        }
+    }
+    
+    // Load products
+    async function loadUltimateProducts() {
+        prodLoading.style.display = 'block';
+        prodTable.style.display = 'none';
+        
+        if (!accessToken) {
+            prodLoading.innerHTML = 'Please sign in with Google first.';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load');
+            
+            var data = await response.json();
+            var values = data.values;
+            
+            if (!values || values.length === 0) {
+                prodLoading.innerHTML = 'No product data found in Google Sheets.';
+                return;
+            }
+            
+            var headers = values[0];
+            var thead = document.getElementById('ultimateProdHead');
+            var tbody = document.getElementById('ultimateProdBody');
+            
+            var headerHtml = '<table>';
+            for (var i = 0; i < headers.length; i++) {
+                headerHtml += '<th style="border:1px solid #ddd; padding:8px; background:#f8f9fa;">' + (headers[i] || '') + '</th>';
+            }
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+            
+            tbody.innerHTML = '';
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var rowHtml = '<tr>';
+                for (var j = 0; j < headers.length; j++) {
+                    rowHtml += '<td style="border:1px solid #ddd; padding:8px;">' + (row[j] || '') + '</td>';
+                }
+                rowHtml += '</tr>';
+                tbody.innerHTML += rowHtml;
+            }
+            
+            prodLoading.style.display = 'none';
+            prodTable.style.display = 'block';
+            console.log('Loaded ' + (values.length - 1) + ' products');
+        } catch (err) {
+            prodLoading.innerHTML = 'Error loading products: ' + err.message;
+        }
+    }
+    
+    // Tab switching
+    custBtn.onclick = function() {
+        custPanel.style.display = 'block';
+        prodPanel.style.display = 'none';
+        custBtn.style.background = '#007bff';
+        prodBtn.style.background = '#6c757d';
+        loadUltimateCustomers();
+    };
+    
+    prodBtn.onclick = function() {
+        custPanel.style.display = 'none';
+        prodPanel.style.display = 'block';
+        prodBtn.style.background = '#007bff';
+        custBtn.style.background = '#6c757d';
+    };
+    
+    loadProdBtn.onclick = loadUltimateProducts;
+    closeBtn.onclick = closeUltimateModal;
+    
+    // Attach to the green button
+    var greenBtn = document.getElementById('simpleOpenManagerBtn');
+    if (greenBtn) {
+        greenBtn.onclick = openUltimateModal;
+    }
+    
+    // Also attach to the original manager button
+    var originalManagerBtn = document.getElementById('btnManager');
+    if (originalManagerBtn) {
+        originalManagerBtn.onclick = function(e) {
+            e.preventDefault();
+            openUltimateModal();
+        };
+    }
+    
+    console.log('Ultimate manager fix ready - click the green OPEN MANAGER button');
+})();
+</script>
+<!-- ========== END SIMPLE WORKING MANAGER BUTTON ========== -->
 </body>
 </html>
