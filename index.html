@@ -1225,5 +1225,42 @@ window.managerCallInOrder = window.managerCallInOrder || function() { window.man
 console.log('Call in Order feature fully loaded');
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
+    <!-- ========== ADDITIVE FIX: Remove Emergency Buttons ========== -->
+<script>
+(function removeEmergencyButtons() {
+    // Function to find and remove the emergency buttons container
+    function removeButtons() {
+        var buttonsContainer = document.querySelector('.emergency-buttons');
+        if (buttonsContainer) {
+            buttonsContainer.remove();
+            console.log('Emergency buttons removed');
+            return true;
+        }
+        return false;
+    }
+    
+    // Try immediately
+    if (!removeButtons()) {
+        // If not found, wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', removeButtons);
+        } else {
+            // Try again after a short delay
+            setTimeout(removeButtons, 500);
+        }
+    }
+    
+    // Also try to remove any floating buttons that might appear later
+    var observer = new MutationObserver(function(mutations) {
+        var buttons = document.querySelector('.emergency-buttons');
+        if (buttons) {
+            buttons.remove();
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
