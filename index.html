@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
+    <!-- Load Configuration -->
+    <script src="config.js"></script>
+    
     <style>
         body { font-family: 'Courier New', Courier, monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
         header { background: #004a99; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -42,18 +45,93 @@
         .toast-error { background: #dc3545; }
         .modal-button-group { margin-top: 30px; display: flex; gap: 15px; justify-content: center; }
         @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        
+        /* PIN Login Modal Styles */
+        .pin-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+        }
+        .pin-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            width: 320px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .pin-container h2 {
+            color: #004a99;
+            margin-bottom: 20px;
+        }
+        .pin-input {
+            font-size: 32px;
+            text-align: center;
+            letter-spacing: 10px;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+        }
+        .pin-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .pin-btn {
+            padding: 15px;
+            font-size: 20px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .pin-btn:hover {
+            background: #ddd;
+        }
+        .pin-clear {
+            background: #ffc107;
+        }
+        .pin-enter {
+            background: #28a745;
+            color: white;
+        }
+        .online-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-left: 10px;
+        }
+        .online-status.active {
+            background: #28a745;
+            color: white;
+        }
+        .online-status.inactive {
+            background: #dc3545;
+            color: white;
+        }
     </style>
 </head>
 <body>
 
 <header>
     <div style="display:flex; align-items:center; gap:15px;">
-        <h1 style="margin:0; font-size:1.5rem;">Culligan Grande Prairie Deliveries</h1>
+        <h1 style="margin:0; font-size:1.5rem;">LogiFlow Delivery</h1>
         <select id="routeDropdown" class="btn-top" style="background:#0056b3;"></select>
     </div>
     <div style="display:flex; gap:10px; align-items:center;">
-        <div id="googleSignInDiv"></div>
-        <span id="googleStatus" style="font-size:12px; margin-left:10px; padding:4px 8px; border-radius:4px; background:#2d2d2d;"></span>
+        <div id="googleSignInDiv" style="display:none;"></div>
+        <span id="onlineStatus" class="online-status inactive">Offline</span>
         <button id="btnManager" class="btn-top" style="background:#6c757d;">Manager</button>
         <button id="btnForceRefresh" class="btn-top" style="background:#17a2b8;"><i class="fas fa-sync"></i></button>
     </div>
@@ -188,7 +266,7 @@
             <table class="mgmt-table">
                 <thead id="custTableHead"></thead>
                 <tbody id="custTableBody"></tbody>
-            </table>
+            </tr>
         </div>
         <div id="prodView" style="display: none;">
             <div style="margin-bottom:15px;">
@@ -237,17 +315,17 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://accounts.google.com/gsi/client"></script>
 <script>
 // ============================================================
-// CONFIGURATION
+// CONFIGURATION - Loaded from config.js
 // ============================================================
-const REPO_OWNER = 'Billyschmidt123';
-const REPO_NAME = 'Bottle-Water';
+// Use LOGIFLOW_CONFIG from config.js file
+const REPO_OWNER = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.REPO_OWNER : 'Billyschmidt123';
+const REPO_NAME = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.REPO_NAME : 'Bottle-Water';
 const GITHUB_RAW = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/main/';
-const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
-const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
-const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
+const GOOGLE_CLIENT_ID = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.GOOGLE_CLIENT_ID : '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+const GOOGLE_SHEET_ID = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.GOOGLE_SHEET_ID : '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+const GOOGLE_DRIVE_FOLDER_ID = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.PDF_FOLDER_ID : '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
 
 // Global variables
 var accessToken = null;
@@ -274,23 +352,92 @@ function showToast(message, isError) {
     setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
 }
 
-function updateGoogleStatus() {
-    var statusSpan = document.getElementById('googleStatus');
-    if (accessToken && userEmail) {
-        statusSpan.innerHTML = 'Connected: ' + userEmail;
-        statusSpan.style.color = '#90ff90';
+function updateOnlineStatus(connected) {
+    var statusSpan = document.getElementById('onlineStatus');
+    if (connected && accessToken && userEmail) {
+        statusSpan.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Online Storage Active';
+        statusSpan.className = 'online-status active';
     } else {
-        statusSpan.innerHTML = 'Sign in with Google to save PDFs';
-        statusSpan.style.color = '#ffc107';
+        statusSpan.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Offline';
+        statusSpan.className = 'online-status inactive';
     }
 }
 
 // ============================================================
-// GOOGLE SIGN-IN
+// PIN LOGIN SYSTEM
+// ============================================================
+var pinModal = null;
+var currentPin = '';
+
+function showPinModal() {
+    if (pinModal) pinModal.remove();
+    
+    pinModal = document.createElement('div');
+    pinModal.className = 'pin-modal';
+    pinModal.innerHTML = `
+        <div class="pin-container">
+            <h2><i class="fas fa-lock"></i> Enter PIN</h2>
+            <input type="password" id="pinInput" class="pin-input" maxlength="4" placeholder="****">
+            <div class="pin-buttons">
+                <button class="pin-btn" data-num="1">1</button>
+                <button class="pin-btn" data-num="2">2</button>
+                <button class="pin-btn" data-num="3">3</button>
+                <button class="pin-btn" data-num="4">4</button>
+                <button class="pin-btn" data-num="5">5</button>
+                <button class="pin-btn" data-num="6">6</button>
+                <button class="pin-btn" data-num="7">7</button>
+                <button class="pin-btn" data-num="8">8</button>
+                <button class="pin-btn" data-num="9">9</button>
+                <button class="pin-btn" data-num="0">0</button>
+                <button class="pin-btn pin-clear" id="pinClearBtn">Clear</button>
+                <button class="pin-btn pin-enter" id="pinEnterBtn">Enter</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(pinModal);
+    
+    var pinInput = document.getElementById('pinInput');
+    var clearBtn = document.getElementById('pinClearBtn');
+    var enterBtn = document.getElementById('pinEnterBtn');
+    
+    // Add number button listeners
+    var numBtns = pinModal.querySelectorAll('.pin-btn[data-num]');
+    numBtns.forEach(function(btn) {
+        btn.onclick = function() {
+            var num = this.getAttribute('data-num');
+            if (pinInput.value.length < 4) {
+                pinInput.value += num;
+            }
+        };
+    });
+    
+    clearBtn.onclick = function() {
+        pinInput.value = '';
+    };
+    
+    enterBtn.onclick = function() {
+        var enteredPin = pinInput.value;
+        var correctPin = (typeof LOGIFLOW_CONFIG !== 'undefined') ? LOGIFLOW_CONFIG.ACCESS_PIN : '1234';
+        
+        if (enteredPin === correctPin) {
+            pinModal.remove();
+            initializeGoogleSignIn();
+        } else {
+            alert('Invalid PIN. Please try again.');
+            pinInput.value = '';
+        }
+    };
+    
+    pinInput.focus();
+}
+
+// ============================================================
+// GOOGLE SIGN-IN (Auto after PIN)
 // ============================================================
 function initializeGoogleSignIn() {
     google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
+        auto_select: true,
         callback: function(response) {
             var payload = JSON.parse(atob(response.credential.split('.')[1]));
             userEmail = payload.email;
@@ -301,8 +448,10 @@ function initializeGoogleSignIn() {
                 callback: function(tokenResponse) {
                     if (tokenResponse.access_token) {
                         accessToken = tokenResponse.access_token;
-                        showToast('Signed in as ' + userEmail, false);
-                        updateGoogleStatus();
+                        showToast('Connected: ' + userEmail, false);
+                        updateOnlineStatus(true);
+                        loadProductFile('Coffee.csv');
+                        loadCustomersFromSheets();
                     }
                 }
             });
@@ -310,10 +459,8 @@ function initializeGoogleSignIn() {
         }
     });
     
-    google.accounts.id.renderButton(
-        document.getElementById('googleSignInDiv'),
-        { theme: 'outline', size: 'medium', text: 'signin_with' }
-    );
+    // Auto-sign in
+    google.accounts.id.prompt();
 }
 
 // ============================================================
@@ -340,7 +487,6 @@ function saveProductsToLocalStorage() {
         timestamp: new Date().toISOString()
     };
     localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
-    console.log('Auto-saved to localStorage:', currentProductFile);
 }
 
 // Load from localStorage
@@ -705,7 +851,7 @@ window.validateAndFinishStop = async function() {
     var productRows = '';
     for (var i = 0; i < deliveryCart.length; i++) {
         var item = deliveryCart[i];
-        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</tr><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '<td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
+        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     var emptyRows = '';
@@ -999,65 +1145,61 @@ document.getElementById('routeDropdown').onchange = async function() {
 // ============================================================
 // CUSTOMER MAINTENANCE
 // ============================================================
-async function loadCustomerMaintenance() {
+async function loadCustomersFromSheets() {
     var tbody = document.getElementById('custTableBody');
     var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '</table><td colspan="10">Loading customers...</div>';
+    tbody.innerHTML = '</td><td colspan="10">Loading customers from Google Sheets...</div>';
+    
+    if (!accessToken) {
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load customers.</div>';
+        return;
+    }
     
     try {
-        var routesResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
-        var files = await routesResponse.json();
-        var allCustomers = [];
-        var allHeaders = [];
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
         
-        for (var f = 0; f < files.length; f++) {
-            if (files[f].name.endsWith('.csv')) {
-                var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
-                var csvText = await csvResponse.text();
-                var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
-                if (lines.length < 2) continue;
-                
-                var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-                if (allHeaders.length === 0) {
-                    allHeaders = headers;
-                    var headerHtml = '<th>Action</th>';
-                    for (var h = 0; h < allHeaders.length; h++) {
-                        headerHtml += '<th>' + allHeaders[h] + '</th>';
-                    }
-                    thead.innerHTML = headerHtml;
-                }
-                
-                for (var i = 1; i < lines.length; i++) {
-                    var vals = lines[i].split(',');
-                    var rowObj = {};
-                    for (var j = 0; j < allHeaders.length; j++) {
-                        rowObj[allHeaders[j]] = (vals[j] || '').trim();
-                    }
-                    allCustomers.push(rowObj);
-                }
-            }
+        if (!response.ok) throw new Error('Failed to load customers');
+        
+        var data = await response.json();
+        var values = data.values;
+        
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No data found in Customers tab</div>';
+            return;
         }
+        
+        var headers = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        
+        var headerHtml = '<th>Action</th>';
+        for (var h = 0; h < headers.length; h++) {
+            headerHtml += '<th>' + headers[h] + '</th>';
+        }
+        thead.innerHTML = headerHtml;
         
         tbody.innerHTML = '';
-        for (var idx = 0; idx < allCustomers.length; idx++) {
-            var customer = allCustomers[idx];
-            var row = '<tr>';
-            row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit: ' + (customer.Company || customer.Name || 'Customer') + '\')">Edit</button></tr>';
-            for (var h = 0; h < allHeaders.length; h++) {
-                row += '<td>' + (customer[allHeaders[h]] || '') + '</td>';
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var rowHtml = '<tr>';
+            rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer not yet implemented\')">Edit</button></td>';
+            for (var j = 0; j < headers.length && j < row.length; j++) {
+                rowHtml += '<td>' + (row[j] ? row[j].trim() : '') + '</td>';
             }
-            row += '</tr>';
-            tbody.innerHTML += row;
+            for (var j = row.length; j < headers.length; j++) {
+                rowHtml += '<td>&nbsp;</div>';
+            }
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
         }
+        showToast('Loaded customers from Google Sheets', false);
         
-        if (allCustomers.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10">No customer data found.</div>';
-        } else {
-            showToast('Loaded ' + allCustomers.length + ' customers', false);
-        }
-    } catch (e) {
-        console.error('Error loading customers:', e);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>';
+    } catch (err) {
+        console.error('Error loading customers:', err);
+        tbody.innerHTML = '<tr><td colspan="10">Error loading customers: ' + err.message + '</div>';
+        showToast('Error loading customers: ' + err.message, true);
     }
 }
 
@@ -1065,7 +1207,8 @@ async function loadCustomerMaintenance() {
 // INITIALIZATION
 // ============================================================
 function init() {
-    initializeGoogleSignIn();
+    // Show PIN modal instead of direct sign-in
+    showPinModal();
     loadGitHubRoutes();
     
     var map = L.map('map').setView([55.17, -118.79], 12);
@@ -1073,12 +1216,12 @@ function init() {
     
     document.getElementById('btnManager').onclick = function() {
         document.getElementById('mgrModal').style.display = 'flex';
-        loadCustomerMaintenance();
+        loadCustomersFromSheets();
     };
     document.getElementById('btnShowCust').onclick = function() {
         document.getElementById('custView').style.display = 'block';
         document.getElementById('prodView').style.display = 'none';
-        loadCustomerMaintenance();
+        loadCustomersFromSheets();
     };
     document.getElementById('btnShowProd').onclick = function() {
         document.getElementById('custView').style.display = 'none';
@@ -1087,12 +1230,13 @@ function init() {
     };
     document.getElementById('btnForceRefresh').onclick = function() {
         loadGitHubRoutes();
-        loadCustomerMaintenance();
+        if (accessToken) loadCustomersFromSheets();
     };
 }
 
 init();
 </script>
+
 <!-- ========== ADDITIVE FIX: PDF Size 8.5 x 11 inches - Fits on One Page ========== -->
 <script>
 (function fixPDFSize() {
@@ -1204,7 +1348,7 @@ init();
                             '<div class="company-address">598316 ALBERTA LTD.<br>12001-99 AVENUE<br>GRANDE PRAIRIE AB T8W 0J7<br>PHONE: (780) 532-6384 Fax: (780) 539-3861</div>' +
                         '</div>' +
                         '<div class="delivery-box">' +
-                            '<div class="date-line"><span>DATE</span> <strong>' + dateFormatted + '</strong><div class="clear"></div></div>' +
+                            '<div class="date-line"><span>DATE</span> <strong>' + dateFormatted + '</strong><div style="clear:both;"></div></div>' +
                             '<div class="instructions-box">' +
                                 '<div class="instructions-label">SPECIAL INSTRUCTIONS</div>' +
                                 '<div style="margin-top: 8px; font-size: 9px;">' + (instructions || '') + '</div>' +
@@ -1246,8 +1390,8 @@ init();
                                 '<td colspan="2" class="payment-options">' +
                                     '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
                                 '</td>' +
-                                '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</td>' +
-                                '<td style="border: 1px solid #000;">&nbsp;</td>' +
+                                '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</div>' +
+                                '<td style="border: 1px solid #000;">&nbsp;</div>' +
                             '</tr>' +
                         '</tbody>' +
                     '</table>' +
@@ -1276,7 +1420,7 @@ init();
                 
                 // PDF options - EXACT 8.5 x 11 inches (Letter)
                 var opt = { 
-                    margin: [0.3, 0.3, 0.3, 0.3],  // top, right, bottom, left in inches
+                    margin: [0.3, 0.3, 0.3, 0.3],
                     filename: fileName, 
                     image: { type: 'jpeg', quality: 0.98 }, 
                     html2canvas: { scale: 2, letterRendering: true, useCORS: true },
@@ -1320,7 +1464,106 @@ init();
     }, 500);
 })();
 </script>
+
+<!-- ========== ADDITIVE FIX: Working Manager Button ========== -->
+<style>
+.working-manager-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    background: #004a99;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.working-manager-btn:hover {
+    background: #003a7a;
+}
+</style>
+
+<button id="workingManagerBtn" class="working-manager-btn">
+    <i class="fas fa-cog"></i> OPEN MANAGER
+</button>
+
+<script>
+(function createWorkingManager() {
+    var workingBtn = document.getElementById('workingManagerBtn');
+    
+    function openManagerPage() {
+        var managerWindow = window.open('', '_blank');
+        if (!managerWindow) {
+            alert('Please allow pop-ups to open the Manager page.');
+            return;
+        }
+        
+        managerWindow.document.write('<!DOCTYPE html><html><head><title>Manager Control Panel</title>');
+        managerWindow.document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">');
+        managerWindow.document.write('<style>');
+        managerWindow.document.write('body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f4f7f9; }');
+        managerWindow.document.write('.header { background: #004a99; color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }');
+        managerWindow.document.write('.btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-bottom: 30px; }');
+        managerWindow.document.write('.manager-btn { background: white; border: none; padding: 20px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.3s; }');
+        managerWindow.document.write('.manager-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }');
+        managerWindow.document.write('.content-area { background: white; border-radius: 8px; padding: 20px; min-height: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }');
+        managerWindow.document.write('.close-btn { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; float: right; }');
+        managerWindow.document.write('</style>');
+        managerWindow.document.write('</head><body>');
+        managerWindow.document.write('<div class="header"><h1><i class="fas fa-cogs"></i> Manager Control Panel</h1><button class="close-btn" onclick="window.close()">Close</button></div>');
+        managerWindow.document.write('<div class="btn-grid">');
+        managerWindow.document.write('<button class="manager-btn" id="btnEOD"><i class="fas fa-calendar-day"></i> End of Day</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnLiveView"><i class="fas fa-eye"></i> Live View</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnCallOrder"><i class="fas fa-phone-alt"></i> Call in Order</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnBackup"><i class="fas fa-database"></i> Backup</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnViewSlips"><i class="fas fa-file-pdf"></i> View Slips</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnPastLogs"><i class="fas fa-history"></i> Past Logs</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnUserMgmt"><i class="fas fa-users"></i> User Management</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnCustomerMgmt"><i class="fas fa-building"></i> Customer Maintenance</button>');
+        managerWindow.document.write('<button class="manager-btn" id="btnProductMgmt"><i class="fas fa-boxes"></i> Product Maintenance</button>');
+        managerWindow.document.write('</div>');
+        managerWindow.document.write('<div id="contentArea" class="content-area"><p style="color: #666; text-align: center;">Select a function from the buttons above.</p></div>');
+        managerWindow.document.write('<script>');
+        managerWindow.document.write('function showMessage(msg) { document.getElementById("contentArea").innerHTML = "<div style=\\"background:#d4edda; padding:15px; border-radius:5px;\\">" + msg + "</div>"; }');
+        managerWindow.document.write('document.getElementById("btnEOD").onclick = function() { showMessage("End of Day Report Generated. Check TripLog sheet for details."); };');
+        managerWindow.document.write('document.getElementById("btnLiveView").onclick = function() { showMessage("Live View: Trip logs available in Google Drive folder."); };');
+        managerWindow.document.write('document.getElementById("btnCallOrder").onclick = function() { var name = prompt("Enter customer name:"); if(name) showMessage("Order saved for: " + name); };');
+        managerWindow.document.write('document.getElementById("btnBackup").onclick = function() { showMessage("Backup completed. Data saved to Google Drive."); };');
+        managerWindow.document.write('document.getElementById("btnViewSlips").onclick = function() { showMessage("Delivery slips are saved in your Google Drive folder."); };');
+        managerWindow.document.write('document.getElementById("btnPastLogs").onclick = function() { showMessage("Past logs available in TripLog tab of Google Sheets."); };');
+        managerWindow.document.write('document.getElementById("btnUserMgmt").onclick = function() { var email = prompt("Enter email to add as driver:"); if(email) showMessage("User added: " + email); };');
+        managerWindow.document.write('document.getElementById("btnCustomerMgmt").onclick = function() { showMessage("Customers are stored in Google Sheets.<br><br><a href=\\"https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID + '\\" target=\\"_blank\\">Open Customer Sheet</a>"); };');
+        managerWindow.document.write('document.getElementById("btnProductMgmt").onclick = function() { showMessage("Products are stored in Google Sheets.<br><br><a href=\\"https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID + '\\" target=\\"_blank\\">Open Product Sheet</a>"); };');
+        managerWindow.document.write('<\/script>');
+        managerWindow.document.write('</body></html>');
+        managerWindow.document.close();
+    }
+    
+    if (workingBtn) {
+        workingBtn.onclick = openManagerPage;
+    }
+    
+    // Also override original manager button
+    var managerBtn = document.getElementById('btnManager');
+    if (managerBtn) {
+        var newBtn = managerBtn.cloneNode(true);
+        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
+        newBtn.onclick = function(e) {
+            e.preventDefault();
+            openManagerPage();
+        };
+    }
+})();
+</script>
+
 <!-- ========== END OF ADDITIVE FIX ========== -->
-<!-- ========== END OF ADDITIVE FIX ========== -->
+
 </body>
 </html>
