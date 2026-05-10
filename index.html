@@ -2114,5 +2114,717 @@ init();
 }
 </style>
 <!-- ========== END OF ADDITIVE FIX ========== -->
+    <!-- ========== ADDITIVE FIX: Enhanced Customer Table with Search, Sort, and Edit Modal ========== -->
+<style>
+.enhanced-table-container {
+    overflow-x: auto;
+    max-height: 55vh;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+.enhanced-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.enhanced-data-table th, .enhanced-data-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+.enhanced-data-table th {
+    background: #004a99;
+    color: white;
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+}
+.enhanced-data-table th:hover {
+    background: #003a7a;
+}
+.enhanced-data-table tr:hover {
+    background: #f5f5f5;
+}
+.search-filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.search-filter-bar input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+.search-filter-bar select {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+}
+.record-count {
+    font-size: 12px;
+    color: #666;
+    margin-left: auto;
+}
+</style>
+
+<script>
+(function enhancedCustomerTable() {
+    // Store customer data
+    var enhancedCustomers = [];
+    var enhancedHeaders = [];
+    var filteredCustomers = [];
+    var currentSortColumn = '';
+    var currentSortDirection = 'asc';
+    var searchTerm = '';
+    
+    // Create modal for editing customer
+    if (!document.getElementById('enhancedCustomerModal')) {
+        var modalHtml = `
+            <div id="enhancedCustomerModal" class="modal-overlay">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
+                        <h2 id="enhancedModalTitle" style="margin:0;">Edit Customer</h2>
+                        <button onclick="closeEnhancedCustomerModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+                    </div>
+                    <div id="enhancedModalFields" class="form-grid" style="grid-template-columns: 1fr 1fr; max-height: 55vh; overflow-y: auto;"></div>
+                    <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                        <button onclick="closeEnhancedCustomerModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                        <button id="saveEnhancedCustomerBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    var currentEditCustomer = null;
+    var currentEditIndex = -1;
+    
+    window.closeEnhancedCustomerModal = function() {
+        document.getElementById('enhancedCustomerModal').style.display = 'none';
+        currentEditCustomer = null;
+        currentEditIndex = -1;
+    };
+    
+    window.saveEnhancedCustomer = async function() {
+        if (!currentEditCustomer || !accessToken) {
+            showToast('Please sign in with Google first', true);
+            return;
+        }
+        
+        // Collect values from modal
+        for (var i = 0; i < enhancedHeaders.length; i++) {
+            var header = enhancedHeaders[i];
+            var input = document.getElementById('enhanced_field_' + header.replace(/ /g, '_'));
+            if (input) {
+                currentEditCustomer[header] = input.value;
+            }
+        }
+        
+        try {
+            // Get current sheet data
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            var data = await response.json();
+            var values = data.values || [];
+            
+            // Update the specific row
+            var rowIndex = currentEditIndex + 1;
+            if (rowIndex < values.length) {
+                for (var i = 0; i < enhancedHeaders.length; i++) {
+                    var header = enhancedHeaders[i];
+                    var colIndex = -1;
+                    for (var j = 0; j < values[0].length; j++) {
+                        if (values[0][j] === header) {
+                            colIndex = j;
+                            break;
+                        }
+                    }
+                    if (colIndex >= 0) {
+                        values[rowIndex][colIndex] = currentEditCustomer[header] || '';
+                    }
+                }
+            }
+            
+            // Write back to sheet
+            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z?valueInputOption=RAW`;
+            await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: values })
+            });
+            
+            showToast('Customer saved to Google Sheets', false);
+            closeEnhancedCustomerModal();
+            loadEnhancedCustomers();
+        } catch (err) {
+            showToast('Error saving: ' + err.message, true);
+        }
+    };
+    
+    document.getElementById('saveEnhancedCustomerBtn').onclick = window.saveEnhancedCustomer;
+    
+    // Open edit modal
+    window.openEnhancedEditModal = function(index) {
+        currentEditIndex = index;
+        currentEditCustomer = JSON.parse(JSON.stringify(enhancedCustomers[index]));
+        
+        var container = document.getElementById('enhancedModalFields');
+        var title = document.getElementById('enhancedModalTitle');
+        title.textContent = 'Edit Customer: ' + (currentEditCustomer.Company || currentEditCustomer.Name || 'Customer');
+        
+        container.innerHTML = '';
+        for (var i = 0; i < enhancedHeaders.length; i++) {
+            var header = enhancedHeaders[i];
+            var value = currentEditCustomer[header] || '';
+            container.innerHTML += `
+                <div class="form-group">
+                    <label>${escapeHtmlEnhanced(header)}</label>
+                    <input type="text" id="enhanced_field_${header.replace(/ /g, '_')}" value="${escapeHtmlEnhanced(value)}">
+                </div>
+            `;
+        }
+        
+        document.getElementById('enhancedCustomerModal').style.display = 'flex';
+    };
+    
+    // Load customers from Google Sheets
+    window.loadEnhancedCustomers = async function() {
+        var container = document.getElementById('custView');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="search-filter-bar">
+                <input type="text" id="customerSearchInput" placeholder="🔍 Search customers..." onkeyup="filterCustomerTable()">
+                <span id="customerRecordCount" class="record-count">Loading...</span>
+            </div>
+            <div class="enhanced-table-container">
+                <table class="enhanced-data-table">
+                    <thead id="enhancedCustomerHead"></thead>
+                    <tbody id="enhancedCustomerBody"></tbody>
+                能得到
+            </div>
+        `;
+        
+        if (!accessToken) {
+            document.getElementById('enhancedCustomerBody').innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
+            document.getElementById('customerRecordCount').textContent = '0 records';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            var data = await response.json();
+            var values = data.values || [];
+            
+            if (values.length < 2) {
+                document.getElementById('enhancedCustomerBody').innerHTML = '<tr><td colspan="10">No customer data found.</div>';
+                document.getElementById('customerRecordCount').textContent = '0 records';
+                return;
+            }
+            
+            enhancedHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+            enhancedCustomers = [];
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var custObj = {};
+                for (var j = 0; j < enhancedHeaders.length && j < row.length; j++) {
+                    custObj[enhancedHeaders[j]] = row[j] ? row[j].trim() : '';
+                }
+                enhancedCustomers.push(custObj);
+            }
+            
+            filteredCustomers = [...enhancedCustomers];
+            renderCustomerTable();
+            document.getElementById('customerRecordCount').textContent = filteredCustomers.length + ' records';
+            
+        } catch (err) {
+            console.error('Error loading customers:', err);
+            document.getElementById('enhancedCustomerBody').innerHTML = '<tr><td colspan="10">Error loading customers: ' + err.message + '</div>';
+        }
+    };
+    
+    function renderCustomerTable() {
+        var thead = document.getElementById('enhancedCustomerHead');
+        var tbody = document.getElementById('enhancedCustomerBody');
+        
+        // Build header with sort indicators
+        var headerHtml = '<tr>';
+        headerHtml += '<th style="width:80px;">Action</th>';
+        for (var i = 0; i < enhancedHeaders.length; i++) {
+            var header = enhancedHeaders[i];
+            var sortIcon = '';
+            if (currentSortColumn === header) {
+                sortIcon = currentSortDirection === 'asc' ? ' ▲' : ' ▼';
+            }
+            headerHtml += `<th onclick="sortCustomerTable('${header.replace(/'/g, "\\'")}')">${escapeHtmlEnhanced(header)}${sortIcon}</th>`;
+        }
+        headerHtml += '</thead>';
+        thead.innerHTML = headerHtml;
+        
+        // Build body
+        tbody.innerHTML = '';
+        for (var i = 0; i < filteredCustomers.length; i++) {
+            var cust = filteredCustomers[i];
+            var rowHtml = '<tr>';
+            rowHtml += `<td><button class="btn-top" style="padding:4px 8px; background:#28a745;" onclick="openEnhancedEditModal(${i})">Edit</button></td>`;
+            for (var j = 0; j < enhancedHeaders.length; j++) {
+                var header = enhancedHeaders[j];
+                var value = cust[header] || '';
+                rowHtml += `<td>${escapeHtmlEnhanced(value)}</td>`;
+            }
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        }
+        
+        document.getElementById('customerRecordCount').textContent = filteredCustomers.length + ' records';
+    }
+    
+    window.sortCustomerTable = function(column) {
+        if (currentSortColumn === column) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortColumn = column;
+            currentSortDirection = 'asc';
+        }
+        
+        filteredCustomers.sort(function(a, b) {
+            var aVal = (a[column] || '').toLowerCase();
+            var bVal = (b[column] || '').toLowerCase();
+            if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        renderCustomerTable();
+    };
+    
+    window.filterCustomerTable = function() {
+        var searchInput = document.getElementById('customerSearchInput');
+        searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        if (!searchTerm) {
+            filteredCustomers = [...enhancedCustomers];
+        } else {
+            filteredCustomers = enhancedCustomers.filter(function(cust) {
+                for (var key in cust) {
+                    if (cust[key] && cust[key].toLowerCase().indexOf(searchTerm) !== -1) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+        
+        renderCustomerTable();
+    };
+    
+    function escapeHtmlEnhanced(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // Override the Customer Maintenance button
+    var showCustBtn = document.getElementById('btnShowCust');
+    if (showCustBtn) {
+        var oldCustClick = showCustBtn.onclick;
+        showCustBtn.onclick = function() {
+            document.getElementById('custView').style.display = 'block';
+            document.getElementById('prodView').style.display = 'none';
+            showCustBtn.classList.add('active');
+            var prodBtn = document.getElementById('btnShowProd');
+            if (prodBtn) prodBtn.classList.remove('active');
+            loadEnhancedCustomers();
+        };
+    }
+    
+    console.log('Enhanced customer table with search, sort, and edit modal applied');
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Enhanced Product Table with Search, Sort, and Edit Modal ========== -->
+<script>
+(function enhancedProductTable() {
+    // Store product data
+    var enhancedProducts = [];
+    var enhancedProductHeaders = [];
+    var filteredProducts = [];
+    var productSortColumn = '';
+    var productSortDirection = 'asc';
+    var productSearchTerm = '';
+    
+    // Create modal for editing product
+    if (!document.getElementById('enhancedProductModal')) {
+        var modalHtml = `
+            <div id="enhancedProductModal" class="modal-overlay">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
+                        <h2 id="enhancedProductModalTitle" style="margin:0;">Edit Product</h2>
+                        <button onclick="closeEnhancedProductModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+                    </div>
+                    <div id="enhancedProductModalFields" class="form-grid" style="grid-template-columns: 1fr 1fr; max-height: 55vh; overflow-y: auto;"></div>
+                    <div style="margin-top:20px; display:flex; justify-content:space-between; gap:10px;">
+                        <button id="productToggleStatusEnhancedBtn" class="btn-top" style="background:#ffc107;">Toggle Status</button>
+                        <div>
+                            <button onclick="closeEnhancedProductModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                            <button id="saveEnhancedProductBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    var currentEditProduct = null;
+    var currentEditProductIndex = -1;
+    
+    window.closeEnhancedProductModal = function() {
+        document.getElementById('enhancedProductModal').style.display = 'none';
+        currentEditProduct = null;
+        currentEditProductIndex = -1;
+    };
+    
+    window.toggleProductStatusEnhanced = async function() {
+        if (!currentEditProduct) return;
+        
+        var newStatus = currentEditProduct.Status === 'Active' ? 'Deactivated' : 'Active';
+        currentEditProduct.Status = newStatus;
+        
+        // Update the status display in modal if exists
+        var statusInput = document.getElementById('enhanced_prod_field_Status');
+        if (statusInput) statusInput.value = newStatus;
+        
+        if (accessToken) {
+            try {
+                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+                var response = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                var data = await response.json();
+                var values = data.values || [];
+                
+                var rowIndex = currentEditProductIndex + 1;
+                if (rowIndex < values.length) {
+                    for (var j = 0; j < values[0].length; j++) {
+                        if (values[0][j] === 'Status') {
+                            values[rowIndex][j] = newStatus;
+                            break;
+                        }
+                    }
+                }
+                
+                var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
+                await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: values })
+                });
+                
+                showToast('Product status toggled to ' + newStatus, false);
+                loadEnhancedProducts();
+            } catch (err) {
+                showToast('Error toggling status: ' + err.message, true);
+            }
+        }
+    };
+    
+    window.saveEnhancedProduct = async function() {
+        if (!currentEditProduct || !accessToken) {
+            showToast('Please sign in with Google first', true);
+            return;
+        }
+        
+        for (var i = 0; i < enhancedProductHeaders.length; i++) {
+            var header = enhancedProductHeaders[i];
+            var input = document.getElementById('enhanced_prod_field_' + header.replace(/ /g, '_'));
+            if (input) {
+                currentEditProduct[header] = input.value;
+            }
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            var data = await response.json();
+            var values = data.values || [];
+            
+            var rowIndex = currentEditProductIndex + 1;
+            if (rowIndex < values.length) {
+                for (var i = 0; i < enhancedProductHeaders.length; i++) {
+                    var header = enhancedProductHeaders[i];
+                    var colIndex = -1;
+                    for (var j = 0; j < values[0].length; j++) {
+                        if (values[0][j] === header) {
+                            colIndex = j;
+                            break;
+                        }
+                    }
+                    if (colIndex >= 0) {
+                        values[rowIndex][colIndex] = currentEditProduct[header] || '';
+                    }
+                }
+            }
+            
+            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
+            await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: values })
+            });
+            
+            showToast('Product saved to Google Sheets', false);
+            closeEnhancedProductModal();
+            loadEnhancedProducts();
+        } catch (err) {
+            showToast('Error saving: ' + err.message, true);
+        }
+    };
+    
+    document.getElementById('saveEnhancedProductBtn').onclick = window.saveEnhancedProduct;
+    var toggleBtn = document.getElementById('productToggleStatusEnhancedBtn');
+    if (toggleBtn) toggleBtn.onclick = window.toggleProductStatusEnhanced;
+    
+    window.openEnhancedProductEditModal = function(index) {
+        currentEditProductIndex = index;
+        currentEditProduct = JSON.parse(JSON.stringify(enhancedProducts[index]));
+        
+        var container = document.getElementById('enhancedProductModalFields');
+        var title = document.getElementById('enhancedProductModalTitle');
+        title.textContent = 'Edit Product: ' + (currentEditProduct.Product || currentEditProduct.Item || 'Product');
+        
+        container.innerHTML = '';
+        for (var i = 0; i < enhancedProductHeaders.length; i++) {
+            var header = enhancedProductHeaders[i];
+            var value = currentEditProduct[header] || '';
+            container.innerHTML += `
+                <div class="form-group">
+                    <label>${escapeHtmlEnhancedProd(header)}</label>
+                    <input type="text" id="enhanced_prod_field_${header.replace(/ /g, '_')}" value="${escapeHtmlEnhancedProd(value)}">
+                </div>
+            `;
+        }
+        
+        document.getElementById('enhancedProductModal').style.display = 'flex';
+    };
+    
+    window.loadEnhancedProducts = async function() {
+        var container = document.getElementById('prodView');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="search-filter-bar">
+                <input type="text" id="productSearchInput" placeholder="🔍 Search products..." onkeyup="filterProductTable()">
+                <button id="refreshProductsBtn" class="btn-top" style="background:#17a2b8; padding:6px 12px;">Refresh</button>
+                <span id="productRecordCount" class="record-count">Loading...</span>
+            </div>
+            <div class="enhanced-table-container">
+                <table class="enhanced-data-table">
+                    <thead id="enhancedProductHead"></thead>
+                    <tbody id="enhancedProductBody"></tbody>
+                能得到
+            </div>
+        `;
+        
+        document.getElementById('refreshProductsBtn').onclick = function() { loadEnhancedProducts(); };
+        
+        if (!accessToken) {
+            document.getElementById('enhancedProductBody').innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
+            document.getElementById('productRecordCount').textContent = '0 records';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            var data = await response.json();
+            var values = data.values || [];
+            
+            if (values.length < 2) {
+                document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">No product data found.</div>';
+                return;
+            }
+            
+            enhancedProductHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+            enhancedProducts = [];
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var prodObj = {};
+                for (var j = 0; j < enhancedProductHeaders.length && j < row.length; j++) {
+                    prodObj[enhancedProductHeaders[j]] = row[j] ? row[j].trim() : '';
+                }
+                if (prodObj.Status !== 'Deactivated') {
+                    enhancedProducts.push(prodObj);
+                }
+            }
+            
+            filteredProducts = [...enhancedProducts];
+            renderProductTable();
+            document.getElementById('productRecordCount').textContent = filteredProducts.length + ' records';
+            
+        } catch (err) {
+            console.error('Error loading products:', err);
+            document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">Error loading products: ' + err.message + '</div>';
+        }
+    };
+    
+    function renderProductTable() {
+        var thead = document.getElementById('enhancedProductHead');
+        var tbody = document.getElementById('enhancedProductBody');
+        
+        var headerHtml = '</tr>';
+        headerHtml += '<th style="width:80px;">Action</th>';
+        for (var i = 0; i < enhancedProductHeaders.length; i++) {
+            var header = enhancedProductHeaders[i];
+            var sortIcon = '';
+            if (productSortColumn === header) {
+                sortIcon = productSortDirection === 'asc' ? ' ▲' : ' ▼';
+            }
+            headerHtml += `<th onclick="sortProductTable('${header.replace(/'/g, "\\'")}')">${escapeHtmlEnhancedProd(header)}${sortIcon}</th>`;
+        }
+        headerHtml += '</thead>';
+        thead.innerHTML = headerHtml;
+        
+        tbody.innerHTML = '';
+        for (var i = 0; i < filteredProducts.length; i++) {
+            var prod = filteredProducts[i];
+            var rowHtml = '<tr>';
+            rowHtml += `<td><button class="btn-top" style="padding:4px 8px; background:#28a745;" onclick="openEnhancedProductEditModal(${i})">Edit</button></td>`;
+            for (var j = 0; j < enhancedProductHeaders.length; j++) {
+                var header = enhancedProductHeaders[j];
+                var value = prod[header] || '';
+                var statusClass = '';
+                if (header === 'Status') {
+                    statusClass = value === 'Active' ? 'status-active' : (value === 'Deactivated' ? 'status-inactive' : '');
+                }
+                rowHtml += `<td class="${statusClass}">${escapeHtmlEnhancedProd(value)}</td>`;
+            }
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        }
+        
+        document.getElementById('productRecordCount').textContent = filteredProducts.length + ' records';
+    }
+    
+    window.sortProductTable = function(column) {
+        if (productSortColumn === column) {
+            productSortDirection = productSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            productSortColumn = column;
+            productSortDirection = 'asc';
+        }
+        
+        filteredProducts.sort(function(a, b) {
+            var aVal = (a[column] || '').toLowerCase();
+            var bVal = (b[column] || '').toLowerCase();
+            if (aVal < bVal) return productSortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return productSortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        renderProductTable();
+    };
+    
+    window.filterProductTable = function() {
+        var searchInput = document.getElementById('productSearchInput');
+        productSearchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+        
+        if (!productSearchTerm) {
+            filteredProducts = [...enhancedProducts];
+        } else {
+            filteredProducts = enhancedProducts.filter(function(prod) {
+                for (var key in prod) {
+                    if (prod[key] && prod[key].toLowerCase().indexOf(productSearchTerm) !== -1) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+        
+        renderProductTable();
+    };
+    
+    function escapeHtmlEnhancedProd(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // Override the Product Maintenance button
+    var showProdBtn = document.getElementById('btnShowProd');
+    if (showProdBtn) {
+        var oldProdClick = showProdBtn.onclick;
+        showProdBtn.onclick = function() {
+            document.getElementById('custView').style.display = 'none';
+            document.getElementById('prodView').style.display = 'block';
+            showProdBtn.classList.add('active');
+            var custBtn = document.getElementById('btnShowCust');
+            if (custBtn) custBtn.classList.remove('active');
+            loadEnhancedProducts();
+        };
+    }
+    
+    console.log('Enhanced product table with search, sort, and edit modal applied');
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Override Manager Button to Use Enhanced Tables ========== -->
+<script>
+(function overrideManagerButton() {
+    var managerBtn = document.getElementById('btnManager');
+    if (managerBtn) {
+        var newBtn = managerBtn.cloneNode(true);
+        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
+        newBtn.onclick = function(e) {
+            e.preventDefault();
+            var modal = document.getElementById('mgrModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                // Load enhanced customer table by default
+                setTimeout(function() {
+                    loadEnhancedCustomers();
+                }, 100);
+            }
+        };
+    }
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
