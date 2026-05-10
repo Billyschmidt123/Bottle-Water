@@ -1093,5 +1093,177 @@ function init() {
 
 init();
 </script>
+    <!-- ========== ADDITIVE FIX: Corrected PDF Layout that Fits on One Page ========== -->
+<script>
+(function fixPDFLayout() {
+    // Wait for the original function to be defined
+    var checkInterval = setInterval(function() {
+        if (typeof window.validateAndFinishStop === 'function') {
+            clearInterval(checkInterval);
+            
+            // Store the original function
+            var originalValidateAndFinishStop = window.validateAndFinishStop;
+            
+            // Override with fixed PDF layout
+            window.validateAndFinishStop = async function() {
+                var receiverName = document.getElementById('receivedBy').value.trim();
+                if (!receiverName) {
+                    alert('Please enter the name of the person receiving the delivery.');
+                    return;
+                }
+                if (isSigBlank) {
+                    alert('A signature is required to complete the delivery.');
+                    return;
+                }
+                
+                var customerName = document.getElementById('stopModalTitle').textContent.replace('Delivery: ', '');
+                var address = document.getElementById('metaAddress').textContent;
+                var instructions = document.getElementById('metaSpecInst').textContent;
+                var sigImage = document.getElementById('sig-canvas').toDataURL();
+                var slipNum = Math.floor(100000 + Math.random() * 900000);
+                var fileName = customerName.replace(/\s+/g, '_') + '_Slip_' + slipNum + '.pdf';
+                var timestamp = new Date().toLocaleString();
+                
+                var logRow = [driverName, receiverName, timestamp, customerName, slipNum, 'Delivered', 'N/A'];
+                
+                showToast('Saving delivery record...', false);
+                var sheetSaved = await appendToGoogleSheets(logRow);
+                if (!sheetSaved) {
+                    alert('Warning: Could not save to Google Sheets. Please check your Google sign-in.');
+                }
+                
+                // Build product rows for PDF - COMPACT VERSION
+                var productRows = '';
+                for (var i = 0; i < deliveryCart.length; i++) {
+                    var item = deliveryCart[i];
+                    productRows += '<tr>' +
+                        '<td style="border:1px solid #000; padding:3px; text-align:center; font-size:9px;">' + item.qty + '</td>' +
+                        '<td style="border:1px solid #000; padding:3px; font-size:9px;">' + item.name + '</td>' +
+                        '<td style="border:1px solid #000; padding:3px; font-size:9px;">' + item.units + '</td>' +
+                        '</tr>';
+                }
+                
+                // Add empty rows to fill space
+                var emptyRows = '';
+                for (var i = deliveryCart.length; i < 8; i++) {
+                    emptyRows += '<tr>' +
+                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
+                        '</tr>';
+                }
+                
+                var dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                // COMPACT PDF HTML - FITS ON ONE PAGE
+                var pdfHTML = '<div style="width:100%; max-width:620px; margin:0 auto; padding:10px; font-family:\'Courier New\', Courier, monospace; font-size:10px;">' +
+                    
+                    // Header section
+                    '<div style="display:flex; justify-content:space-between; margin-bottom:8px;">' +
+                        '<div style="width:55%;">' +
+                            '<div style="font-size:18px; font-weight:bold;">Culligan Water</div>' +
+                            '<div style="font-size:8px;">BOTTLE WATER</div>' +
+                            '<div style="margin-top:5px; font-size:7px;">598316 ALBERTA LTD.<br>12001-99 AVENUE<br>GRANDE PRAIRIE AB T8W 0J7</div>' +
+                        '</div>' +
+                        '<div style="width:40%; text-align:right;">' +
+                            '<div style="border-bottom:1px solid #000; margin-bottom:3px; font-size:8px;"><span style="float:left;">DATE</span> <strong>' + dateFormatted + '</strong><div style="clear:both;"></div></div>' +
+                            '<div style="border:1px solid red; padding:3px; text-align:center;">' +
+                                '<div style="font-size:11px; font-weight:bold;">DELIVERY SLIP</div>' +
+                                '<div style="font-size:13px; font-weight:bold;">' + slipNum + '</div>' +
+                                '<div style="font-size:6px;">NOT YOUR INVOICE</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // Sold To section
+                    '<div style="margin-bottom:8px;">' +
+                        '<div><strong>SOLD TO:</strong> ' + customerName + '</div>' +
+                        '<div><strong>ADDRESS:</strong> ' + address + '</div>' +
+                    '</div>' +
+                    
+                    // Special Instructions (if any)
+                    (instructions ? '<div style="margin-bottom:8px; padding:3px; background:#f9f9f9;"><strong>INSTRUCTIONS:</strong> ' + instructions + '</div>' : '') +
+                    
+                    // Products table - COMPACT
+                    '<table style="width:100%; border-collapse:collapse; margin:6px 0;">' +
+                        '<thead>' +
+                            '<tr style="background:#eee;">' +
+                                '<th style="border:1px solid #000; padding:3px; width:15%; text-align:center;">QTY</th>' +
+                                '<th style="border:1px solid #000; padding:3px; width:65%; text-align:left;">DESCRIPTION</th>' +
+                                '<th style="border:1px solid #000; padding:3px; width:20%; text-align:left;">UNIT</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>' +
+                            productRows +
+                            emptyRows +
+                        '</tbody>' +
+                    '</table>' +
+                    
+                    // Footer with signature and received by
+                    '<div style="display:flex; justify-content:space-between; margin-top:8px;">' +
+                        '<div style="width:45%;">' +
+                            '<div style="border-bottom:1px solid #000; margin-top:15px;"></div>' +
+                            '<img src="' + sigImage + '" style="max-height:40px; max-width:180px; margin-top:-12px;">' +
+                            '<div style="font-size:7px; text-align:center;">SIGNATURE</div>' +
+                        '</div>' +
+                        '<div style="width:45%;">' +
+                            '<div style="border-bottom:1px solid #000; text-align:center; font-weight:bold; padding-bottom:2px;">' + receiverName + '</div>' +
+                            '<div style="font-size:7px; text-align:center;">RECEIVED BY</div>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // Terms
+                    '<div style="margin-top:10px; font-size:6px; text-align:center;">' +
+                        'G.S.T. #8991131088 RT | NET 30 DAYS | 2% MONTHLY INTEREST' +
+                    '</div>' +
+                '</div>';
+                
+                // PDF options - Letter size with smaller margins
+                var opt = { 
+                    margin: [0.4, 0.4, 0.4, 0.4],  // top, right, bottom, left in inches
+                    filename: fileName, 
+                    image: { type: 'jpeg', quality: 0.98 }, 
+                    html2canvas: { scale: 1.5, letterRendering: true }, 
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+                };
+                
+                try {
+                    var pdfBlob = await html2pdf().set(opt).from(pdfHTML).output('blob');
+                    var reader = new FileReader();
+                    reader.readAsDataURL(pdfBlob);
+                    reader.onloadend = async function() {
+                        showToast('Saving PDF to Google Drive...', false);
+                        var driveSaved = await savePDFToDrive(fileName, reader.result);
+                        
+                        if (driveSaved && sheetSaved) {
+                            alert('SUCCESS!\nDelivery completed and saved to Google Drive and Sheets.\nSlip Number: ' + slipNum);
+                        } else if (driveSaved) {
+                            alert('PDF saved to Google Drive: ' + fileName + '\nSheet log failed - check permissions.');
+                        } else if (sheetSaved) {
+                            alert('Delivery recorded to Google Sheets.\nPDF could not be saved to Drive.\nPDF downloaded to your computer.');
+                            var link = document.createElement('a');
+                            link.download = fileName;
+                            link.href = reader.result;
+                            link.click();
+                        } else {
+                            alert('Delivery completed but NOT saved to cloud.\nPDF downloaded to your computer.\nPlease sign in with Google to enable cloud save.');
+                            var link = document.createElement('a');
+                            link.download = fileName;
+                            link.href = reader.result;
+                            link.click();
+                        }
+                        document.getElementById('stopModal').style.display = 'none';
+                    };
+                } catch (err) {
+                    alert('Error generating PDF: ' + err);
+                }
+            };
+            
+            console.log('PDF layout fix applied - compact version fits on one page');
+        }
+    }, 500);
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
