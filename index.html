@@ -158,20 +158,25 @@
         <div id="custView" style="display: block;"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody>能有</div>
         <div id="prodView" style="display: none;">
             <div style="margin-bottom:15px;">
-                <button class="btn-top" onclick="loadProductFile('Products')" style="background:#6f4e37;">Load Products</button>
+                <button class="btn-top" onclick="loadProductFile()" style="background:#6f4e37;">Load Products</button>
             </div>
             <div style="overflow-x: auto;"><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody>能有</div>
         </div>
     </div>
 </div>
 
-<div id="editModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 800px;">
-        <h2 id="editModalTitle">Edit Record</h2><hr>
-        <div id="editFormFields" class="form-grid"></div>
+<!-- Customer Edit Modal -->
+<div id="custEditModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 700px;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 id="custEditModalTitle" style="margin:0;">Edit Customer</h2>
+            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+        </div>
+        <hr>
+        <div id="custEditFormFields" class="form-grid" style="grid-template-columns: 1fr 1fr;"></div>
         <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-            <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-            <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
+            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+            <button class="btn-top" style="background:#28a745;" onclick="saveCustomerEdit()">SAVE CHANGES</button>
         </div>
     </div>
 </div>
@@ -194,7 +199,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
 
-<!-- ===== MAIN APPLICATION SCRIPT ===== -->
 <script>
 // ============================================================
 // CONFIGURATION
@@ -211,13 +215,15 @@ var accessToken = null;
 var userEmail = null;
 var currentProdList = [];
 var currentProdHeaders = [];
-var currentProductFile = '';
 var deliveryCart = [];
 var isSigBlank = true;
 var driverName = "";
 var currentStopIndex = -1;
 var currentRouteStops = [];
 var currentEditingProductIndex = -1;
+var currentEditingCustomerIndex = -1;
+var currentCustomerList = [];
+var currentCustomerHeaders = [];
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -259,10 +265,7 @@ function initializeGoogleSignIn() {
                         accessToken = tokenResponse.access_token;
                         showToast('Signed in as ' + userEmail, false);
                         updateGoogleStatus();
-                        // Refresh products if they were waiting
-                        if (currentProductFile === 'Products') {
-                            loadProductFile('Products');
-                        }
+                        loadProductFile();
                         loadCustomersFromSheets();
                     }
                 }
@@ -274,13 +277,65 @@ function initializeGoogleSignIn() {
 }
 
 // ============================================================
+// SAVE TO GOOGLE SHEETS (Generic function)
+// ============================================================
+async function saveToSheet(sheetName, headers, data) {
+    if (!accessToken) {
+        showToast('Please sign in with Google first', true);
+        return false;
+    }
+    
+    try {
+        var values = [headers];
+        for (var i = 0; i < data.length; i++) {
+            var row = [];
+            for (var j = 0; j < headers.length; j++) {
+                row.push(data[i][headers[j]] || '');
+            }
+            values.push(row);
+        }
+        
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:ZZZ?valueInputOption=RAW`;
+        
+        // Clear existing data
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:ZZZ:clear`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        // Write new data
+        var response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': 'Bearer ' + accessToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: values })
+        });
+        
+        if (response.ok) {
+            showToast(`${sheetName} saved to Google Sheets`, false);
+            return true;
+        } else {
+            var error = await response.json();
+            console.error('Save error:', error);
+            showToast(`Failed to save ${sheetName}`, true);
+            return false;
+        }
+    } catch (err) {
+        console.error('Save error:', err);
+        showToast(`Error saving ${sheetName}: ${err.message}`, true);
+        return false;
+    }
+}
+
+// ============================================================
 // LOAD PRODUCTS FROM GOOGLE SHEETS
 // ============================================================
-async function loadProductFile(fileName) {
-    currentProductFile = fileName;
+async function loadProductFile() {
     var tbody = document.getElementById('prodTableBody');
     var theadRow = document.getElementById('prodTableHead');
-    tbody.innerHTML = '<table><td colspan="10">Loading products from Google Sheets...</div>';
+    tbody.innerHTML = '<td><td colspan="10">Loading products from Google Sheets...</div>';
     
     if (!accessToken) {
         tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load products.</div>';
@@ -304,18 +359,15 @@ async function loadProductFile(fileName) {
             return;
         }
         
-        // First row is headers
         currentProdHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
         if (currentProdHeaders.indexOf('Status') === -1) currentProdHeaders.push('Status');
         
-        // Build header HTML
         var headerHtml = '<th>Action</th>';
         for (var h = 0; h < currentProdHeaders.length; h++) {
             headerHtml += '<th>' + currentProdHeaders[h] + '</th>';
         }
         theadRow.innerHTML = headerHtml;
         
-        // Build product list
         currentProdList = [];
         for (var i = 1; i < values.length; i++) {
             var row = values[i];
@@ -327,7 +379,6 @@ async function loadProductFile(fileName) {
                 }
             }
             pObj.Status = pObj.Status || 'Active';
-            // Skip "NOT DELIVERED" placeholder
             var firstHeader = currentProdHeaders[0];
             if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') {
                 currentProdList.push(pObj);
@@ -363,55 +414,8 @@ function renderProdTable() {
 window.toggleProductStatus = function(idx) {
     currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
     renderProdTable();
-    saveProductToSheet(idx);
+    saveToSheet('Products', currentProdHeaders.filter(function(h) { return h !== 'Status'; }), currentProdList);
 };
-
-async function saveProductToSheet(productIndex) {
-    if (!accessToken) {
-        showToast('Please sign in with Google to save', true);
-        return;
-    }
-    
-    try {
-        var headers = currentProdHeaders.filter(function(h) { return h !== 'Status'; });
-        var values = [headers];
-        
-        for (var i = 0; i < currentProdList.length; i++) {
-            var row = [];
-            for (var j = 0; j < headers.length; j++) {
-                row.push(currentProdList[i][headers[j]] || '');
-            }
-            values.push(row);
-        }
-        
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
-        
-        // Clear existing data
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z:clear`, {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        });
-        
-        // Write new data
-        var response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + accessToken,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ values: values })
-        });
-        
-        if (response.ok) {
-            showToast('Product saved to Google Sheets', false);
-        } else {
-            throw new Error('Save failed');
-        }
-    } catch (err) {
-        console.error('Save error:', err);
-        showToast('Error saving to Google Sheets', true);
-    }
-}
 
 window.openProductEditModal = function(idx) {
     currentEditingProductIndex = idx;
@@ -439,7 +443,7 @@ window.saveProductEdit = function() {
         if (input) currentProdList[currentEditingProductIndex][header] = input.value;
     }
     renderProdTable();
-    saveProductToSheet(currentEditingProductIndex);
+    saveToSheet('Products', currentProdHeaders.filter(function(h) { return h !== 'Status'; }), currentProdList);
     closeProductEditModal();
     showToast('Product saved to Google Sheets', false);
 };
@@ -452,7 +456,7 @@ window.toggleProductStatusFromModal = function() { if (currentEditingProductInde
 async function loadCustomersFromSheets() {
     var tbody = document.getElementById('custTableBody');
     var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading customers from Google Sheets...</div>';
+    tbody.innerHTML = '</tr><td colspan="10">Loading customers from Google Sheets...</div>';
     
     if (!accessToken) {
         tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load customers.</div>';
@@ -476,29 +480,26 @@ async function loadCustomersFromSheets() {
             return;
         }
         
-        var headers = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        currentCustomerHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
         
         var headerHtml = '<th>Action</th>';
-        for (var h = 0; h < headers.length; h++) {
-            headerHtml += '<th>' + headers[h] + '</th>';
+        for (var h = 0; h < currentCustomerHeaders.length; h++) {
+            headerHtml += '<th>' + currentCustomerHeaders[h] + '</th>';
         }
         thead.innerHTML = headerHtml;
         
-        tbody.innerHTML = '';
+        currentCustomerList = [];
         for (var i = 1; i < values.length; i++) {
             var row = values[i];
-            var rowHtml = '<tr>';
-            rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer not yet implemented\')">Edit</button></td>';
-            for (var j = 0; j < headers.length && j < row.length; j++) {
-                rowHtml += '<td>' + (row[j] ? row[j].trim() : '') + '</td>';
+            var custObj = {};
+            for (var j = 0; j < currentCustomerHeaders.length && j < row.length; j++) {
+                custObj[currentCustomerHeaders[j]] = row[j] ? row[j].trim() : '';
             }
-            for (var j = row.length; j < headers.length; j++) {
-                rowHtml += '<td>&nbsp;</td>';
-            }
-            rowHtml += '</tr>';
-            tbody.innerHTML += rowHtml;
+            currentCustomerList.push(custObj);
         }
-        showToast('Loaded ' + (values.length - 1) + ' customers from Google Sheets', false);
+        
+        renderCustTable();
+        showToast('Loaded ' + currentCustomerList.length + ' customers from Google Sheets', false);
         
     } catch (err) {
         console.error('Error loading customers:', err);
@@ -506,6 +507,52 @@ async function loadCustomersFromSheets() {
         showToast('Error loading customers: ' + err.message, true);
     }
 }
+
+function renderCustTable() {
+    var tbody = document.getElementById('custTableBody');
+    tbody.innerHTML = '';
+    for (var idx = 0; idx < currentCustomerList.length; idx++) {
+        var cust = currentCustomerList[idx];
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openCustomerEditModal(' + idx + ')">Edit</button></td>';
+        for (var h = 0; h < currentCustomerHeaders.length; h++) {
+            tr.innerHTML += '<td>' + (cust[currentCustomerHeaders[h]] || '') + '</td>';
+        }
+        tbody.appendChild(tr);
+    }
+}
+
+window.openCustomerEditModal = function(idx) {
+    currentEditingCustomerIndex = idx;
+    var customer = currentCustomerList[idx];
+    var container = document.getElementById('custEditFormFields');
+    container.innerHTML = '';
+    for (var i = 0; i < currentCustomerHeaders.length; i++) {
+        var header = currentCustomerHeaders[i];
+        var value = customer[header] || '';
+        container.innerHTML += '<div class="form-group"><label>' + header + '</label><input type="text" id="cust_edit_' + header.replace(/ /g, '_') + '" value="' + value.replace(/"/g, '&quot;') + '"></div>';
+    }
+    document.getElementById('custEditModalTitle').textContent = 'Edit Customer: ' + (customer.Company || customer.Name || 'Customer');
+    document.getElementById('custEditModal').style.display = 'flex';
+};
+
+window.closeCustomerEditModal = function() { 
+    document.getElementById('custEditModal').style.display = 'none'; 
+    currentEditingCustomerIndex = -1; 
+};
+
+window.saveCustomerEdit = function() {
+    if (currentEditingCustomerIndex === -1) { alert('No customer selected'); return; }
+    for (var i = 0; i < currentCustomerHeaders.length; i++) {
+        var header = currentCustomerHeaders[i];
+        var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
+        if (input) currentCustomerList[currentEditingCustomerIndex][header] = input.value;
+    }
+    renderCustTable();
+    saveToSheet('Customers', currentCustomerHeaders, currentCustomerList);
+    closeCustomerEditModal();
+    showToast('Customer saved to Google Sheets', false);
+};
 
 // ============================================================
 // SAVE PDF TO GOOGLE DRIVE
@@ -626,7 +673,7 @@ window.validateAndFinishStop = async function() {
         '<div style="border:1px solid red; padding:3px; text-align:center;"><div style="font-size:11px; font-weight:bold;">DELIVERY SLIP</div><div style="font-size:13px; font-weight:bold;">' + slipNum + '</div><div style="font-size:6px;">NOT YOUR INVOICE</div></div></div></div>' +
         '<div style="margin-bottom:8px;"><div><strong>SOLD TO:</strong> ' + customerName + '</div><div><strong>ADDRESS:</strong> ' + address + '</div></div>' +
         (instructions ? '<div style="margin-bottom:8px; padding:3px; background:#f9f9f9;"><strong>INSTRUCTIONS:</strong> ' + instructions + '</div>' : '') +
-        '<table style="width:100%; border-collapse:collapse; margin:6px 0;"><thead><tr style="background:#eee;"><th style="border:1px solid #000; padding:3px; text-align:center;">QTY</th><th style="border:1px solid #000; padding:3px; text-align:left;">DESCRIPTION</th><th style="border:1px solid #000; padding:3px; text-align:left;">UNIT</th><th style="border:1px solid #000; padding:3px; text-align:right;">TOTAL</th></tr></thead><tbody>' + productRows + emptyRows + '</tbody></table>' +
+        '<table style="width:100%; border-collapse:collapse; margin:6px 0;"><thead><tr style="background:#eee;"><th style="border:1px solid #000; padding:3px; text-align:center;">QTY</th><th style="border:1px solid #000; padding:3px; text-align:left;">DESCRIPTION</th><th style="border:1px solid #000; padding:3px; text-align:left;">UNIT</th><th style="border:1px solid #000; padding:3px; text-align:right;">TOTAL</th></tr></thead><tbody>' + productRows + emptyRows + '</tbody></td>' +
         '<div style="display:flex; justify-content:space-between; margin-top:8px;"><div style="width:45%;"><div style="border-bottom:1px solid #000; margin-top:15px;"></div><img src="' + sigImage + '" style="max-height:40px; max-width:180px; margin-top:-12px;"><div style="font-size:7px; text-align:center;">SIGNATURE</div></div>' +
         '<div style="width:45%;"><div style="border-bottom:1px solid #000; text-align:center; font-weight:bold; padding-bottom:2px;">' + receiverName + '</div><div style="font-size:7px; text-align:center;">RECEIVED BY</div></div></div>' +
         '<div style="margin-top:10px; font-size:6px; text-align:center;">G.S.T. #8991131088 RT | NET 30 DAYS | 2% MONTHLY INTEREST</div></div>';
@@ -721,7 +768,7 @@ document.getElementById('routeDropdown').onchange = async function() {
                 document.getElementById('btnActivateSig').style.background = '#007bff';
                 document.getElementById('btnActivateSig').textContent = 'CLICK TO SIGN';
                 document.getElementById('receivedBy').value = '';
-                async function loadDropdown(fName, targetId) {
+                async function loadDropdown(targetId) {
                     if (accessToken) {
                         try {
                             var sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
@@ -750,7 +797,7 @@ document.getElementById('routeDropdown').onchange = async function() {
                         } catch(e) { console.warn('Sheet load error:', e); }
                     }
                     // Fallback to GitHub
-                    var githubResp = await fetch(GITHUB_RAW + 'Products/' + fName + '?t=' + Date.now());
+                    var githubResp = await fetch(GITHUB_RAW + 'Products/Water.csv?t=' + Date.now());
                     if (githubResp.ok) {
                         var txt = await githubResp.text();
                         var productLines = txt.split('\n').filter(function(l) { return l.trim(); });
@@ -768,8 +815,8 @@ document.getElementById('routeDropdown').onchange = async function() {
                         }
                     } else { var target = document.getElementById(targetId); target.innerHTML = '<option value="">Error loading products</option>'; }
                 }
-                loadDropdown('Water.csv', 'stopProductDropdown');
-                loadDropdown('Coffee.csv', 'stopCoffeeDropdown');
+                loadDropdown('stopProductDropdown');
+                loadDropdown('stopCoffeeDropdown');
                 document.getElementById('stopModal').style.display = 'flex';
             };
         })(i - 1, rowData, addr, phone, displayName);
@@ -839,7 +886,7 @@ window.loadTripLogFromDrive = async function(fileId, fileName) {
             for (var v = 0; v < headers.length; v++) tableHtml += '<td>' + (vals[v] || '').trim() + '</td>';
             tableHtml += '</tr>';
         }
-        tableHtml += '</tbody></table></div>';
+        tableHtml += '</tbody>能有</div>';
         contentDiv.innerHTML = tableHtml;
     } catch(e) { contentDiv.innerHTML = 'Error loading file: ' + e.message; }
 };
@@ -862,8 +909,8 @@ function init() {
     window.map = map;
     document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; loadCustomersFromSheets(); };
     document.getElementById('btnShowCust').onclick = function() { document.getElementById('custView').style.display = 'block'; document.getElementById('prodView').style.display = 'none'; loadCustomersFromSheets(); };
-    document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; loadProductFile('Products'); };
-    document.getElementById('btnForceRefresh').onclick = function() { loadGitHubRoutes(); if(accessToken) loadCustomersFromSheets(); };
+    document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; loadProductFile(); };
+    document.getElementById('btnForceRefresh').onclick = function() { loadGitHubRoutes(); if(accessToken) { loadCustomersFromSheets(); loadProductFile(); } };
     setTimeout(function() { if (window.map) window.map.invalidateSize(); }, 500);
 }
 
