@@ -43,6 +43,41 @@
         .status-inactive { color: red; text-decoration: line-through; }
         .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; }
         .working-bottom-btn:hover { background: #218838; }
+        
+        /* ADDITIVE FIX: Styles for edit modals */
+        .edit-modal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+            max-height: 55vh;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        .edit-field-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .edit-field-group label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #333;
+        }
+        .edit-field-group input, .edit-field-group textarea {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
     </style>
 </head>
 <body>
@@ -155,7 +190,7 @@
         </div>
         <table class="cart-table">
             <thead><tr><th>Item</th><th>Qty</th><th></th></thead>
-            <tbody id="cartItemsBody"><tr><td colspan="3" style="text-align:center; color:#999;">No items added</td></tr></tbody>
+            <tbody id="cartItemsBody"><tr><td colspan="3" style="text-align:center; color:#999;">No items added</div></tr></tbody>
         </table>
         <hr>
         <div class="form-group">
@@ -173,6 +208,43 @@
         <div style="margin-top:20px; display:flex; gap:10px;">
             <button class="btn-top" style="background:#dc3545; flex:1;" onclick="markNotDelivered()">❌ NOT DELIVERED</button>
             <button class="btn-top" style="background:#28a745; flex:2;" onclick="completeDelivery()">✅ COMPLETE DELIVERY</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== ADDITIVE FIX: Customer Edit Modal ========== -->
+<div id="customerEditModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 700px;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 id="customerEditModalTitle">Edit Customer</h2>
+            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+        </div>
+        <hr>
+        <div id="customerEditFields" class="edit-modal-grid"></div>
+        <div class="modal-buttons">
+            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+            <button id="saveCustomerEditBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== ADDITIVE FIX: Product Edit Modal ========== -->
+<div id="productEditModalNew" class="modal-overlay">
+    <div class="modal-content" style="max-width: 700px;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 id="productEditModalTitleNew">Edit Product</h2>
+            <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#dc3545;">Cancel</button>
+        </div>
+        <hr>
+        <div id="productEditFields" class="edit-modal-grid"></div>
+        <div class="modal-buttons">
+            <div>
+                <button id="productToggleStatusBtnNew" class="btn-top" style="background:#ffc107;">Toggle Status</button>
+            </div>
+            <div>
+                <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button id="saveProductEditBtnNew" class="btn-top" style="background:#28a745;">Save Changes</button>
+            </div>
         </div>
     </div>
 </div>
@@ -200,6 +272,11 @@ var map;
 var customers = [];
 var customerHeaders = [];
 var signatureActive = false;
+
+// ========== ADDITIVE FIX: Variables for edit modals ==========
+var currentEditingCustomerIndex = -1;
+var currentEditingProductIndex = -1;
+var currentEditingProductOriginal = null;
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -263,7 +340,7 @@ function renderCustomerTable() {
     tbody.innerHTML = '';
     customers.forEach((cust, idx) => {
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="editCustomer(' + idx + ')">✏️ Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button><tr>';
         customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -284,7 +361,7 @@ function filterCustomers() {
     filtered.forEach((cust, originalIdx) => {
         var idx = customers.indexOf(cust);
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="editCustomer(' + idx + ')">✏️ Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button></td>';
         customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -292,19 +369,61 @@ function filterCustomers() {
     document.getElementById('custCount').innerHTML = filtered.length + ' records';
 }
 
-window.editCustomer = function(idx) {
-    var cust = customers[idx];
-    var newName = prompt('Edit Customer Name:', cust.Name);
-    if (newName && newName.trim()) cust.Name = newName.trim();
-    var newAddress = prompt('Edit Address:', cust.Address);
-    if (newAddress && newAddress.trim()) cust.Address = newAddress.trim();
-    var newPhone = prompt('Edit Phone:', cust.Phone);
-    if (newPhone && newPhone.trim()) cust.Phone = newPhone.trim();
-    var newEmail = prompt('Edit Email:', cust.Email);
-    if (newEmail && newEmail.trim()) cust.Email = newEmail.trim();
+// ========== ADDITIVE FIX: Customer Edit Modal Functions ==========
+function openCustomerEditModal(idx) {
+    currentEditingCustomerIndex = idx;
+    var customer = customers[idx];
+    var modal = document.getElementById('customerEditModal');
+    var title = document.getElementById('customerEditModalTitle');
+    var fieldsContainer = document.getElementById('customerEditFields');
+    
+    title.textContent = 'Edit Customer: ' + (customer.Name || 'Customer');
+    
+    fieldsContainer.innerHTML = '';
+    for (var i = 0; i < customerHeaders.length; i++) {
+        var header = customerHeaders[i];
+        var value = customer[header] || '';
+        fieldsContainer.innerHTML += `
+            <div class="edit-field-group">
+                <label>${escapeHtml(header)}</label>
+                <input type="text" id="cust_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+            </div>
+        `;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeCustomerEditModal() {
+    document.getElementById('customerEditModal').style.display = 'none';
+    currentEditingCustomerIndex = -1;
+}
+
+function saveCustomerEdit() {
+    if (currentEditingCustomerIndex === -1) return;
+    
+    for (var i = 0; i < customerHeaders.length; i++) {
+        var header = customerHeaders[i];
+        var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
+        if (input) {
+            customers[currentEditingCustomerIndex][header] = input.value;
+        }
+    }
+    
     renderCustomerTable();
-    showToast('Customer updated', false);
-};
+    closeCustomerEditModal();
+    showToast('Customer saved', false);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
 
 // ============================================================
 // LOAD PRODUCTS FROM GITHUB
@@ -339,11 +458,9 @@ async function loadProductFile(fileName) {
             }
             renderProductTable();
             showToast(`Loaded ${currentProdList.length} products from ${fileName}`, false);
-            // Save to localStorage
             localStorage.setItem('logiflow_products_' + fileName, JSON.stringify(currentProdList));
         }
     } catch(e) {
-        // Try localStorage fallback
         var saved = localStorage.getItem('logiflow_products_' + fileName);
         if (saved) {
             currentProdList = JSON.parse(saved);
@@ -363,7 +480,7 @@ function renderProductTable() {
         var statusClass = p.Status === 'Active' ? 'status-active' : 'status-inactive';
         var statusText = p.Status === 'Active' ? '✅ Active' : '⭕ Inactive';
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="editProduct(' + idx + ')">✏️ Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openProductEditModalNew(' + idx + ')">✏️ Edit</button></td>';
         row += '<td class="' + statusClass + '">' + statusText + '</div>';
         currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
         row += '</tr>';
@@ -383,7 +500,7 @@ function filterProducts() {
         var statusClass = p.Status === 'Active' ? 'status-active' : 'status-inactive';
         var statusText = p.Status === 'Active' ? '✅ Active' : '⭕ Inactive';
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="editProduct(' + currentProdList.indexOf(p) + ')">✏️ Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">✏️ Edit</button></td>';
         row += '<td class="' + statusClass + '">' + statusText + '</div>';
         currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
         row += '</tr>';
@@ -392,16 +509,72 @@ function filterProducts() {
     document.getElementById('prodCount').innerHTML = filtered.length + ' records';
 }
 
-window.editProduct = function(idx) {
-    var prod = currentProdList[idx];
-    var newName = prompt('Edit Product Name:', prod[currentProdHeaders[0]]);
-    if (newName && newName.trim()) prod[currentProdHeaders[0]] = newName.trim();
-    var toggleStatus = confirm('Toggle product status? Current: ' + prod.Status);
-    if (toggleStatus) prod.Status = prod.Status === 'Active' ? 'Inactive' : 'Active';
+// ========== ADDITIVE FIX: Product Edit Modal Functions ==========
+function openProductEditModalNew(idx) {
+    currentEditingProductIndex = idx;
+    currentEditingProductOriginal = JSON.parse(JSON.stringify(currentProdList[idx]));
+    var product = currentProdList[idx];
+    var modal = document.getElementById('productEditModalNew');
+    var title = document.getElementById('productEditModalTitleNew');
+    var fieldsContainer = document.getElementById('productEditFields');
+    
+    title.textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
+    
+    fieldsContainer.innerHTML = '';
+    for (var i = 0; i < currentProdHeaders.length; i++) {
+        var header = currentProdHeaders[i];
+        if (header === 'Status') continue;
+        var value = product[header] || '';
+        fieldsContainer.innerHTML += `
+            <div class="edit-field-group">
+                <label>${escapeHtml(header)}</label>
+                <input type="text" id="prod_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+            </div>
+        `;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeProductEditModalNew() {
+    document.getElementById('productEditModalNew').style.display = 'none';
+    currentEditingProductIndex = -1;
+    currentEditingProductOriginal = null;
+}
+
+function saveProductEditNew() {
+    if (currentEditingProductIndex === -1) return;
+    
+    for (var i = 0; i < currentProdHeaders.length; i++) {
+        var header = currentProdHeaders[i];
+        if (header === 'Status') continue;
+        var input = document.getElementById('prod_edit_' + header.replace(/ /g, '_'));
+        if (input) {
+            currentProdList[currentEditingProductIndex][header] = input.value;
+        }
+    }
+    
     renderProductTable();
     localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(currentProdList));
-    showToast('Product updated', false);
-};
+    closeProductEditModalNew();
+    showToast('Product saved', false);
+}
+
+function toggleProductStatusNew() {
+    if (currentEditingProductIndex === -1) return;
+    
+    var newStatus = currentProdList[currentEditingProductIndex].Status === 'Active' ? 'Inactive' : 'Active';
+    currentProdList[currentEditingProductIndex].Status = newStatus;
+    
+    renderProductTable();
+    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(currentProdList));
+    
+    var statusMsg = newStatus === 'Active' ? 'activated' : 'deactivated';
+    showToast(`Product ${statusMsg}`, false);
+    
+    // Re-open modal with updated data
+    openProductEditModalNew(currentEditingProductIndex);
+}
 
 // ============================================================
 // ROUTES FROM GITHUB
@@ -564,7 +737,7 @@ function addToCart() {
 function renderCart() {
     var body = document.getElementById('cartItemsBody');
     if (!deliveryCart.length) {
-        body.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No items added</td></tr>';
+        body.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No items added</div></tr>';
         return;
     }
     body.innerHTML = '';
@@ -679,7 +852,6 @@ function completeDelivery() {
     var slipNum = Math.floor(100000 + Math.random() * 900000);
     var timestamp = new Date().toLocaleString();
     
-    // Build delivery record
     var deliveryRecord = {
         slipNumber: slipNum,
         customer: customerName,
@@ -692,12 +864,10 @@ function completeDelivery() {
         signature: document.getElementById('sig-canvas').toDataURL()
     };
     
-    // Save to localStorage
     var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
     deliveries.push(deliveryRecord);
     localStorage.setItem('logiflow_deliveries', JSON.stringify(deliveries));
     
-    // Build product list text
     var productText = '';
     deliveryCart.forEach(item => {
         productText += `${item.qty}x ${item.name}\n`;
@@ -791,7 +961,6 @@ document.getElementById('btnShowProd').onclick = function() {
     loadProductFile('Coffee.csv');
 };
 
-// Feature buttons
 document.getElementById('btnEndOfDay').onclick = function() {
     var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
     alert(`End of Day Report\n\nTotal Deliveries: ${deliveries.length}\n\nCheck browser console for details.`);
@@ -843,7 +1012,12 @@ document.body.appendChild(bottomBtn);
 var marker = L.marker([55.17, -118.79]).addTo(map);
 marker.bindPopup("LogiFlow Delivery - Ready").openPopup();
 
-console.log('LogiFlow Delivery System Ready - No PIN Required');
+// ========== ADDITIVE FIX: Attach modal button event listeners ==========
+document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
+document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
+document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
+
+console.log('LogiFlow Delivery System Ready - Edit modals enabled');
 </script>
 </body>
 </html>
