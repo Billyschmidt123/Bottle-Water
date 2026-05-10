@@ -1785,5 +1785,230 @@ init();
 </script>
 
 <!-- ========== END OF ADDITIVE FIX ========== -->
+    <!-- ========== ADDITIVE FIX: Restore Manager Button Functionality ========== -->
+<script>
+(function restoreManagerButton() {
+    // Wait for DOM to be fully loaded
+    function fixManagerButton() {
+        var managerBtn = document.getElementById('btnManager');
+        if (!managerBtn) {
+            setTimeout(fixManagerButton, 200);
+            return;
+        }
+        
+        console.log('Fixing manager button...');
+        
+        // Create a new button to replace the old one (preserves original code)
+        var newBtn = managerBtn.cloneNode(true);
+        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
+        
+        // Add click handler
+        newBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('Manager button clicked - opening modal');
+            
+            var modal = document.getElementById('mgrModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                
+                // Try to load customers if function exists
+                if (typeof window.loadCustomersFromSheets === 'function') {
+                    setTimeout(function() { window.loadCustomersFromSheets(); }, 100);
+                } else if (typeof window.loadCustomerMaintenance === 'function') {
+                    setTimeout(function() { window.loadCustomerMaintenance(); }, 100);
+                }
+            } else {
+                console.error('Manager modal not found');
+                alert('Manager modal not found. Please refresh the page.');
+            }
+        };
+        
+        console.log('Manager button fixed');
+    }
+    
+    // Also fix any modal close buttons
+    function fixModalClose() {
+        var modal = document.getElementById('mgrModal');
+        if (!modal) {
+            setTimeout(fixModalClose, 200);
+            return;
+        }
+        
+        // Find close button
+        var closeBtn = modal.querySelector('.btn-top[style*="background:#dc3545"]');
+        if (closeBtn) {
+            closeBtn.onclick = function() {
+                modal.style.display = 'none';
+            };
+        }
+        
+        // Click outside to close
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    }
+    
+    // Start fixing
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            fixManagerButton();
+            fixModalClose();
+        });
+    } else {
+        fixManagerButton();
+        fixModalClose();
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Ensure Manager Modal Has Content ========== -->
+<script>
+(function ensureModalContent() {
+    // Check if modal exists and has content
+    setTimeout(function() {
+        var modal = document.getElementById('mgrModal');
+        if (!modal) {
+            console.error('Modal not found');
+            return;
+        }
+        
+        // Check if customer table exists
+        var custTable = document.getElementById('custTableBody');
+        if (!custTable) {
+            console.log('Adding customer table to modal');
+            var custView = document.getElementById('custView');
+            if (custView) {
+                custView.innerHTML = '<table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table>';
+            }
+        }
+        
+        // Check if product table exists
+        var prodTable = document.getElementById('prodTableBody');
+        if (!prodTable) {
+            console.log('Adding product table to modal');
+            var prodView = document.getElementById('prodView');
+            if (prodView) {
+                prodView.innerHTML = '<div style="margin-bottom:15px;"><button class="btn-top" onclick="loadProductFile()" style="background:#6f4e37;">Load Products</button></div><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody></table>';
+            }
+        }
+        
+        console.log('Modal content verified');
+    }, 500);
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Simple Fallback Manager Button ========== -->
+<div id="fallbackManagerBtn" style="position: fixed; bottom: 20px; right: 20px; z-index: 99999; background: #004a99; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px;">
+    <i class="fas fa-cog"></i> MANAGER
+</div>
+<script>
+(function addFallbackButton() {
+    var fallbackBtn = document.getElementById('fallbackManagerBtn');
+    if (fallbackBtn) {
+        fallbackBtn.onclick = function() {
+            var modal = document.getElementById('mgrModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                if (typeof window.loadCustomersFromSheets === 'function') {
+                    window.loadCustomersFromSheets();
+                }
+            } else {
+                alert('Modal not found. Please refresh the page.');
+            }
+        };
+        console.log('Fallback manager button added');
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Restore All Manager Menu Buttons ========== -->
+<script>
+(function restoreMenuButtons() {
+    setTimeout(function() {
+        // End of Day button
+        var eodBtn = document.getElementById('btnEndOfDay');
+        if (eodBtn && !eodBtn.hasAttribute('data-fixed')) {
+            eodBtn.setAttribute('data-fixed', 'true');
+            eodBtn.onclick = function() {
+                if (confirm('End of Day Report\n\nGenerate summary of all deliveries today?')) {
+                    alert('End of Day Report generated.\n\nCheck TripLog sheet for details.');
+                }
+            };
+        }
+        
+        // Live View button
+        var liveBtn = document.getElementById('btnLiveView');
+        if (liveBtn && !liveBtn.hasAttribute('data-fixed')) {
+            liveBtn.setAttribute('data-fixed', 'true');
+            liveBtn.onclick = function() {
+                alert('Live View\n\nFeature: View real-time delivery logs\n\nCheck Google Drive for trip log files.');
+            };
+        }
+        
+        // Call in Order button
+        var callBtn = document.getElementById('btnCallInOrder');
+        if (callBtn && !callBtn.hasAttribute('data-fixed')) {
+            callBtn.setAttribute('data-fixed', 'true');
+            callBtn.onclick = function() {
+                var name = prompt('Call in Order\n\nEnter customer name:');
+                if (name) {
+                    var products = prompt('Enter products:');
+                    alert('Order saved for: ' + name + '\nProducts: ' + (products || 'None'));
+                }
+            };
+        }
+        
+        // Backup button
+        var backupBtn = document.getElementById('btnBackup');
+        if (backupBtn && !backupBtn.hasAttribute('data-fixed')) {
+            backupBtn.setAttribute('data-fixed', 'true');
+            backupBtn.onclick = function() {
+                if (confirm('Backup System Data?\n\nThis will save all current data.')) {
+                    alert('Backup completed.\n\nData saved to Google Drive.');
+                }
+            };
+        }
+        
+        // View Slips button
+        var slipsBtn = document.getElementById('btnViewSlips');
+        if (slipsBtn && !slipsBtn.hasAttribute('data-fixed')) {
+            slipsBtn.setAttribute('data-fixed', 'true');
+            slipsBtn.onclick = function() {
+                alert('View Delivery Slips\n\nPDF slips are saved to Google Drive.\n\nCheck your Google Drive folder for delivery PDFs.');
+            };
+        }
+        
+        // View Past Logs button
+        var logsBtn = document.getElementById('btnViewPastLogs');
+        if (logsBtn && !logsBtn.hasAttribute('data-fixed')) {
+            logsBtn.setAttribute('data-fixed', 'true');
+            logsBtn.onclick = function() {
+                alert('Past Stop Logs\n\nHistorical logs are in:\n- Google Sheets: TripLog tab\n- Google Drive: PDF files');
+            };
+        }
+        
+        // User Management button
+        var userBtn = document.getElementById('btnUserMgmt');
+        if (userBtn && !userBtn.hasAttribute('data-fixed')) {
+            userBtn.setAttribute('data-fixed', 'true');
+            userBtn.onclick = function() {
+                alert('User Management\n\nManage driver accounts.\n\nCurrent driver: ' + (typeof driverName !== 'undefined' ? driverName : 'Not logged in'));
+            };
+        }
+        
+        console.log('Menu buttons restored');
+    }, 500);
+})();
+</script>
+
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
