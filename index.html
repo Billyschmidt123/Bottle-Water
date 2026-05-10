@@ -266,7 +266,7 @@
             <table class="mgmt-table">
                 <thead id="custTableHead"></thead>
                 <tbody id="custTableBody"></tbody>
-            </tr>
+            </table>
         </div>
         <div id="prodView" style="display: none;">
             <div style="margin-bottom:15px;">
@@ -521,7 +521,7 @@ async function loadProductFile(fileName) {
     }
     
     // Fall back to GitHub
-    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</div>';
+    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</td></tr>';
     
     try {
         var text = await fetchFromGitHub('Products/' + fileName);
@@ -560,7 +560,7 @@ async function loadProductFile(fileName) {
             showToast('Loaded from GitHub', false);
         }
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
+        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</td></tr>';
         showToast('Error loading products from GitHub', true);
     }
 }
@@ -851,7 +851,7 @@ window.validateAndFinishStop = async function() {
     var productRows = '';
     for (var i = 0; i < deliveryCart.length; i++) {
         var item = deliveryCart[i];
-        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
+        productRows += '<td><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     var emptyRows = '';
@@ -1148,7 +1148,7 @@ document.getElementById('routeDropdown').onchange = async function() {
 async function loadCustomersFromSheets() {
     var tbody = document.getElementById('custTableBody');
     var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '</td><td colspan="10">Loading customers from Google Sheets...</div>';
+    tbody.innerHTML = '<tr><td colspan="10">Loading customers from Google Sheets...</div>';
     
     if (!accessToken) {
         tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load customers.</div>';
@@ -1184,7 +1184,7 @@ async function loadCustomersFromSheets() {
         for (var i = 1; i < values.length; i++) {
             var row = values[i];
             var rowHtml = '<tr>';
-            rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer not yet implemented\')">Edit</button></td>';
+            rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="editCustomerFromTable(' + (i-1) + ')">Edit</button></td>';
             for (var j = 0; j < headers.length && j < row.length; j++) {
                 rowHtml += '<td>' + (row[j] ? row[j].trim() : '') + '</td>';
             }
@@ -1389,7 +1389,7 @@ init();
                             '<tr class="payment-row">' +
                                 '<td colspan="2" class="payment-options">' +
                                     '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
-                                '</td>' +
+                                '</table>' +
                                 '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</div>' +
                                 '<td style="border: 1px solid #000;">&nbsp;</div>' +
                             '</tr>' +
@@ -2308,14 +2308,14 @@ init();
         
         container.innerHTML = `
             <div class="search-filter-bar">
-                <input type="text" id="customerSearchInput" placeholder="🔍 Search customers..." onkeyup="filterCustomerTable()">
+                <input type="text" id="customerSearchInput" placeholder="Search customers..." onkeyup="filterCustomerTable()">
                 <span id="customerRecordCount" class="record-count">Loading...</span>
             </div>
             <div class="enhanced-table-container">
                 <table class="enhanced-data-table">
                     <thead id="enhancedCustomerHead"></thead>
                     <tbody id="enhancedCustomerBody"></tbody>
-                能得到
+                </table>
             </div>
         `;
         
@@ -2334,7 +2334,7 @@ init();
             var values = data.values || [];
             
             if (values.length < 2) {
-                document.getElementById('enhancedCustomerBody').innerHTML = '<tr><td colspan="10">No customer data found.</div>';
+                document.getElementById('enhancedCustomerBody').innerHTML = '</tr><td colspan="10">No customer data found.</div>';
                 document.getElementById('customerRecordCount').textContent = '0 records';
                 return;
             }
@@ -2387,7 +2387,7 @@ init();
             for (var j = 0; j < enhancedHeaders.length; j++) {
                 var header = enhancedHeaders[j];
                 var value = cust[header] || '';
-                rowHtml += `<td>${escapeHtmlEnhanced(value)}</td>`;
+                rowHtml += `<td>${escapeHtmlEnhanced(value)}</div>`;
             }
             rowHtml += '</tr>';
             tbody.innerHTML += rowHtml;
@@ -2643,7 +2643,7 @@ init();
         
         container.innerHTML = `
             <div class="search-filter-bar">
-                <input type="text" id="productSearchInput" placeholder="🔍 Search products..." onkeyup="filterProductTable()">
+                <input type="text" id="productSearchInput" placeholder="Search products..." onkeyup="filterProductTable()">
                 <button id="refreshProductsBtn" class="btn-top" style="background:#17a2b8; padding:6px 12px;">Refresh</button>
                 <span id="productRecordCount" class="record-count">Loading...</span>
             </div>
@@ -2651,14 +2651,14 @@ init();
                 <table class="enhanced-data-table">
                     <thead id="enhancedProductHead"></thead>
                     <tbody id="enhancedProductBody"></tbody>
-                能得到
+                </table>
             </div>
         `;
         
         document.getElementById('refreshProductsBtn').onclick = function() { loadEnhancedProducts(); };
         
         if (!accessToken) {
-            document.getElementById('enhancedProductBody').innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
+            document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
             document.getElementById('productRecordCount').textContent = '0 records';
             return;
         }
@@ -2672,7 +2672,7 @@ init();
             var values = data.values || [];
             
             if (values.length < 2) {
-                document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">No product data found.</div>';
+                document.getElementById('enhancedProductBody').innerHTML = '<td><td colspan="10">No product data found.</div>';
                 return;
             }
             
@@ -2703,7 +2703,7 @@ init();
         var thead = document.getElementById('enhancedProductHead');
         var tbody = document.getElementById('enhancedProductBody');
         
-        var headerHtml = '</tr>';
+        var headerHtml = '<tr>';
         headerHtml += '<th style="width:80px;">Action</th>';
         for (var i = 0; i < enhancedProductHeaders.length; i++) {
             var header = enhancedProductHeaders[i];
@@ -2728,7 +2728,7 @@ init();
                 if (header === 'Status') {
                     statusClass = value === 'Active' ? 'status-active' : (value === 'Deactivated' ? 'status-inactive' : '');
                 }
-                rowHtml += `<td class="${statusClass}">${escapeHtmlEnhancedProd(value)}</td>`;
+                rowHtml += `<td class="${statusClass}">${escapeHtmlEnhancedProd(value)}</div>`;
             }
             rowHtml += '</tr>';
             tbody.innerHTML += rowHtml;
@@ -2959,11 +2959,11 @@ init();
             for (var i = 1; i < values.length; i++) {
                 var row = values[i];
                 var rowHtml = '<tr>';
-                rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer: ' + (row[0] || 'Customer') + '\')">Edit</button></tr>';
+                rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer: ' + (row[0] || 'Customer') + '\')">Edit</button></td>';
                 for (var j = 0; j < headers.length; j++) {
                     rowHtml += '<td>' + (row[j] || '') + '</td>';
                 }
-                rowHtml += '</table>';
+                rowHtml += '</tr>';
                 tbody.innerHTML += rowHtml;
             }
             
@@ -3025,6 +3025,135 @@ init();
     background: #f5f5f5;
 }
 </style>
+
+<!-- ========== ADDITIVE FIX: Remove Chinese Characters from DOM ========== -->
+<script>
+(function removeChineseCharacters() {
+    // Function to remove Chinese characters from text nodes
+    function cleanTextNodes(element) {
+        if (element.nodeType === Node.TEXT_NODE) {
+            // Remove any Chinese characters (Unicode range: 4E00-9FFF, 3400-4DBF, 3000-303F)
+            var cleaned = element.textContent.replace(/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f]/g, '');
+            if (cleaned !== element.textContent) {
+                element.textContent = cleaned;
+            }
+        } else if (element.nodeType === Node.ELEMENT_NODE) {
+            // Skip script and style tags
+            if (element.tagName !== 'SCRIPT' && element.tagName !== 'STYLE') {
+                for (var i = 0; i < element.childNodes.length; i++) {
+                    cleanTextNodes(element.childNodes[i]);
+                }
+            }
+        }
+    }
+    
+    // Run after page loads
+    window.addEventListener('DOMContentLoaded', function() {
+        cleanTextNodes(document.body);
+        console.log('Chinese characters removed from DOM');
+    });
+    
+    // Also run after any modal opens (in case content is loaded dynamically)
+    var mgrModal = document.getElementById('mgrModal');
+    if (mgrModal) {
+        var observer = new MutationObserver(function() {
+            if (mgrModal.style.display === 'flex') {
+                cleanTextNodes(mgrModal);
+            }
+        });
+        observer.observe(mgrModal, { attributes: true, childList: true, subtree: true });
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Connect Tables to Product and Customer Buttons ========== -->
+<script>
+(function connectTablesToButtons() {
+    // Ensure Customer Maintenance button loads customer table from Google Sheets
+    var custBtn = document.getElementById('btnShowCust');
+    if (custBtn) {
+        var originalCustClick = custBtn.onclick;
+        custBtn.onclick = function(e) {
+            e.preventDefault();
+            document.getElementById('custView').style.display = 'block';
+            document.getElementById('prodView').style.display = 'none';
+            custBtn.classList.add('active');
+            var prodBtn = document.getElementById('btnShowProd');
+            if (prodBtn) prodBtn.classList.remove('active');
+            
+            // Load customers from Google Sheets
+            if (typeof loadEnhancedCustomers === 'function') {
+                loadEnhancedCustomers();
+            } else if (typeof loadCustomersFromSheets === 'function') {
+                loadCustomersFromSheets();
+            } else {
+                console.log('Customer table connection: using fallback');
+                if (accessToken) {
+                    (async function() {
+                        var tbody = document.getElementById('custTableBody');
+                        var thead = document.getElementById('custTableHead');
+                        if (tbody) {
+                            tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
+                            try {
+                                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+                                var response = await fetch(url, {
+                                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                                });
+                                var data = await response.json();
+                                var values = data.values;
+                                if (values && values.length > 0) {
+                                    var headers = values[0];
+                                    var headerHtml = '<th>Action</th>';
+                                    for (var h = 0; h < headers.length; h++) {
+                                        headerHtml += '<th>' + (headers[h] || '') + '</th>';
+                                    }
+                                    if (thead) thead.innerHTML = headerHtml;
+                                    tbody.innerHTML = '';
+                                    for (var i = 1; i < values.length; i++) {
+                                        var row = values[i];
+                                        var rowHtml = '<tr>';
+                                        rowHtml += '<td><button class="btn-top" style="padding:4px;">Edit</button></td>';
+                                        for (var j = 0; j < headers.length; j++) {
+                                            rowHtml += '<td>' + (row[j] || '') + '</td>';
+                                        }
+                                        rowHtml += '</tr>';
+                                        tbody.innerHTML += rowHtml;
+                                    }
+                                }
+                            } catch(err) {
+                                tbody.innerHTML = '<tr><td colspan="10">Error loading customers</div>';
+                            }
+                        }
+                    })();
+                }
+            }
+        };
+    }
+    
+    // Ensure Product Maintenance button loads product table
+    var prodBtn = document.getElementById('btnShowProd');
+    if (prodBtn) {
+        var originalProdClick = prodBtn.onclick;
+        prodBtn.onclick = function(e) {
+            e.preventDefault();
+            document.getElementById('custView').style.display = 'none';
+            document.getElementById('prodView').style.display = 'block';
+            prodBtn.classList.add('active');
+            var custBtnElem = document.getElementById('btnShowCust');
+            if (custBtnElem) custBtnElem.classList.remove('active');
+            
+            // Load products (default to Coffee.csv)
+            if (typeof loadEnhancedProducts === 'function') {
+                loadEnhancedProducts();
+            } else if (typeof loadProductFile === 'function') {
+                loadProductFile('Coffee.csv');
+            }
+        };
+    }
+    
+    console.log('Tables connected to Product Maintenance and Customer Maintenance buttons');
+})();
+</script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
