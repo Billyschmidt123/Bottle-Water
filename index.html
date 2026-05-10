@@ -44,7 +44,7 @@
         .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; }
         .working-bottom-btn:hover { background: #218838; }
         
-        /* Styles for edit modals - each field gets its own row in a grid */
+        /* Styles for edit modals */
         .edit-modal-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -90,6 +90,30 @@
             margin-top: 20px;
             padding-top: 15px;
             border-top: 1px solid #ddd;
+        }
+        
+        /* ========== ADDITIVE FIX: Loading indicator styles ========== */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .data-source-badge {
+            background: #17a2b8;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -150,11 +174,12 @@
             <div class="search-bar">
                 <input type="text" id="custSearch" placeholder="Search customers..." onkeyup="filterCustomers()">
                 <span id="custCount" class="badge"></span>
+                <span id="customerDataSource" class="data-source-badge">Loading...</span>
             </div>
             <div style="overflow-x: auto; max-height: 60vh; overflow-y: auto;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
-                    <tbody id="custTableBody"></tbody>
+                    <tbody id="custTableBody"><tr><td colspan="10">Loading customers from Google Sheets...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -225,7 +250,7 @@
     </div>
 </div>
 
-<!-- ========== ADDITIVE FIX: Customer Edit Modal - Shows ALL fields from the table ========== -->
+<!-- Customer Edit Modal -->
 <div id="customerEditModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 800px;">
         <div style="display:flex; justify-content: space-between; align-items:center;">
@@ -241,7 +266,7 @@
     </div>
 </div>
 
-<!-- ========== ADDITIVE FIX: Product Edit Modal - Shows ALL fields from the table ========== -->
+<!-- Product Edit Modal -->
 <div id="productEditModalNew" class="modal-overlay">
     <div class="modal-content" style="max-width: 800px;">
         <div style="display:flex; justify-content: space-between; align-items:center;">
@@ -271,6 +296,10 @@ const REPO_OWNER = 'Billyschmidt123';
 const REPO_NAME = 'Bottle-Water';
 const GITHUB_RAW = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/`;
 
+// ========== ADDITIVE FIX: Google Sheets Configuration ==========
+const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+
 // Global variables
 var currentProdList = [];
 var currentProdHeaders = [];
@@ -286,7 +315,11 @@ var customers = [];
 var customerHeaders = [];
 var signatureActive = false;
 
-// ========== ADDITIVE FIX: Variables for edit modals ==========
+// ========== ADDITIVE FIX: Google Sheets Auth Variables ==========
+var accessToken = null;
+var userEmail = null;
+
+// Variables for edit modals
 var currentEditingCustomerIndex = -1;
 var currentEditingProductIndex = -1;
 var currentEditingProductOriginal = null;
@@ -302,46 +335,155 @@ function showToast(msg, isErr) {
     setTimeout(() => toast.remove(), 3000);
 }
 
-// ============================================================
-// INITIALIZATION - NO PIN REQUIRED
-// ============================================================
-function init() {
-    showToast('System ready. Click START ROUTE to begin.', false);
-    loadRoutes();
-    loadProductFile('Coffee.csv');
-    loadDemoCustomers();
+// ========== ADDITIVE FIX: Google Sheets API Functions ==========
+async function loadCustomersFromGoogleSheets() {
+    var tbody = document.getElementById('custTableBody');
+    var dataSourceSpan = document.getElementById('customerDataSource');
     
-    // Initialize map
-    map = L.map('map').setView([55.17, -118.79], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers from Google Sheets...</div>';
+    dataSourceSpan.textContent = 'Connecting to Google...';
+    dataSourceSpan.style.background = '#ffc107';
+    dataSourceSpan.style.color = '#333';
+    
+    // First, check if we have an access token
+    if (!accessToken) {
+        showToast('Please sign in with Google to load customer data', true);
+        tbody.innerHTML = '<tr><td colspan="10">⚠️ Please sign in with Google to load customer data. Click the "Sign in with Google" button above.</div>';
+        dataSourceSpan.textContent = 'Not signed in';
+        dataSourceSpan.style.background = '#dc3545';
+        dataSourceSpan.style.color = 'white';
+        return;
+    }
+    
+    try {
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        var data = await response.json();
+        var values = data.values;
+        
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No customer data found in Google Sheets</div>';
+            dataSourceSpan.textContent = 'No data';
+            dataSourceSpan.style.background = '#dc3545';
+            return;
+        }
+        
+        // Parse headers from first row
+        customerHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        
+        // Parse customer data from subsequent rows
+        customers = [];
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var custObj = {};
+            for (var j = 0; j < customerHeaders.length && j < row.length; j++) {
+                custObj[customerHeaders[j]] = row[j] ? row[j].trim() : '';
+            }
+            // Fill missing columns with empty strings
+            for (var j = row.length; j < customerHeaders.length; j++) {
+                custObj[customerHeaders[j]] = '';
+            }
+            customers.push(custObj);
+        }
+        
+        renderCustomerTable();
+        dataSourceSpan.textContent = `Google Sheets (${customers.length} records)`;
+        dataSourceSpan.style.background = '#28a745';
+        dataSourceSpan.style.color = 'white';
+        showToast(`Loaded ${customers.length} customers from Google Sheets`, false);
+        
+    } catch (err) {
+        console.error('Error loading customers from Google Sheets:', err);
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error loading customers: ${err.message}</div>`;
+        dataSourceSpan.textContent = 'Error loading';
+        dataSourceSpan.style.background = '#dc3545';
+        showToast('Error loading customers from Google Sheets', true);
+    }
 }
-init();
+
+// ========== ADDITIVE FIX: Google Sign-In Function ==========
+function showGoogleSignInButton() {
+    // Create sign-in button in header if not exists
+    if (!document.getElementById('googleSignInBtn')) {
+        var headerDiv = document.querySelector('header div:last-child');
+        var signInBtn = document.createElement('button');
+        signInBtn.id = 'googleSignInBtn';
+        signInBtn.innerHTML = '<i class="fab fa-google"></i> Sign in with Google';
+        signInBtn.className = 'btn-top';
+        signInBtn.style.background = '#4285f4';
+        signInBtn.style.marginLeft = '10px';
+        signInBtn.onclick = startGoogleSignIn;
+        headerDiv.appendChild(signInBtn);
+    }
+}
+
+function startGoogleSignIn() {
+    showToast('Opening Google Sign-In...', false);
+    
+    // Load Google Identity Services script if not loaded
+    if (typeof google === 'undefined' || !google.accounts) {
+        var script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = function() {
+            initializeGoogleSignIn();
+        };
+        document.head.appendChild(script);
+    } else {
+        initializeGoogleSignIn();
+    }
+}
+
+function initializeGoogleSignIn() {
+    google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false
+    });
+    google.accounts.id.prompt();
+}
+
+function handleCredentialResponse(response) {
+    try {
+        var payload = JSON.parse(atob(response.credential.split('.')[1]));
+        userEmail = payload.email;
+        showToast('Signed in as: ' + userEmail, false);
+        
+        var tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+            callback: function(tokenResponse) {
+                if (tokenResponse.access_token) {
+                    accessToken = tokenResponse.access_token;
+                    showToast('Connected to Google Sheets', false);
+                    // Update online status indicator
+                    var statusSpan = document.getElementById('onlineStatus');
+                    statusSpan.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Google Connected';
+                    statusSpan.style.background = '#28a745';
+                    // Load customers from Google Sheets
+                    loadCustomersFromGoogleSheets();
+                }
+            }
+        });
+        tokenClient.requestAccessToken();
+    } catch(e) {
+        console.error('Sign-in error:', e);
+        showToast('Sign-in failed: ' + e.message, true);
+    }
+}
 
 // ============================================================
-// DEMO CUSTOMERS (Local database)
+// CUSTOMER TABLE FUNCTIONS
 // ============================================================
-function loadDemoCustomers() {
-    customers = [
-        { Name: "ABC Corporation", Address: "123 Main Street", Phone: "555-0101", Email: "contact@abccorp.com" },
-        { Name: "XYZ Industries", Address: "456 Oak Avenue", Phone: "555-0102", Email: "info@xyz.com" },
-        { Name: "Smith Trading Ltd", Address: "789 Pine Road", Phone: "555-0103", Email: "smith@trading.com" },
-        { Name: "Johnson & Sons", Address: "321 Elm Street", Phone: "555-0104", Email: "johnson@sons.com" },
-        { Name: "Williams Group", Address: "654 Maple Drive", Phone: "555-0105", Email: "williams@group.com" },
-        { Name: "Brown Enterprises", Address: "987 Cedar Lane", Phone: "555-0106", Email: "brown@enterprises.com" },
-        { Name: "Jones Logistics", Address: "147 Birch Way", Phone: "555-0107", Email: "jones@logistics.com" },
-        { Name: "Miller Supplies Inc", Address: "258 Spruce Court", Phone: "555-0108", Email: "miller@supplies.com" },
-        { Name: "Davis Distributing", Address: "369 Ash Boulevard", Phone: "555-0109", Email: "davis@distributing.com" },
-        { Name: "Garcia Foods", Address: "741 Palm Street", Phone: "555-0110", Email: "garcia@foods.com" },
-        { Name: "Rodriguez Solutions", Address: "852 Willow Way", Phone: "555-0111", Email: "rodriguez@solutions.com" },
-        { Name: "Martinez Corp", Address: "963 Poplar Lane", Phone: "555-0112", Email: "martinez@corp.com" }
-    ];
-    customerHeaders = ["Name", "Address", "Phone", "Email"];
-    renderCustomerTable();
-    showToast(`Loaded ${customers.length} customers`, false);
-}
-
 function renderCustomerTable() {
     var thead = document.getElementById('custTableHead');
     var tbody = document.getElementById('custTableBody');
@@ -364,12 +506,12 @@ function renderCustomerTable() {
 function filterCustomers() {
     var search = document.getElementById('custSearch').value.toLowerCase();
     var tbody = document.getElementById('custTableBody');
-    var filtered = customers.filter(c => 
-        c.Name.toLowerCase().includes(search) || 
-        c.Address.toLowerCase().includes(search) ||
-        c.Phone.includes(search) ||
-        c.Email.toLowerCase().includes(search)
-    );
+    var filtered = customers.filter(c => {
+        for (var key in c) {
+            if (c[key] && c[key].toLowerCase().includes(search)) return true;
+        }
+        return false;
+    });
     tbody.innerHTML = '';
     filtered.forEach((cust, originalIdx) => {
         var idx = customers.indexOf(cust);
@@ -382,7 +524,7 @@ function filterCustomers() {
     document.getElementById('custCount').innerHTML = filtered.length + ' records';
 }
 
-// ========== ADDITIVE FIX: Customer Edit Modal Functions - Shows ALL fields ==========
+// Customer Edit Modal Functions
 function openCustomerEditModal(idx) {
     console.log('Opening customer edit modal for index:', idx);
     currentEditingCustomerIndex = idx;
@@ -391,9 +533,8 @@ function openCustomerEditModal(idx) {
     var title = document.getElementById('customerEditModalTitle');
     var fieldsContainer = document.getElementById('customerEditFields');
     
-    title.textContent = 'Edit Customer: ' + (customer.Name || 'Customer');
+    title.textContent = 'Edit Customer: ' + (customer[customerHeaders[0]] || 'Customer');
     
-    // Clear and rebuild ALL fields from customerHeaders
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
@@ -421,7 +562,6 @@ function saveCustomerEdit() {
         return;
     }
     
-    // Save ALL fields back to the customer object
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
         var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
@@ -432,7 +572,8 @@ function saveCustomerEdit() {
     
     renderCustomerTable();
     closeCustomerEditModal();
-    showToast('Customer saved successfully', false);
+    showToast('Customer saved locally', false);
+    // Note: To save back to Google Sheets, you would need write permissions
 }
 
 function escapeHtmlForModal(str) {
@@ -529,7 +670,7 @@ function filterProducts() {
     document.getElementById('prodCount').innerHTML = filtered.length + ' records';
 }
 
-// ========== ADDITIVE FIX: Product Edit Modal Functions - Shows ALL fields ==========
+// Product Edit Modal Functions
 function openProductEditModalNew(idx) {
     console.log('Opening product edit modal for index:', idx);
     currentEditingProductIndex = idx;
@@ -541,11 +682,10 @@ function openProductEditModalNew(idx) {
     
     title.textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
     
-    // Clear and rebuild ALL fields from product headers (excluding Status)
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
-        if (header === 'Status') continue; // Status is handled by toggle button
+        if (header === 'Status') continue;
         var value = product[header] || '';
         var fieldId = 'prod_edit_' + header.replace(/ /g, '_');
         fieldsContainer.innerHTML += `
@@ -571,7 +711,6 @@ function saveProductEditNew() {
         return;
     }
     
-    // Save ALL fields back to the product object
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
         if (header === 'Status') continue;
@@ -602,7 +741,6 @@ function toggleProductStatusNew() {
     var statusMsg = newStatus === 'Active' ? 'activated' : 'deactivated';
     showToast(`Product ${statusMsg}`, false);
     
-    // Re-open modal with updated data
     openProductEditModalNew(currentEditingProductIndex);
 }
 
@@ -979,10 +1117,20 @@ document.getElementById('btnManager').onclick = function() {
     document.getElementById('mgrModal').style.display = 'flex';
 };
 
+// ========== ADDITIVE FIX: Override Customer Maintenance button to load from Google Sheets ==========
 document.getElementById('btnShowCust').onclick = function() {
     document.getElementById('custView').style.display = 'block';
     document.getElementById('prodView').style.display = 'none';
-    renderCustomerTable();
+    // Load from Google Sheets instead of demo data
+    if (accessToken) {
+        loadCustomersFromGoogleSheets();
+    } else {
+        showGoogleSignInButton();
+        var tbody = document.getElementById('custTableBody');
+        tbody.innerHTML = '<tr><td colspan="10">⚠️ Please click the "Sign in with Google" button above to load customer data.</div>';
+        document.getElementById('customerDataSource').textContent = 'Sign in required';
+        document.getElementById('customerDataSource').style.background = '#ffc107';
+    }
 };
 
 document.getElementById('btnShowProd').onclick = function() {
@@ -1025,7 +1173,11 @@ document.getElementById('btnUserMgmt').onclick = () => alert('User Management - 
 document.getElementById('btnForceRefresh').onclick = function() {
     loadRoutes();
     loadProductFile('Coffee.csv');
-    loadDemoCustomers();
+    if (accessToken) {
+        loadCustomersFromGoogleSheets();
+    } else {
+        showGoogleSignInButton();
+    }
     showToast('Refreshed', false);
 };
 
@@ -1038,16 +1190,27 @@ bottomBtn.innerHTML = '<i class="fas fa-cog"></i> MANAGER PANEL';
 bottomBtn.onclick = () => document.getElementById('mgrModal').style.display = 'flex';
 document.body.appendChild(bottomBtn);
 
-// Initialize map marker
+// Initialize map
+map = L.map('map').setView([55.17, -118.79], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
 var marker = L.marker([55.17, -118.79]).addTo(map);
 marker.bindPopup("LogiFlow Delivery - Ready").openPopup();
 
-// ========== ADDITIVE FIX: Attach modal button event listeners ==========
+// ========== ADDITIVE FIX: Initial load ==========
+loadRoutes();
+loadProductFile('Coffee.csv');
+
+// Show Google Sign-In button for customer data
+showGoogleSignInButton();
+
+// Attach modal button event listeners
 document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
 document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
 document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
 
-// ========== ADDITIVE FIX: Ensure modals close when clicking outside ==========
+// Close modals when clicking outside
 window.onclick = function(event) {
     var customerModal = document.getElementById('customerEditModal');
     var productModal = document.getElementById('productEditModalNew');
@@ -1055,7 +1218,7 @@ window.onclick = function(event) {
     if (event.target === productModal) closeProductEditModalNew();
 };
 
-console.log('LogiFlow Delivery System Ready - Edit modals show ALL fields from tables');
+console.log('LogiFlow Delivery System Ready - Loading customers from Google Sheets after sign-in');
 </script>
 </body>
 </html>
