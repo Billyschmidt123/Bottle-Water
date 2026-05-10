@@ -62,10 +62,28 @@
         .toast-error {
             background: #dc3545;
         }
+        .toast-warning {
+            background: #ffc107;
+            color: #333;
+        }
         .user-email {
             font-size: 12px;
             margin-left: 10px;
-            color: #66ff66;
+            color: #90ff90;
+        }
+        .google-signin-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 15px;
+        }
+        .save-status {
+            font-size: 11px;
+            margin-left: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #333;
+            color: #ffc107;
         }
         @keyframes fadeOut {
             0% { opacity: 1; }
@@ -83,11 +101,13 @@
             <select id="routeDropdown" class="btn-top" style="background:#0056b3;"></select>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
-            <!-- ========== ADDITIVE FIX: Google Sign In ========== -->
-            <div id="g_id_onload" data-client_id="343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com" data-auto_prompt="false"></div>
-            <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline" data-text="signin_with" data-shape="rectangular"></div>
-            <button id="googleSignOutBtn" class="btn-top" style="background:#dc3545; display:none;">Sign Out</button>
-            <span id="userEmailDisplay" class="user-email"></span>
+            <!-- ========== ADDITIVE FIX: Google Sign In Container ========== -->
+            <div class="google-signin-container">
+                <div id="googleSignInDiv"></div>
+                <button id="googleSignOutBtn" class="btn-top" style="background:#dc3545; display:none;">Sign Out</button>
+                <span id="userEmailDisplay" class="user-email"></span>
+                <span id="saveStatus" class="save-status">⚡ Local Save Only</span>
+            </div>
             <!-- ========== END OF ADDITIVE FIX ========== -->
             <button id="btnManager" class="btn-top" style="background:#6c757d;">Manager</button>
             <button id="btnForceRefresh" class="btn-top" style="background:#17a2b8;"><i class="fas fa-sync"></i></button>
@@ -385,7 +405,7 @@
 
                 if (csvHeaders.length === 0) {
                     csvHeaders = lines[0].split(',').map(h => h.trim());
-                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    thead.innerHTML = `<td><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
                 }
 
                 lines.slice(1).forEach(line => {
@@ -428,7 +448,7 @@
                         <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleCustomerStatus(${idx})">${c._status === "Active" ? "Deactivate" : "Activate"}</button>
                     </div>`;
                 csvHeaders.forEach(h => row += `<td>${c[h] || ''}</div>`);
-                tbody.innerHTML += row + '</tr>';
+                tbody.innerHTML += row + '<tr>';
             });
         }
         window.renderCustTable = renderCustTable;
@@ -877,7 +897,7 @@
                             <th style="border: 1px solid #000; width: 62%; font-size: 9px; padding: 2px;">DESCRIPTION</th>
                             <th style="border: 1px solid #000; width: 15%; font-size: 9px; padding: 2px;">EACH</th>
                             <th style="border: 1px solid #000; width: 15%; font-size: 9px; padding: 2px;">TOTAL</th>
-                        </tr>
+                        </td>
                     </thead>
                     <tbody>
                         ${deliveryCart.map(item => `
@@ -951,7 +971,7 @@
                     const base64Content = reader.result.split(',')[1];
                     const targetPath = `Pdf/${fileName}`;
                     
-                    // ========== ADDITIVE FIX: Try GitHub save, then fallback to Google Drive ==========
+                    // ========== ADDITIVE FIX: Try GitHub save, then Google Drive, then local download ==========
                     let saveSuccess = false;
                     
                     // Try GitHub first (original code preserved)
@@ -968,21 +988,27 @@
                             document.getElementById('stopModal').style.display = 'none';
                         }
                     } catch (githubErr) {
-                        console.warn("GitHub save failed, trying Google Drive fallback:", githubErr);
+                        console.warn("GitHub save failed:", githubErr);
                     }
                     
-                    // Fallback to Google Drive if GitHub failed and user is signed in
-                    if (!saveSuccess && window.googleDriveSave) {
-                        const driveSuccess = await window.googleDriveSave(fileName, base64Content, 'application/pdf');
+                    // Fallback to Google Drive if signed in
+                    if (!saveSuccess && window.googleDriveSaveFallback) {
+                        const driveSuccess = await window.googleDriveSaveFallback(fileName, base64Content, 'application/pdf');
                         if (driveSuccess) {
-                            await window.googleSheetsAppendToLog([driverName, receiverName, new Date().toLocaleString(), customerName, slipNum, "Delivered", "N/A"]);
-                            alert(`SUCCESS!\nPDF saved to Google Drive.\nFilename: ${fileName}\nDelivery logged to Google Sheets.`);
+                            saveSuccess = true;
+                            alert(`SUCCESS!\nPDF saved to Google Drive.\nFilename: ${fileName}`);
                             document.getElementById('stopModal').style.display = 'none';
-                        } else {
-                            alert("Failed to save to both GitHub and Google Drive. Please check your Google sign-in.");
                         }
-                    } else if (!saveSuccess && !window.googleDriveSave) {
-                        alert("GitHub save failed and Google Drive is not configured. Please sign in with Google to enable cloud save.");
+                    }
+                    
+                    // Final fallback: download locally
+                    if (!saveSuccess) {
+                        const link = document.createElement('a');
+                        link.download = fileName;
+                        link.href = reader.result;
+                        link.click();
+                        alert(`PDF downloaded to your computer.\nFilename: ${fileName}\n(Google Drive save requires signing in)`);
+                        document.getElementById('stopModal').style.display = 'none';
                     }
                 };
             } catch (err) { alert("Critical error generating PDF: " + err); }
@@ -1216,73 +1242,18 @@
         function managerUserMgmt() { alert("Loading User Management Panel..."); }
     </script>
 
-    <!-- ========== ADDITIVE FIX: Simplified Google Drive & Sheets Integration ========== -->
+    <!-- ========== ADDITIVE FIX: Simplified Google Drive Save (Fallback Only) ========== -->
     <script>
-    // Google Configuration
-    const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
-    const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
-    const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
-    
-    let accessToken = null;
-    let userEmail = null;
-    
-    function showToast(message, isError) {
-        var toast = document.createElement('div');
-        toast.className = 'toast-notification';
-        if (isError) toast.classList.add('toast-error');
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
-    }
-    
-    // Handle Google Sign-In response
-    function handleCredentialResponse(response) {
-        console.log("Google Sign-In success");
-        // Decode JWT to get user email
-        var payload = JSON.parse(atob(response.credential.split('.')[1]));
-        userEmail = payload.email;
-        document.getElementById('userEmailDisplay').textContent = '✓ ' + userEmail;
-        document.getElementById('googleSignOutBtn').style.display = 'inline-block';
-        showToast("Signed in as: " + userEmail, false);
-        
-        // Request access token for API calls
-        requestAccessToken();
-    }
-    
-    function requestAccessToken() {
-        var tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            callback: function(tokenResponse) {
-                if (tokenResponse.access_token) {
-                    accessToken = tokenResponse.access_token;
-                    showToast("Google Drive & Sheets access granted", false);
-                    console.log("Access token obtained");
-                } else {
-                    console.error("Token error:", tokenResponse);
-                    showToast("Failed to get access token", true);
-                }
-            }
-        });
-        tokenClient.requestAccessToken();
-    }
-    
-    function signOut() {
-        accessToken = null;
-        userEmail = null;
-        document.getElementById('userEmailDisplay').textContent = '';
-        document.getElementById('googleSignOutBtn').style.display = 'none';
-        google.accounts.id.disableAutoSelect();
-        showToast("Signed out", false);
-    }
-    
-    window.googleDriveSave = async function(filename, base64Data, mimeType) {
-        if (!accessToken) {
-            showToast("Please sign in with Google first to save files.", true);
-            return false;
-        }
-        
+    // Simple Google Drive save function (optional, will fallback to download if not signed in)
+    window.googleDriveSaveFallback = async function(filename, base64Data, mimeType) {
         try {
+            // Check if we have a stored token
+            let token = localStorage.getItem('google_access_token');
+            if (!token) {
+                console.log("No Google token found, will download locally");
+                return false;
+            }
+            
             var base64Content = base64Data;
             if (base64Data.includes(',')) {
                 base64Content = base64Data.split(',')[1];
@@ -1290,156 +1261,163 @@
             
             var metadata = {
                 name: filename,
-                mimeType: mimeType,
-                parents: [GOOGLE_DRIVE_FOLDER_ID]
+                mimeType: mimeType
             };
             
-            // First, create the file metadata
             var metadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
                 method: 'POST',
                 headers: {
-                    'Authorization': 'Bearer ' + accessToken,
+                    'Authorization': 'Bearer ' + token,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(metadata)
             });
             
-            var fileData = await metadataResponse.json();
-            if (!metadataResponse.ok) {
-                throw new Error(fileData.error?.message || 'Metadata creation failed');
-            }
+            if (!metadataResponse.ok) return false;
             
+            var fileData = await metadataResponse.json();
             var fileId = fileData.id;
             
-            // Then upload the content
             var uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
                 headers: {
-                    'Authorization': 'Bearer ' + accessToken,
+                    'Authorization': 'Bearer ' + token,
                     'Content-Type': mimeType
                 },
                 body: base64Content
             });
             
-            if (uploadResponse.ok) {
-                showToast("PDF saved to Google Drive: " + filename, false);
-                return true;
-            } else {
-                var error = await uploadResponse.json();
-                console.error("Upload error:", error);
-                showToast("Failed to save PDF", true);
-                return false;
-            }
+            return uploadResponse.ok;
         } catch (err) {
-            console.error("Drive save exception:", err);
-            showToast("Error saving to Drive: " + err.message, true);
+            console.error("Drive save error:", err);
             return false;
         }
     };
     
-    window.googleSheetsAppendToLog = async function(rowArray) {
-        if (!accessToken) return false;
-        try {
-            var range = 'TripLog!A:G';
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED`;
-            
-            var response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    values: [rowArray]
-                })
-            });
-            
-            if (response.ok) {
-                console.log("Appended to Google Sheets log");
-                return true;
-            } else {
-                var error = await response.json();
-                console.error("Sheets error:", error);
-                return false;
-            }
-        } catch (err) {
-            console.error("Sheets append error:", err);
-            return false;
-        }
+    // Simple function to save product data to localStorage (always works)
+    window.saveProductsToLocalStorage = function(products, headers, filename) {
+        var data = {
+            headers: headers,
+            products: products,
+            file: filename,
+            timestamp: new Date().toISOString()
+        };
+        localStorage.setItem('logiflow_products_' + filename, JSON.stringify(data));
+        console.log("Products saved to localStorage");
+        return true;
     };
     
-    window.saveProductToSheet = async function(productData, headers) {
-        if (!accessToken) {
-            showToast("Please sign in with Google to save products", true);
-            return false;
+    // Load products from localStorage if available
+    window.loadProductsFromLocalStorage = function(filename) {
+        var saved = localStorage.getItem('logiflow_products_' + filename);
+        if (saved) {
+            var data = JSON.parse(saved);
+            console.log("Loaded products from localStorage for:", filename);
+            return data;
         }
-        try {
-            var range = 'Products!A:Z';
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${range}:clear?valueInputOption=USER_ENTERED`;
-            
-            // Clear existing data first
-            await fetch(url, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + accessToken }
-            });
-            
-            // Write headers and data
-            var writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${range}:update?valueInputOption=USER_ENTERED`;
-            var allData = [headers, ...productData];
-            
-            var response = await fetch(writeUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ values: allData })
-            });
-            
-            if (response.ok) {
-                showToast("Products saved to Google Sheets", false);
-                return true;
-            } else {
-                var error = await response.json();
-                console.error("Sheets write error:", error);
-                return false;
-            }
-        } catch (err) {
-            console.error("Save error:", err);
-            return false;
-        }
+        return null;
     };
     
-    // Initialize Google Sign-In
-    window.onload = function() {
+    // Update status display
+    function updateSaveStatus() {
+        var token = localStorage.getItem('google_access_token');
+        var statusSpan = document.getElementById('saveStatus');
+        if (statusSpan) {
+            if (token) {
+                statusSpan.innerHTML = '✅ Google Drive Ready';
+                statusSpan.style.color = '#90ff90';
+                statusSpan.style.background = '#2d2d2d';
+            } else {
+                statusSpan.innerHTML = '💾 Saving to Browser (Sign in with Google for cloud save)';
+                statusSpan.style.color = '#ffc107';
+                statusSpan.style.background = '#2d2d2d';
+            }
+        }
+    }
+    
+    // Check for existing token on load
+    window.checkGoogleToken = function() {
+        var token = localStorage.getItem('google_access_token');
+        if (token) {
+            document.getElementById('userEmailDisplay').textContent = '✓ Connected';
+            document.getElementById('googleSignOutBtn').style.display = 'inline-block';
+        }
+        updateSaveStatus();
+    };
+    
+    // Set up Google Sign-In button
+    window.setupGoogleSignIn = function() {
+        var clientId = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+        
         google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleCredentialResponse,
-            auto_select: false
+            client_id: clientId,
+            callback: function(response) {
+                console.log("Google Sign-In success");
+                var payload = JSON.parse(atob(response.credential.split('.')[1]));
+                document.getElementById('userEmailDisplay').textContent = '✓ ' + payload.email;
+                document.getElementById('googleSignOutBtn').style.display = 'inline-block';
+                updateSaveStatus();
+                
+                // Request access token for Drive API
+                var tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'https://www.googleapis.com/auth/drive.file',
+                    callback: function(tokenResponse) {
+                        if (tokenResponse.access_token) {
+                            localStorage.setItem('google_access_token', tokenResponse.access_token);
+                            updateSaveStatus();
+                            alert("Google Drive access granted! PDFs will save to your Drive.");
+                        }
+                    }
+                });
+                tokenClient.requestAccessToken();
+            }
         });
         
         google.accounts.id.renderButton(
-            document.querySelector('.g_id_signin'),
-            { theme: 'outline', size: 'small' }
+            document.getElementById('googleSignInDiv'),
+            { theme: 'outline', size: 'small', text: 'signin_with' }
         );
         
-        document.getElementById('googleSignOutBtn').onclick = signOut;
+        document.getElementById('googleSignOutBtn').onclick = function() {
+            localStorage.removeItem('google_access_token');
+            document.getElementById('userEmailDisplay').textContent = '';
+            document.getElementById('googleSignOutBtn').style.display = 'none';
+            google.accounts.id.disableAutoSelect();
+            updateSaveStatus();
+            alert("Signed out. PDFs will download locally.");
+        };
+    };
+    
+    // Initialize on page load
+    window.onload = function() {
+        if (typeof google !== 'undefined' && google.accounts) {
+            setupGoogleSignIn();
+        } else {
+            console.log("Google API not loaded yet, waiting...");
+            setTimeout(function() {
+                if (typeof google !== 'undefined' && google.accounts) {
+                    setupGoogleSignIn();
+                }
+            }, 1000);
+        }
+        checkGoogleToken();
     };
     </script>
     <!-- ========== END OF ADDITIVE FIX ========== -->
 
-    <!-- ========== ADDITIVE FIX: Override Product Save with Google Sheets ========== -->
+    <!-- ========== ADDITIVE FIX: Override Product Save with LocalStorage Fallback ========== -->
     <script>
     (function fixProductManagement() {
         setTimeout(function() {
             if (typeof window.ghGet !== 'undefined') {
-                console.log("Product management fix with Google Sheets fallback applied");
+                console.log("Product management fix with localStorage fallback applied");
             } else {
                 setTimeout(arguments.callee, 500);
                 return;
             }
             
-            // Override updateRow with Google Sheets fallback
+            // Override updateRow with localStorage fallback
             window.updateRow = async function(idx) {
                 var data = currentProdList[idx];
                 for (var h = 0; h < currentProdHeaders.length; h++) {
@@ -1450,20 +1428,26 @@
                     }
                 }
                 
-                // Try GitHub first (preserved original behavior)
-                var csvContent = currentProdHeaders.join(',') + '\n';
-                for (var p = 0; p < currentProdList.length; p++) {
-                    var product = currentProdList[p];
-                    var row = [];
-                    for (var h = 0; h < currentProdHeaders.length; h++) {
-                        var val = product[currentProdHeaders[h]] || '';
-                        if (val.indexOf(',') !== -1) val = '"' + val + '"';
-                        row.push(val);
-                    }
-                    csvContent += row.join(',') + '\n';
-                }
+                // Update the product list with new data
+                window.renderProdTable();
                 
+                // Save to localStorage
+                var saved = window.saveProductsToLocalStorage(currentProdList, currentProdHeaders, currentProductFile);
+                
+                // Try GitHub save (original)
                 try {
+                    var csvContent = currentProdHeaders.join(',') + '\n';
+                    for (var p = 0; p < currentProdList.length; p++) {
+                        var product = currentProdList[p];
+                        var row = [];
+                        for (var h = 0; h < currentProdHeaders.length; h++) {
+                            var val = product[currentProdHeaders[h]] || '';
+                            if (val.indexOf(',') !== -1) val = '"' + val + '"';
+                            row.push(val);
+                        }
+                        csvContent += row.join(',') + '\n';
+                    }
+                    
                     var response = await fetch('https://api.github.com/repos/' + window.repo + '/contents/Products/' + currentProductFile, {
                         method: 'PUT',
                         headers: { 'Authorization': 'token ' + window.token, 'Content-Type': 'application/json' },
@@ -1475,36 +1459,17 @@
                     });
                     
                     if (response.ok) {
-                        showToast("Product saved to GitHub successfully!", false);
-                        window.renderProdTable();
+                        alert("Product saved to GitHub successfully!");
                         return;
                     }
                 } catch (gitHubErr) {
                     console.warn("GitHub save failed:", gitHubErr);
                 }
                 
-                // Fallback to Google Sheets if signed in
-                if (accessToken) {
-                    var sheetData = [];
-                    for (var p = 0; p < currentProdList.length; p++) {
-                        var prod = currentProdList[p];
-                        var rowData = [];
-                        for (var h = 0; h < currentProdHeaders.length; h++) {
-                            rowData.push(prod[currentProdHeaders[h]] || '');
-                        }
-                        sheetData.push(rowData);
-                    }
-                    
-                    var success = await window.saveProductToSheet(sheetData, currentProdHeaders);
-                    if (success) {
-                        window.renderProdTable();
-                    }
-                } else {
-                    showToast("GitHub save failed. Please sign in with Google to enable cloud save.", true);
-                }
+                alert("Product saved to browser storage. Changes will persist on this device.\n(Sign in with Google to save to cloud)");
             };
             
-            console.log("Product management fix with Google Sheets fallback applied");
+            console.log("Product management fix with localStorage fallback applied");
         }, 100);
     })();
     </script>
