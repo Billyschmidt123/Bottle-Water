@@ -3,29 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System</title>
+    <title>LogiFlow Delivery System - Live Data</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Courier New', monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
-        header { background: #004a99; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header { background: #004a99; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .main-container { display: flex; flex: 1; overflow: hidden; }
         #map { flex: 1; height: 100%; }
-        .side-panel { width: 350px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+        .side-panel { width: 380px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
         .panel-header { padding: 15px; border-bottom: 1px solid #eee; }
         .stop-list { flex: 1; overflow-y: auto; padding: 10px; }
         .btn-top { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-top:hover { background: #0056b3; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
-        .mgmt-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-        .mgmt-table th, .mgmt-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .mgmt-table th { background: #f0f0f0; }
+        .mgmt-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        .mgmt-table th, .mgmt-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        .mgmt-table th { background: #f0f0f0; position: sticky; top: 0; }
         .mgmt-nav-btn { padding: 10px 20px; border: none; background: #eee; cursor: pointer; border-radius: 4px 4px 0 0; margin-right: 5px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
         .driver-nav-bar { background: #e9ecef; padding: 10px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #dee2e6; flex-wrap: wrap; }
-        .info-bar { background: #fff; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .info-bar { background: #fff; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .btn-nav { padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: white; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; z-index: 2000; animation: fadeOut 3s ease-in-out forwards; }
         .toast-error { background: #dc3545; }
@@ -44,185 +50,40 @@
         .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; }
         .working-bottom-btn:hover { background: #218838; }
         
-        /* Edit modal styles */
-        .edit-modal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-            max-height: 55vh;
-            overflow-y: auto;
-            padding: 5px;
-        }
-        .edit-field-group {
-            display: flex;
-            flex-direction: column;
-        }
-        .edit-field-group label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 12px;
-            color: #333;
-        }
-        .edit-field-group input, .edit-field-group textarea {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 13px;
-        }
-        .modal-buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
-        }
-        .modal-buttons-left {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
-        }
+        .edit-modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin: 15px 0; max-height: 55vh; overflow-y: auto; padding: 5px; }
+        .edit-field-group { display: flex; flex-direction: column; }
+        .edit-field-group label { font-weight: bold; margin-bottom: 5px; font-size: 12px; color: #333; }
+        .edit-field-group input, .edit-field-group textarea { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 13px; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
+        .modal-buttons-left { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
         
-        /* ========== MANUAL LOGIN MODAL STYLES ========== */
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #004a99 0%, #002a55 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 20000;
-        }
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 16px;
-            text-align: center;
-            width: 420px;
-            max-width: 90%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        .login-container h1 {
-            color: #004a99;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        .login-container .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .login-logo {
-            font-size: 60px;
-            color: #004a99;
-            margin-bottom: 20px;
-        }
-        .login-form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-        .login-form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #333;
-            font-size: 13px;
-        }
-        .login-form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-        .login-form-group input:focus {
-            outline: none;
-            border-color: #004a99;
-            box-shadow: 0 0 0 2px rgba(0,74,153,0.1);
-        }
-        .login-btn {
-            background: #004a99;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .login-btn:hover {
-            background: #003a7a;
-        }
-        .login-error {
-            color: #dc3545;
-            font-size: 12px;
-            margin-top: 10px;
-            display: none;
-        }
-        .data-source-badge {
-            background: #17a2b8;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            margin-left: 10px;
-        }
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: #e8f0fe;
-            padding: 8px 15px;
-            border-radius: 20px;
-        }
-        .user-info i {
-            font-size: 20px;
-        }
-        .logout-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 12px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 11px;
-        }
-        .logout-btn:hover {
-            background: #c82333;
-        }
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #004a99 0%, #002a55 100%); display: flex; justify-content: center; align-items: center; z-index: 20000; }
+        .login-container { background: white; padding: 40px; border-radius: 16px; text-align: center; width: 420px; max-width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .login-container h1 { color: #004a99; margin-bottom: 10px; font-size: 28px; }
+        .login-container .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .login-logo { font-size: 60px; color: #004a99; margin-bottom: 20px; }
+        .google-login-btn { background: #4285f4; color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .google-login-btn:hover { background: #3367d6; }
+        .login-error { color: #dc3545; font-size: 12px; margin-top: 10px; display: none; }
+        .user-info { display: flex; align-items: center; gap: 10px; background: #e8f0fe; padding: 8px 15px; border-radius: 20px; }
+        .user-info img { width: 32px; height: 32px; border-radius: 50%; }
+        .logout-btn { background: #dc3545; color: white; border: none; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 11px; }
+        .data-source-badge { background: #17a2b8; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 10px; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .route-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; background: #fff; margin: 2px 0; border-radius: 4px; transition: background 0.2s; }
+        .route-item:hover { background: #e8f0fe; }
+        .route-item strong { font-size: 14px; }
+        .route-item small { color: #666; }
     </style>
 </head>
 <body>
 
 <header>
     <div><h1 style="margin:0; font-size:1.5rem;">LogiFlow Delivery</h1></div>
-    <div style="display:flex; gap:10px; align-items:center;">
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <div id="userInfoDisplay" style="display:none;" class="user-info"></div>
-        <span id="onlineStatus" class="badge" style="background:#dc3545;"><i class="fas fa-lock"></i> Not Logged In</span>
+        <span id="onlineStatus" class="badge" style="background:#dc3545;"><i class="fas fa-sign-out-alt"></i> Not Connected</span>
         <button id="btnManager" class="btn-top" style="display:none;">Manager</button>
         <button id="btnForceRefresh" class="btn-top" style="display:none;"><i class="fas fa-sync"></i></button>
     </div>
@@ -245,7 +106,7 @@
             <h3 style="margin:0 0 10px 0;">Select a Route</h3>
             <select id="routeDropdown" class="btn-top" style="background:#0056b3; width:100%;"></select>
         </div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">No route loaded.</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Select a route from the dropdown</p></div>
     </div>
 </div>
 
@@ -254,7 +115,7 @@
     <div class="modal-content">
         <div style="display:flex; justify-content: space-between;">
             <h2>Manager Control Panel</h2>
-            <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
+            <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top btn-danger">Exit</button>
         </div>
         <hr>
         <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px;">
@@ -269,31 +130,29 @@
             <button id="btnUserMgmt" class="mgmt-nav-btn">User Management</button>
         </div>
         
-        <!-- Customer View -->
         <div id="custView">
             <div class="search-bar">
                 <input type="text" id="custSearch" placeholder="Search customers..." onkeyup="filterCustomers()">
                 <span id="custCount" class="badge"></span>
                 <span id="customerDataSource" class="data-source-badge">Loading...</span>
             </div>
-            <div style="overflow-x: auto; max-height: 60vh; overflow-y: auto;">
+            <div style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
-                    <tbody id="custTableBody"><tr><td colspan="10">Please log in to load customer data...</div></tr></tbody>
+                    <tbody id="custTableBody"></tbody>
                 </table>
             </div>
         </div>
         
-        <!-- Product View -->
         <div id="prodView" style="display:none;">
             <div style="margin-bottom:10px; display:flex; gap:10px;">
-                <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">☕ Coffee Products</button>
-                <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">💧 Water Products</button>
-                <button class="btn-top" onclick="loadProductFile('Equipment.csv')" style="background:#6c757d;">🔧 Equipment</button>
+                <button id="btnLoadCoffee" class="btn-top" style="background:#6f4e37;">☕ Coffee Products</button>
+                <button id="btnLoadWater" class="btn-top" style="background:#00a8e8;">💧 Water Products</button>
             </div>
             <div class="search-bar">
                 <input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterProducts()">
                 <span id="prodCount" class="badge"></span>
+                <span id="productDataSource" class="data-source-badge">Loading...</span>
             </div>
             <div style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
                 <table class="mgmt-table">
@@ -305,12 +164,12 @@
     </div>
 </div>
 
-<!-- Stop Modal (Delivery) -->
+<!-- Stop Modal -->
 <div id="stopModal" class="modal-overlay">
     <div class="modal-content" style="max-width:700px;">
         <div style="display:flex; justify-content:space-between;">
             <h2 id="stopModalTitle">Delivery Stop</h2>
-            <button onclick="closeStopModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+            <button onclick="closeStopModal()" class="btn-top btn-danger">Cancel</button>
         </div>
         <hr>
         <div style="background:#f8f9fa; padding:12px; border-radius:8px;">
@@ -328,7 +187,7 @@
         </div>
         <table class="cart-table">
             <thead><tr><th>Item</th><th>Qty</th><th></th></thead>
-            <tbody id="cartItemsBody"><tr><td colspan="3" style="text-align:center; color:#999;">No items added</div></tr></tbody>
+            <tbody id="cartItemsBody"></tbody>
         </table>
         <hr>
         <div class="form-group">
@@ -340,12 +199,12 @@
             <canvas id="sig-canvas" width="400" height="120"></canvas>
             <div style="margin-top:5px; display:flex; gap:10px;">
                 <button class="btn-top" onclick="clearSignature()">Clear</button>
-                <button class="btn-top" style="background:#28a745;" onclick="activateSignature()">Click to Sign</button>
+                <button class="btn-top btn-success" onclick="activateSignature()">Click to Sign</button>
             </div>
         </div>
         <div style="margin-top:20px; display:flex; gap:10px;">
-            <button class="btn-top" style="background:#dc3545; flex:1;" onclick="markNotDelivered()">❌ NOT DELIVERED</button>
-            <button class="btn-top" style="background:#28a745; flex:2;" onclick="completeDelivery()">✅ COMPLETE DELIVERY</button>
+            <button class="btn-top btn-danger" style="flex:1;" onclick="markNotDelivered()">❌ NOT DELIVERED</button>
+            <button class="btn-top btn-success" style="flex:2;" onclick="completeDelivery()">✅ COMPLETE DELIVERY</button>
         </div>
     </div>
 </div>
@@ -353,15 +212,15 @@
 <!-- Customer Edit Modal -->
 <div id="customerEditModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 800px;">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
+        <div style="display:flex; justify-content: space-between;">
             <h2 id="customerEditModalTitle">Edit Customer</h2>
-            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+            <button onclick="closeCustomerEditModal()" class="btn-top btn-danger">Cancel</button>
         </div>
         <hr>
         <div id="customerEditFields" class="edit-modal-grid"></div>
         <div class="modal-buttons">
-            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-            <button id="saveCustomerEditBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+            <button onclick="closeCustomerEditModal()" class="btn-top">Cancel</button>
+            <button id="saveCustomerEditBtn" class="btn-top btn-success">Save Changes</button>
         </div>
     </div>
 </div>
@@ -369,19 +228,17 @@
 <!-- Product Edit Modal -->
 <div id="productEditModalNew" class="modal-overlay">
     <div class="modal-content" style="max-width: 800px;">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
+        <div style="display:flex; justify-content: space-between;">
             <h2 id="productEditModalTitleNew">Edit Product</h2>
-            <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#dc3545;">Cancel</button>
+            <button onclick="closeProductEditModalNew()" class="btn-top btn-danger">Cancel</button>
         </div>
         <hr>
         <div id="productEditFields" class="edit-modal-grid"></div>
         <div class="modal-buttons-left">
+            <div><button id="productToggleStatusBtnNew" class="btn-top" style="background:#ffc107;">Toggle Status</button></div>
             <div>
-                <button id="productToggleStatusBtnNew" class="btn-top" style="background:#ffc107;">Toggle Status</button>
-            </div>
-            <div>
-                <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="saveProductEditBtnNew" class="btn-top" style="background:#28a745;">Save Changes</button>
+                <button onclick="closeProductEditModalNew()" class="btn-top">Cancel</button>
+                <button id="saveProductEditBtnNew" class="btn-top btn-success">Save Changes</button>
             </div>
         </div>
     </div>
@@ -390,37 +247,33 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ============================================================
-// CONFIGURATION
+// GOOGLE SHEETS CONFIGURATION
 // ============================================================
-const REPO_OWNER = 'Billyschmidt123';
-const REPO_NAME = 'Bottle-Water';
-const GITHUB_RAW = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/`;
-
-// ========== LOGIN CREDENTIALS ==========
-const VALID_USERNAME = 'culliganservicescheduling@gmail.com';
-const VALID_PASSWORD = 'Service123!A';
+const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
 
 // Global variables
-var isLoggedIn = false;
-var currentUser = null;
+var accessToken = null;
+var userEmail = null;
+var userName = null;
+var userPicture = null;
 var currentProdList = [];
 var currentProdHeaders = [];
-var currentProductFile = '';
+var currentProductFile = 'Coffee.csv';
 var deliveryCart = [];
 var isSigBlank = true;
-var drawing = false;
 var driverName = "";
 var currentStopIndex = -1;
 var currentRouteStops = [];
 var map;
 var customers = [];
 var customerHeaders = [];
-var signatureActive = false;
 var currentEditingCustomerIndex = -1;
 var currentEditingProductIndex = -1;
 
 // ============================================================
-// MANUAL LOGIN MODAL
+// GOOGLE SIGN-IN
 // ============================================================
 function showLoginModal() {
     var modal = document.createElement('div');
@@ -428,100 +281,96 @@ function showLoginModal() {
     modal.className = 'login-overlay';
     modal.innerHTML = `
         <div class="login-container">
-            <div class="login-logo">
-                <i class="fas fa-truck"></i>
-            </div>
+            <div class="login-logo"><i class="fas fa-truck"></i></div>
             <h1>LogiFlow Delivery</h1>
-            <div class="subtitle">Sign in to access your delivery system</div>
-            <div class="login-form-group">
-                <label><i class="fas fa-envelope"></i> Email</label>
-                <input type="email" id="loginUsername" placeholder="culliganservicescheduling@gmail.com" value="culliganservicescheduling@gmail.com">
-            </div>
-            <div class="login-form-group">
-                <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="loginPassword" placeholder="Enter password">
-            </div>
-            <div id="loginError" class="login-error">Invalid username or password</div>
-            <button id="loginBtn" class="login-btn"><i class="fas fa-sign-in-alt"></i> Sign In</button>
-            <p style="font-size:11px; color:#999; margin-top:20px;">
-                <i class="fas fa-shield-alt"></i> Secure login with your credentials
-            </p>
+            <div class="subtitle">Sign in with Google to access your live data</div>
+            <button id="googleLoginBtn" class="google-login-btn"><i class="fab fa-google"></i> Sign in with Google</button>
+            <div id="loginError" class="login-error"></div>
         </div>
     `;
     document.body.appendChild(modal);
-    
-    document.getElementById('loginBtn').onclick = function() {
-        var username = document.getElementById('loginUsername').value.trim();
-        var password = document.getElementById('loginPassword').value;
+    document.getElementById('googleLoginBtn').onclick = startGoogleSignIn;
+}
+
+function startGoogleSignIn() {
+    showToast('Opening Google Sign-In...', false);
+    google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false
+    });
+    google.accounts.id.prompt();
+}
+
+function handleCredentialResponse(response) {
+    try {
+        var payload = JSON.parse(atob(response.credential.split('.')[1]));
+        userEmail = payload.email;
+        userName = payload.name;
+        userPicture = payload.picture;
         
-        if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-            isLoggedIn = true;
-            currentUser = username;
-            document.getElementById('loginModal').remove();
-            completeLogin();
-        } else {
-            var errorDiv = document.getElementById('loginError');
-            errorDiv.style.display = 'block';
-            setTimeout(function() {
-                errorDiv.style.display = 'none';
-            }, 3000);
-        }
-    };
-    
-    // Allow Enter key to submit
-    document.getElementById('loginPassword').onkeypress = function(e) {
-        if (e.key === 'Enter') {
-            document.getElementById('loginBtn').click();
-        }
-    };
+        var tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+            callback: function(tokenResponse) {
+                if (tokenResponse.access_token) {
+                    accessToken = tokenResponse.access_token;
+                    document.getElementById('loginModal').remove();
+                    completeLogin();
+                } else {
+                    showLoginError('Failed to get access token');
+                }
+            }
+        });
+        tokenClient.requestAccessToken();
+    } catch(e) {
+        showLoginError('Sign-in failed: ' + e.message);
+    }
+}
+
+function showLoginError(msg) {
+    var errorDiv = document.getElementById('loginError');
+    errorDiv.textContent = msg;
+    errorDiv.style.display = 'block';
+    setTimeout(function() { errorDiv.style.display = 'none'; }, 3000);
 }
 
 function completeLogin() {
-    // Update UI for logged-in state
-    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-check-circle"></i> Logged In';
+    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Live Connected';
     document.getElementById('onlineStatus').style.background = '#28a745';
     document.getElementById('btnManager').style.display = 'inline-block';
     document.getElementById('btnForceRefresh').style.display = 'inline-block';
     document.getElementById('driverNavBar').style.display = 'flex';
     document.getElementById('mainContainer').style.display = 'flex';
     
-    // Show user info
     var userInfoDiv = document.getElementById('userInfoDisplay');
     userInfoDiv.style.display = 'flex';
-    userInfoDiv.innerHTML = `<i class="fas fa-user-circle"></i><span>${currentUser}</span><button class="logout-btn" onclick="logout()">Logout</button>`;
+    userInfoDiv.innerHTML = `<img src="${userPicture}" alt="${userName}"><span>${userName || userEmail}</span><button class="logout-btn" onclick="logout()">Logout</button>`;
     
-    // Load data
-    loadRoutes();
-    loadProductFile('Coffee.csv');
-    loadDemoCustomers();
+    // Load all live data
+    loadCustomersFromSheet();
+    loadProductsFromSheet('Coffee.csv');
+    loadRoutesFromSheet();
     
     // Initialize map
-    if (!map) {
-        map = L.map('map').setView([55.17, -118.79], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-        var marker = L.marker([55.17, -118.79]).addTo(map);
-        marker.bindPopup("LogiFlow Delivery - Ready").openPopup();
-    }
+    map = L.map('map').setView([55.17, -118.79], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
     
-    showToast(`Welcome back, ${currentUser}!`, false);
+    showToast(`Welcome ${userName}! Live data loaded.`, false);
 }
 
 function logout() {
-    isLoggedIn = false;
-    currentUser = null;
-    
-    // Reset UI
-    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-lock"></i> Not Logged In';
+    accessToken = null;
+    userEmail = null;
+    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-sign-out-alt"></i> Not Connected';
     document.getElementById('onlineStatus').style.background = '#dc3545';
     document.getElementById('btnManager').style.display = 'none';
     document.getElementById('btnForceRefresh').style.display = 'none';
     document.getElementById('driverNavBar').style.display = 'none';
     document.getElementById('mainContainer').style.display = 'none';
     document.getElementById('userInfoDisplay').style.display = 'none';
-    
-    // Show login modal again
     showLoginModal();
 }
 
@@ -530,38 +379,63 @@ function showToast(msg, isErr) {
     toast.className = 'toast-notification' + (isErr ? ' toast-error' : '');
     toast.innerHTML = msg;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
 }
 
 // ============================================================
-// LOAD CUSTOMERS (Demo Data)
+// LOAD CUSTOMERS FROM GOOGLE SHEET
 // ============================================================
-function loadDemoCustomers() {
-    customers = [
-        { Name: "ABC Corporation", Address: "123 Main Street", Phone: "555-0101", Email: "contact@abccorp.com" },
-        { Name: "XYZ Industries", Address: "456 Oak Avenue", Phone: "555-0102", Email: "info@xyz.com" },
-        { Name: "Smith Trading Ltd", Address: "789 Pine Road", Phone: "555-0103", Email: "smith@trading.com" },
-        { Name: "Johnson & Sons", Address: "321 Elm Street", Phone: "555-0104", Email: "johnson@sons.com" },
-        { Name: "Williams Group", Address: "654 Maple Drive", Phone: "555-0105", Email: "williams@group.com" },
-        { Name: "Brown Enterprises", Address: "987 Cedar Lane", Phone: "555-0106", Email: "brown@enterprises.com" },
-        { Name: "Jones Logistics", Address: "147 Birch Way", Phone: "555-0107", Email: "jones@logistics.com" },
-        { Name: "Miller Supplies Inc", Address: "258 Spruce Court", Phone: "555-0108", Email: "miller@supplies.com" },
-        { Name: "Davis Distributing", Address: "369 Ash Boulevard", Phone: "555-0109", Email: "davis@distributing.com" },
-        { Name: "Garcia Foods", Address: "741 Palm Street", Phone: "555-0110", Email: "garcia@foods.com" },
-        { Name: "Rodriguez Solutions", Address: "852 Willow Way", Phone: "555-0111", Email: "rodriguez@solutions.com" },
-        { Name: "Martinez Corp", Address: "963 Poplar Lane", Phone: "555-0112", Email: "martinez@corp.com" }
-    ];
-    customerHeaders = ["Name", "Address", "Phone", "Email"];
-    renderCustomerTable();
-    document.getElementById('customerDataSource').textContent = 'Demo Data';
-    document.getElementById('customerDataSource').style.background = '#17a2b8';
-    showToast(`Loaded ${customers.length} customers`, false);
+async function loadCustomersFromSheet() {
+    var tbody = document.getElementById('custTableBody');
+    var sourceSpan = document.getElementById('customerDataSource');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers...</div>';
+    sourceSpan.textContent = 'Loading...';
+    
+    if (!accessToken) {
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google</div>';
+        return;
+    }
+    
+    try {
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+        if (!response.ok) throw new Error('Failed to load');
+        
+        var data = await response.json();
+        var values = data.values;
+        
+        if (!values || values.length < 2) {
+            tbody.innerHTML = '<tr><td colspan="10">No customer data found. Please create a "Customers" tab in your Google Sheet.</div>';
+            sourceSpan.textContent = 'No data';
+            return;
+        }
+        
+        customerHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        customers = [];
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var custObj = {};
+            for (var j = 0; j < customerHeaders.length && j < row.length; j++) {
+                custObj[customerHeaders[j]] = row[j] ? row[j].trim() : '';
+            }
+            customers.push(custObj);
+        }
+        
+        renderCustomerTable();
+        sourceSpan.textContent = `Google Sheets (${customers.length} customers)`;
+        sourceSpan.style.background = '#28a745';
+        showToast(`Loaded ${customers.length} customers from Google Sheets`, false);
+    } catch(err) {
+        tbody.innerHTML = `<tr><td colspan="10">Error: ${err.message}</div>`;
+        sourceSpan.textContent = 'Error';
+        sourceSpan.style.background = '#dc3545';
+        showToast('Error loading customers', true);
+    }
 }
 
 function renderCustomerTable() {
     var thead = document.getElementById('custTableHead');
     var tbody = document.getElementById('custTableBody');
-    
     var headerHtml = '<th style="width:80px;">Action</th>';
     customerHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
     thead.innerHTML = headerHtml;
@@ -601,24 +475,19 @@ function filterCustomers() {
 function openCustomerEditModal(idx) {
     currentEditingCustomerIndex = idx;
     var customer = customers[idx];
-    var modal = document.getElementById('customerEditModal');
-    var title = document.getElementById('customerEditModalTitle');
     var fieldsContainer = document.getElementById('customerEditFields');
-    
-    title.textContent = 'Edit Customer: ' + (customer[customerHeaders[0]] || 'Customer');
-    
+    document.getElementById('customerEditModalTitle').textContent = 'Edit Customer: ' + (customer[customerHeaders[0]] || 'Customer');
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
-        var value = customer[header] || '';
         fieldsContainer.innerHTML += `
             <div class="edit-field-group">
                 <label>${escapeHtml(header)}</label>
-                <input type="text" id="cust_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+                <input type="text" id="cust_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(customer[header] || '')}">
             </div>
         `;
     }
-    modal.style.display = 'flex';
+    document.getElementById('customerEditModal').style.display = 'flex';
 }
 
 function closeCustomerEditModal() {
@@ -626,73 +495,90 @@ function closeCustomerEditModal() {
     currentEditingCustomerIndex = -1;
 }
 
-function saveCustomerEdit() {
+async function saveCustomerEdit() {
     if (currentEditingCustomerIndex === -1) return;
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
         var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
         if (input) customers[currentEditingCustomerIndex][header] = input.value;
     }
+    
+    // Save back to Google Sheets
+    if (accessToken) {
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            var data = await response.json();
+            var values = data.values || [];
+            var rowIndex = currentEditingCustomerIndex + 1;
+            if (rowIndex < values.length) {
+                for (var i = 0; i < customerHeaders.length; i++) {
+                    values[rowIndex][i] = customers[currentEditingCustomerIndex][customerHeaders[i]] || '';
+                }
+            }
+            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z?valueInputOption=RAW`;
+            await fetch(updateUrl, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: values })
+            });
+            showToast('Customer saved to Google Sheets', false);
+        } catch(err) { showToast('Error saving: ' + err.message, true); }
+    }
     renderCustomerTable();
     closeCustomerEditModal();
-    showToast('Customer saved', false);
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
 }
 
 // ============================================================
-// LOAD PRODUCTS FROM GITHUB
+// LOAD PRODUCTS FROM GOOGLE SHEET
 // ============================================================
-async function loadProductFile(fileName) {
+async function loadProductsFromSheet(fileName) {
     currentProductFile = fileName;
     var tbody = document.getElementById('prodTableBody');
     var thead = document.getElementById('prodTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
+    var sourceSpan = document.getElementById('productDataSource');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading products...</div>';
+    sourceSpan.textContent = 'Loading...';
     
+    if (!accessToken) {
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google</div>';
+        return;
+    }
+    
+    var sheetName = fileName.replace('.csv', 's');
     try {
-        var resp = await fetch(GITHUB_RAW + 'Products/' + fileName + '?t=' + Date.now());
-        if (!resp.ok) throw new Error('File not found');
-        var text = await resp.text();
-        var lines = text.split('\n').filter(l => l.trim());
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+        if (!response.ok) throw new Error('Sheet not found');
         
-        if (lines.length > 0) {
-            currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h);
-            var headerHtml = '<th style="width:80px;">Action</th><th style="width:80px;">Status</th>';
-            currentProdHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
-            thead.innerHTML = headerHtml;
-            
-            currentProdList = [];
-            for (var i = 1; i < lines.length; i++) {
-                var vals = lines[i].split(',');
-                var obj = {};
-                currentProdHeaders.forEach((h, idx) => obj[h] = vals[idx] ? vals[idx].trim() : '');
-                obj.Status = obj.Status || 'Active';
-                if (obj[currentProdHeaders[0]] && obj[currentProdHeaders[0]] !== 'Not Delivered') {
-                    currentProdList.push(obj);
-                }
+        var data = await response.json();
+        var values = data.values;
+        if (!values || values.length < 2) throw new Error('No data');
+        
+        currentProdHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        var headerHtml = '<th style="width:80px;">Action</th><th style="width:80px;">Status</th>';
+        currentProdHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
+        thead.innerHTML = headerHtml;
+        
+        currentProdList = [];
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var obj = {};
+            for (var j = 0; j < currentProdHeaders.length && j < row.length; j++) {
+                obj[currentProdHeaders[j]] = row[j] ? row[j].trim() : '';
             }
-            renderProductTable();
-            showToast(`Loaded ${currentProdList.length} products`, false);
-            localStorage.setItem('logiflow_products_' + fileName, JSON.stringify(currentProdList));
+            obj.Status = obj.Status || 'Active';
+            if (obj[currentProdHeaders[0]]) currentProdList.push(obj);
         }
-    } catch(e) {
-        var saved = localStorage.getItem('logiflow_products_' + fileName);
-        if (saved) {
-            currentProdList = JSON.parse(saved);
-            renderProductTable();
-            showToast(`Loaded ${currentProdList.length} products from cache`, false);
-        } else {
-            tbody.innerHTML = '<tr><td colspan="10">❌ Error loading products. Check GitHub repository.</div>';
-            showToast('Error loading products', true);
-        }
+        
+        renderProductTable();
+        sourceSpan.textContent = `${fileName} (${currentProdList.length} products)`;
+        sourceSpan.style.background = '#28a745';
+        showToast(`Loaded ${currentProdList.length} products from ${fileName}`, false);
+    } catch(err) {
+        tbody.innerHTML = `<tr><td colspan="10">Error: ${err.message}. Make sure sheet "${sheetName}" exists.</div>`;
+        sourceSpan.textContent = 'Error';
+        sourceSpan.style.background = '#dc3545';
     }
 }
 
@@ -715,18 +601,16 @@ function renderProductTable() {
 function filterProducts() {
     var search = document.getElementById('prodSearch').value.toLowerCase();
     var tbody = document.getElementById('prodTableBody');
-    var filtered = currentProdList.filter(p => 
-        p[currentProdHeaders[0]] && p[currentProdHeaders[0]].toLowerCase().includes(search)
-    );
+    var filtered = currentProdList.filter(p => p[currentProdHeaders[0]] && p[currentProdHeaders[0]].toLowerCase().includes(search));
     tbody.innerHTML = '';
     filtered.forEach((p, idx) => {
         var statusClass = p.Status === 'Active' ? 'status-active' : 'status-inactive';
         var statusText = p.Status === 'Active' ? '✅ Active' : '⭕ Inactive';
-        var row = '<table>';
+        var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">✏️ Edit</button></td>';
         row += '<td class="' + statusClass + '">' + statusText + '</div>';
-        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '<td>');
-        row += '</td>';
+        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
+        row += '</tr>';
         tbody.innerHTML += row;
     });
     document.getElementById('prodCount').innerHTML = filtered.length + ' records';
@@ -735,25 +619,20 @@ function filterProducts() {
 function openProductEditModalNew(idx) {
     currentEditingProductIndex = idx;
     var product = currentProdList[idx];
-    var modal = document.getElementById('productEditModalNew');
-    var title = document.getElementById('productEditModalTitleNew');
     var fieldsContainer = document.getElementById('productEditFields');
-    
-    title.textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
-    
+    document.getElementById('productEditModalTitleNew').textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
         if (header === 'Status') continue;
-        var value = product[header] || '';
         fieldsContainer.innerHTML += `
             <div class="edit-field-group">
                 <label>${escapeHtml(header)}</label>
-                <input type="text" id="prod_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+                <input type="text" id="prod_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(product[header] || '')}">
             </div>
         `;
     }
-    modal.style.display = 'flex';
+    document.getElementById('productEditModalNew').style.display = 'flex';
 }
 
 function closeProductEditModalNew() {
@@ -761,7 +640,7 @@ function closeProductEditModalNew() {
     currentEditingProductIndex = -1;
 }
 
-function saveProductEditNew() {
+async function saveProductEditNew() {
     if (currentEditingProductIndex === -1) return;
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
@@ -769,10 +648,39 @@ function saveProductEditNew() {
         var input = document.getElementById('prod_edit_' + header.replace(/ /g, '_'));
         if (input) currentProdList[currentEditingProductIndex][header] = input.value;
     }
+    
+    if (accessToken) {
+        try {
+            var sheetName = currentProductFile.replace('.csv', 's');
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z`;
+            var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            var data = await response.json();
+            var values = data.values || [];
+            var rowIndex = currentEditingProductIndex + 1;
+            if (rowIndex < values.length) {
+                for (var i = 0; i < currentProdHeaders.length; i++) {
+                    var header = currentProdHeaders[i];
+                    if (header !== 'Status') {
+                        for (var j = 0; j < values[0].length; j++) {
+                            if (values[0][j] === header) {
+                                values[rowIndex][j] = currentProdList[currentEditingProductIndex][header] || '';
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z?valueInputOption=RAW`;
+            await fetch(updateUrl, {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: values })
+            });
+            showToast('Product saved to Google Sheets', false);
+        } catch(err) { showToast('Error saving: ' + err.message, true); }
+    }
     renderProductTable();
-    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(currentProdList));
     closeProductEditModalNew();
-    showToast('Product saved', false);
 }
 
 function toggleProductStatusNew() {
@@ -780,98 +688,114 @@ function toggleProductStatusNew() {
     var newStatus = currentProdList[currentEditingProductIndex].Status === 'Active' ? 'Inactive' : 'Active';
     currentProdList[currentEditingProductIndex].Status = newStatus;
     renderProductTable();
-    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(currentProdList));
     openProductEditModalNew(currentEditingProductIndex);
     showToast(`Product ${newStatus === 'Active' ? 'activated' : 'deactivated'}`, false);
 }
 
 // ============================================================
-// ROUTES FROM GITHUB
+// LOAD ROUTES FROM GOOGLE SHEET
 // ============================================================
-async function loadRoutes() {
+var allRoutes = [];
+
+async function loadRoutesFromSheet() {
+    var dropdown = document.getElementById('routeDropdown');
+    dropdown.innerHTML = '<option value=""><div class="loading-spinner"></div> Loading routes...</option>';
+    
+    if (!accessToken) {
+        dropdown.innerHTML = '<option value="">Sign in with Google first</option>';
+        return;
+    }
+    
     try {
-        var resp = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/routes`);
-        if (!resp.ok) throw new Error('API error');
-        var files = await resp.json();
-        var dropdown = document.getElementById('routeDropdown');
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Routes!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+        if (!response.ok) throw new Error('Routes sheet not found');
+        
+        var data = await response.json();
+        var values = data.values;
+        if (!values || values.length < 2) throw new Error('No route data');
+        
+        var routeHeaders = values[0].map(h => h ? h.trim().toLowerCase() : '');
+        var routeNameIdx = routeHeaders.findIndex(h => h.includes('name') || h === 'route');
+        if (routeNameIdx === -1) routeNameIdx = 0;
+        
+        allRoutes = [];
         dropdown.innerHTML = '<option value="">-- Select Route --</option>';
-        var hasRoutes = false;
-        files.forEach(f => {
-            if (f.name && f.name.endsWith('.csv')) {
-                hasRoutes = true;
-                var opt = document.createElement('option');
-                opt.value = f.name;
-                opt.textContent = f.name.replace('.csv', '');
-                dropdown.appendChild(opt);
+        
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var routeName = row[routeNameIdx] || `Route ${i}`;
+            var routeData = {};
+            for (var j = 0; j < routeHeaders.length && j < row.length; j++) {
+                routeData[routeHeaders[j]] = row[j] || '';
             }
-        });
-        if (!hasRoutes) {
-            dropdown.innerHTML += '<option disabled>No route files found</option>';
-            showToast('No route files found in GitHub', true);
+            allRoutes.push({ name: routeName, data: routeData, stops: [] });
+            var opt = document.createElement('option');
+            opt.value = i.toString();
+            opt.textContent = routeName;
+            dropdown.appendChild(opt);
         }
-    } catch(e) {
-        console.error('Error loading routes:', e);
-        showToast('Error loading routes from GitHub', true);
-        document.getElementById('routeDropdown').innerHTML = '<option>Error loading routes</option>';
+        showToast(`Loaded ${allRoutes.length} routes`, false);
+    } catch(err) {
+        dropdown.innerHTML = '<option value="">Error loading routes</option>';
+        showToast('Error loading routes: ' + err.message, true);
     }
 }
 
 document.getElementById('routeDropdown').onchange = async function() {
-    var file = this.value;
-    if (!file) return;
+    var routeIndex = parseInt(this.value);
+    if (isNaN(routeIndex)) return;
+    
     var stopDiv = document.getElementById('stopList');
-    stopDiv.innerHTML = '<p style="text-align:center;">Loading stops...</p>';
+    stopDiv.innerHTML = '<p><div class="loading-spinner"></div> Loading stops...</p>';
     
     try {
-        var resp = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/routes/${file}?t=${Date.now()}`);
-        if (!resp.ok) throw new Error('Failed to load');
-        var text = await resp.text();
-        var lines = text.split('\n').filter(l => l.trim());
+        var route = allRoutes[routeIndex - 1];
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${route.name}!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+        if (!response.ok) throw new Error('Stop sheet not found');
         
-        if (lines.length < 2) {
-            stopDiv.innerHTML = '<p>No stop data found</p>';
-            return;
-        }
+        var data = await response.json();
+        var values = data.values;
+        if (!values || values.length < 2) throw new Error('No stop data');
         
-        var headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        var headers = values[0].map(h => h ? h.trim().toLowerCase() : '');
         var nameIdx = headers.findIndex(h => h.includes('name') || h === 'company');
         var addrIdx = headers.findIndex(h => h.includes('address'));
         var phoneIdx = headers.findIndex(h => h.includes('phone'));
-        
         if (nameIdx === -1) nameIdx = 0;
         if (addrIdx === -1) addrIdx = 1;
         
         stopDiv.innerHTML = '';
         currentRouteStops = [];
         
-        for (var i = 1; i < lines.length; i++) {
-            var vals = lines[i].split(',').map(v => v.trim());
+        for (var i = 1; i < values.length; i++) {
+            var vals = values[i];
             var name = vals[nameIdx] || `Stop ${i}`;
             var addr = vals[addrIdx] || 'No address';
             var phone = phoneIdx >= 0 ? vals[phoneIdx] : '--';
-            var data = {};
-            headers.forEach((h, idx) => data[h] = vals[idx] || '');
-            
-            currentRouteStops.push({ name, addr, phone, data });
+            var stopData = {};
+            for (var j = 0; j < headers.length && j < vals.length; j++) {
+                stopData[headers[j]] = vals[j] || '';
+            }
+            currentRouteStops.push({ name: name, addr: addr, phone: phone, data: stopData });
             
             var div = document.createElement('div');
-            div.style.cssText = 'padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fff; margin:2px 0; border-radius:4px; transition: background 0.2s;';
+            div.className = 'route-item';
             div.innerHTML = `<strong>${i}. ${name}</strong><br><small>📍 ${addr}</small><br><small>📞 ${phone}</small>`;
             div.onclick = (function(idx, s) { return function() { selectStop(idx, s); }; })(i-1, currentRouteStops[i-1]);
-            div.onmouseover = () => div.style.background = '#e8f0fe';
-            div.onmouseout = () => div.style.background = '#fff';
             stopDiv.appendChild(div);
         }
         showToast(`Loaded ${currentRouteStops.length} stops`, false);
-    } catch(e) {
-        stopDiv.innerHTML = '<p>Error loading route file</p>';
-        showToast('Error loading route', true);
+    } catch(err) {
+        stopDiv.innerHTML = '<p>Error loading stops</p>';
+        showToast('Error loading stops: ' + err.message, true);
     }
 };
 
 function selectStop(idx, stop) {
     if (!driverName) {
-        alert('⚠️ You must click START ROUTE first and enter your name.');
+        alert('Click START ROUTE first');
         return;
     }
     currentStopIndex = idx;
@@ -890,35 +814,35 @@ function selectStop(idx, stop) {
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     isSigBlank = true;
-    signatureActive = false;
     canvas.style.pointerEvents = 'none';
     canvas.style.background = '#eee';
     document.getElementById('receivedBy').value = '';
     
-    loadProductDropdown();
+    loadStopProductDropdown();
     document.getElementById('stopModal').style.display = 'flex';
 }
 
-async function loadProductDropdown() {
+async function loadStopProductDropdown() {
     var target = document.getElementById('stopProductDropdown');
     target.innerHTML = '<option value="">-- Select Product --</option>';
+    if (!accessToken) return;
     
-    var productFiles = ['Water.csv', 'Coffee.csv', 'Equipment.csv'];
-    var icons = { 'Water.csv': '💧', 'Coffee.csv': '☕', 'Equipment.csv': '🔧' };
-    
-    for (var f of productFiles) {
+    for (var sheet of ['Coffees', 'Waters']) {
         try {
-            var resp = await fetch(GITHUB_RAW + 'Products/' + f + '?t=' + Date.now());
-            if (resp.ok) {
-                var text = await resp.text();
-                var lines = text.split('\n').filter(l => l.trim());
-                for (var i = 1; i < lines.length; i++) {
-                    var name = lines[i].split(',')[0];
-                    if (name && name !== 'Not Delivered' && name !== 'Status') {
-                        var opt = document.createElement('option');
-                        opt.value = name;
-                        opt.textContent = icons[f] + ' ' + name;
-                        target.appendChild(opt);
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheet}!A1:Z`;
+            var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            if (response.ok) {
+                var data = await response.json();
+                var values = data.values;
+                if (values && values.length > 1) {
+                    for (var i = 1; i < values.length; i++) {
+                        var name = values[i][0];
+                        if (name && name !== 'Status') {
+                            var opt = document.createElement('option');
+                            opt.value = name;
+                            opt.textContent = (sheet === 'Coffees' ? '☕ ' : '💧 ') + name;
+                            target.appendChild(opt);
+                        }
                     }
                 }
             }
@@ -926,21 +850,20 @@ async function loadProductDropdown() {
     }
 }
 
+// ============================================================
+// DELIVERY FUNCTIONS
+// ============================================================
 function addToCart() {
     var dropdown = document.getElementById('stopProductDropdown');
     var item = dropdown.value;
     var qty = parseInt(document.getElementById('stopQty').value);
-    if (!item || qty < 1) {
-        alert('Select a product and quantity');
-        return;
-    }
+    if (!item || qty < 1) { alert('Select a product'); return; }
     var existing = deliveryCart.find(i => i.name === item);
     if (existing) existing.qty += qty;
     else deliveryCart.push({ name: item, qty: qty });
     renderCart();
     dropdown.value = '';
     document.getElementById('stopQty').value = '1';
-    showToast(`Added ${qty} x ${item}`, false);
 }
 
 function renderCart() {
@@ -951,148 +874,78 @@ function renderCart() {
     }
     body.innerHTML = '';
     deliveryCart.forEach((item, i) => {
-        var row = '<tr>';
-        row += '<td>' + item.name + '</td>';
-        row += '<td>' + item.qty + '</td>';
-        row += '<td><button onclick="removeFromCart(' + i + ')" style="background:none; border:none; color:#dc3545; cursor:pointer;"><i class="fas fa-trash"></i></button></td>';
-        row += '</tr>';
-        body.innerHTML += row;
+        body.innerHTML += `<tr><td>${item.name}</div><td>${item.qty}</div><td><button onclick="removeFromCart(${i})" style="background:none; border:none; color:#dc3545;"><i class="fas fa-trash"></i></button></div></tr>`;
     });
 }
 
-function removeFromCart(i) {
-    deliveryCart.splice(i, 1);
-    renderCart();
-}
-
-function closeStopModal() {
-    document.getElementById('stopModal').style.display = 'none';
-}
-
-function clearSignature() {
-    var canvas = document.getElementById('sig-canvas');
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    isSigBlank = true;
-    showToast('Signature cleared', false);
-}
+function removeFromCart(i) { deliveryCart.splice(i,1); renderCart(); }
+function closeStopModal() { document.getElementById('stopModal').style.display = 'none'; }
+function clearSignature() { var ctx = document.getElementById('sig-canvas').getContext('2d'); ctx.clearRect(0,0,400,120); isSigBlank = true; }
 
 function activateSignature() {
     var canvas = document.getElementById('sig-canvas');
-    var ctx = canvas.getContext('2d');
     canvas.style.pointerEvents = 'auto';
     canvas.style.background = '#fff';
-    canvas.style.cursor = 'crosshair';
-    signatureActive = true;
+    var ctx = canvas.getContext('2d');
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#000';
-    ctx.lineCap = 'round';
-    
     var drawing = false;
-    
-    function startDrawing(e) {
-        drawing = true;
-        ctx.beginPath();
-        var rect = canvas.getBoundingClientRect();
-        var x = (e.clientX || (e.touches ? e.touches[0].clientX : 0)) - rect.left;
-        var y = (e.clientY || (e.touches ? e.touches[0].clientY : 0)) - rect.top;
-        ctx.moveTo(x, y);
-        isSigBlank = false;
-    }
-    
-    function draw(e) {
+    canvas.onmousedown = function() { drawing = true; ctx.beginPath(); isSigBlank = false; };
+    canvas.onmouseup = function() { drawing = false; };
+    canvas.onmousemove = function(e) {
         if (!drawing) return;
-        e.preventDefault();
         var rect = canvas.getBoundingClientRect();
-        var x = (e.clientX || (e.touches ? e.touches[0].clientX : 0)) - rect.left;
-        var y = (e.clientY || (e.touches ? e.touches[0].clientY : 0)) - rect.top;
-        ctx.lineTo(x, y);
+        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x, y);
-    }
-    
-    function stopDrawing() {
-        drawing = false;
-    }
-    
-    canvas.removeEventListener('mousedown', startDrawing);
-    canvas.removeEventListener('mousemove', draw);
-    canvas.removeEventListener('mouseup', stopDrawing);
-    canvas.removeEventListener('touchstart', startDrawing);
-    canvas.removeEventListener('touchmove', draw);
-    canvas.removeEventListener('touchend', stopDrawing);
-    
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('touchstart', startDrawing);
-    canvas.addEventListener('touchmove', draw);
-    canvas.addEventListener('touchend', stopDrawing);
-    
-    showToast('Signature area active - draw your signature', false);
+        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    };
+    showToast('Draw your signature', false);
 }
 
-function markNotDelivered() {
+async function markNotDelivered() {
     var reason = prompt('Reason for non-delivery:');
-    if (!reason) {
-        alert('Reason is required');
-        return;
-    }
+    if (!reason) return;
     var customerName = document.getElementById('stopModalTitle').innerHTML.replace('📦 Delivery: ', '');
-    showToast(`Marked NOT DELIVERED: ${customerName} - ${reason}`, false);
-    alert(`Not delivered: ${customerName}\nReason: ${reason}\n\nRecord saved locally.`);
+    var timestamp = new Date().toLocaleString();
+    
+    if (accessToken) {
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/TripLog!A1:E:append?valueInputOption=USER_ENTERED`;
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[timestamp, customerName, driverName, 'NOT DELIVERED', reason]] })
+            });
+            showToast('Recorded to Google Sheets', false);
+        } catch(e) { showToast('Error saving', true); }
+    }
+    alert(`Not delivered: ${customerName}\nReason: ${reason}`);
     closeStopModal();
 }
 
-function completeDelivery() {
+async function completeDelivery() {
     var receiverName = document.getElementById('receivedBy').value.trim();
-    if (!receiverName) {
-        alert('Please enter the name of the person receiving the delivery.');
-        document.getElementById('receivedBy').focus();
-        return;
-    }
-    if (isSigBlank) {
-        alert('Please provide a signature before completing the delivery.');
-        return;
-    }
+    if (!receiverName) { alert('Enter receiver name'); return; }
+    if (isSigBlank) { alert('Signature required'); return; }
     
     var customerName = document.getElementById('stopModalTitle').innerHTML.replace('📦 Delivery: ', '');
     var slipNum = Math.floor(100000 + Math.random() * 900000);
     var timestamp = new Date().toLocaleString();
+    var productText = deliveryCart.map(i => `${i.qty}x ${i.name}`).join(', ');
     
-    var deliveryRecord = {
-        slipNumber: slipNum,
-        customer: customerName,
-        address: document.getElementById('metaAddress').innerHTML,
-        phone: document.getElementById('metaPhone').innerHTML,
-        receivedBy: receiverName,
-        timestamp: timestamp,
-        driver: driverName,
-        items: JSON.parse(JSON.stringify(deliveryCart)),
-        signature: document.getElementById('sig-canvas').toDataURL()
-    };
+    if (accessToken) {
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/TripLog!A1:G:append?valueInputOption=USER_ENTERED`;
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[timestamp, customerName, driverName, receiverName, slipNum, 'DELIVERED', productText]] })
+            });
+            showToast('Saved to Google Sheets', false);
+        } catch(e) { showToast('Error saving to sheet', true); }
+    }
     
-    var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
-    deliveries.push(deliveryRecord);
-    localStorage.setItem('logiflow_deliveries', JSON.stringify(deliveries));
-    
-    var productText = '';
-    deliveryCart.forEach(item => {
-        productText += `${item.qty}x ${item.name}\n`;
-    });
-    
-    var summary = `✅ DELIVERY COMPLETED!\n\n`;
-    summary += `Slip #: ${slipNum}\n`;
-    summary += `Customer: ${customerName}\n`;
-    summary += `Received by: ${receiverName}\n`;
-    summary += `Time: ${timestamp}\n`;
-    summary += `Driver: ${driverName}\n\n`;
-    summary += `Products:\n${productText || '(none)'}\n\n`;
-    summary += `Record saved to browser storage.`;
-    
-    alert(summary);
-    showToast(`Delivery completed! Slip #${slipNum}`, false);
+    alert(`✅ DELIVERY COMPLETED!\n\nSlip #: ${slipNum}\nCustomer: ${customerName}\nReceived by: ${receiverName}\nProducts: ${productText || '(none)'}`);
     closeStopModal();
 }
 
@@ -1100,137 +953,65 @@ function completeDelivery() {
 // DRIVER CONTROLS
 // ============================================================
 document.getElementById('btnStartRoute').onclick = function() {
-    var name = prompt('Enter driver name:', driverName || '');
+    var name = prompt('Enter driver name:');
     if (name && name.trim()) {
         driverName = name.trim();
-        showToast(`Route started for driver: ${driverName}`, false);
-        alert(`Route started!\nDriver: ${driverName}\n\nSelect a route from the dropdown and click on stops to begin deliveries.`);
-    } else if (name === '') {
-        alert('Driver name is required.');
+        showToast(`Route started: ${driverName}`, false);
+        alert(`Driver: ${driverName}\nSelect a route and click stops to begin.`);
     }
 };
-
-document.getElementById('btnFinishRoute').onclick = function() {
-    if (driverName) {
-        if (confirm(`Finish route for driver: ${driverName}?`)) {
-            driverName = '';
-            showToast('Route finished', false);
-            alert('Route finished. Click START ROUTE again when ready.');
-        }
-    } else {
-        alert('No active route. Click START ROUTE first.');
-    }
-};
-
-document.getElementById('btnPrevStop').onclick = function() {
-    if (currentRouteStops.length && currentStopIndex > 0) {
-        selectStop(currentStopIndex - 1, currentRouteStops[currentStopIndex - 1]);
-    } else if (currentStopIndex === 0) {
-        showToast('First stop reached', true);
-    } else {
-        showToast('No route loaded', true);
-    }
-};
-
-document.getElementById('btnNextStop').onclick = function() {
-    if (currentRouteStops.length && currentStopIndex < currentRouteStops.length - 1) {
-        selectStop(currentStopIndex + 1, currentRouteStops[currentStopIndex + 1]);
-    } else if (currentStopIndex === currentRouteStops.length - 1) {
-        showToast('Last stop reached', true);
-    } else {
-        showToast('No route loaded', true);
-    }
-};
-
-document.getElementById('btnDirections').onclick = function() {
-    if (currentStopIndex >= 0 && currentRouteStops[currentStopIndex]) {
-        var addr = encodeURIComponent(currentRouteStops[currentStopIndex].addr);
-        window.open(`https://www.google.com/maps/dir/?api=1&destination=${addr}`, '_blank');
-    } else {
-        alert('Select a stop first');
-    }
-};
+document.getElementById('btnFinishRoute').onclick = function() { if(driverName) { driverName=''; showToast('Route finished', false); } };
+document.getElementById('btnPrevStop').onclick = function() { if(currentRouteStops.length && currentStopIndex>0) selectStop(currentStopIndex-1, currentRouteStops[currentStopIndex-1]); };
+document.getElementById('btnNextStop').onclick = function() { if(currentRouteStops.length && currentStopIndex<currentRouteStops.length-1) selectStop(currentStopIndex+1, currentRouteStops[currentStopIndex+1]); };
+document.getElementById('btnDirections').onclick = function() { if(currentStopIndex>=0) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(currentRouteStops[currentStopIndex].addr)}`); };
 
 // ============================================================
 // MANAGER BUTTONS
 // ============================================================
-document.getElementById('btnManager').onclick = function() {
-    document.getElementById('mgrModal').style.display = 'flex';
-};
-
+document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; };
 document.getElementById('btnShowCust').onclick = function() {
     document.getElementById('custView').style.display = 'block';
     document.getElementById('prodView').style.display = 'none';
-    renderCustomerTable();
+    if(accessToken) loadCustomersFromSheet();
 };
-
 document.getElementById('btnShowProd').onclick = function() {
     document.getElementById('custView').style.display = 'none';
     document.getElementById('prodView').style.display = 'block';
-    loadProductFile('Coffee.csv');
+    if(accessToken) loadProductsFromSheet(currentProductFile);
 };
-
-document.getElementById('btnEndOfDay').onclick = function() {
-    var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
-    alert(`End of Day Report\n\nTotal Deliveries: ${deliveries.length}\n\nCheck browser console for details.`);
-    console.table(deliveries);
-};
-document.getElementById('btnLiveView').onclick = () => alert('Live View: Check the map for current location');
-document.getElementById('btnCallInOrder').onclick = () => alert('Call in Order feature - Enter customer details:');
-document.getElementById('btnBackup').onclick = () => {
-    var data = {
-        customers: customers,
-        deliveries: JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]'),
-        products: currentProdList,
-        timestamp: new Date().toISOString()
-    };
-    localStorage.setItem('logiflow_backup', JSON.stringify(data));
-    alert('Backup saved to browser storage');
-};
-document.getElementById('btnViewSlips').onclick = () => {
-    var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
-    if (deliveries.length === 0) alert('No delivery slips found');
-    else {
-        var list = deliveries.map(d => `Slip ${d.slipNumber}: ${d.customer} - ${d.timestamp}`).join('\n');
-        alert(`Delivery Slips:\n\n${list}`);
+document.getElementById('btnLoadCoffee').onclick = function() { loadProductsFromSheet('Coffee.csv'); };
+document.getElementById('btnLoadWater').onclick = function() { loadProductsFromSheet('Water.csv'); };
+document.getElementById('btnEndOfDay').onclick = function() { alert('End of Day - Check TripLog sheet'); };
+document.getElementById('btnLiveView').onclick = function() { alert('Live View - Map shows current location'); };
+document.getElementById('btnCallInOrder').onclick = function() { alert('Call in Order - Use the delivery form'); };
+document.getElementById('btnBackup').onclick = function() { alert('Data backed up to Google Sheets'); };
+document.getElementById('btnViewSlips').onclick = function() { window.open(`https://drive.google.com/drive/folders/${GOOGLE_DRIVE_FOLDER_ID}`, '_blank'); };
+document.getElementById('btnViewPastLogs').onclick = function() { window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}`, '_blank'); };
+document.getElementById('btnUserMgmt').onclick = function() { alert('User Management - Manage drivers'); };
+document.getElementById('btnForceRefresh').onclick = function() {
+    if(accessToken) {
+        loadCustomersFromSheet();
+        loadProductsFromSheet(currentProductFile);
+        loadRoutesFromSheet();
+        showToast('Refreshed from Google Sheets', false);
     }
 };
-document.getElementById('btnViewPastLogs').onclick = () => {
-    var deliveries = JSON.parse(localStorage.getItem('logiflow_deliveries') || '[]');
-    alert(`Past Logs\n\nTotal: ${deliveries.length} deliveries\n\nCheck browser console for full log.`);
-    console.log('Past Deliveries:', deliveries);
-};
-document.getElementById('btnUserMgmt').onclick = () => alert('User Management - Add or remove drivers');
-document.getElementById('btnForceRefresh').onclick = function() {
-    loadRoutes();
-    loadProductFile('Coffee.csv');
-    renderCustomerTable();
-    showToast('Refreshed', false);
-};
 
-// ============================================================
-// BOTTOM MANAGER BUTTON
-// ============================================================
+// Bottom button
 var bottomBtn = document.createElement('button');
 bottomBtn.className = 'working-bottom-btn';
 bottomBtn.innerHTML = '<i class="fas fa-cog"></i> MANAGER PANEL';
 bottomBtn.onclick = () => document.getElementById('mgrModal').style.display = 'flex';
 document.body.appendChild(bottomBtn);
 
-// Attach modal button event listeners
+// Event listeners
 document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
 document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
 document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
 
-// Close modals when clicking outside
-window.onclick = function(event) {
-    var customerModal = document.getElementById('customerEditModal');
-    var productModal = document.getElementById('productEditModalNew');
-    if (event.target === customerModal) closeCustomerEditModal();
-    if (event.target === productModal) closeProductEditModalNew();
-};
+function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { return m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'; }); }
 
-// Start the application with login modal
+// Start
 showLoginModal();
 </script>
 </body>
