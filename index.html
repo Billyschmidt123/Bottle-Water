@@ -44,10 +44,10 @@
         .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; }
         .working-bottom-btn:hover { background: #218838; }
         
-        /* ADDITIVE FIX: Styles for edit modals */
+        /* Styles for edit modals - each field gets its own row in a grid */
         .edit-modal-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 15px;
             margin: 15px 0;
             max-height: 55vh;
@@ -64,16 +64,29 @@
             font-size: 12px;
             color: #333;
         }
-        .edit-field-group input, .edit-field-group textarea {
+        .edit-field-group input, .edit-field-group textarea, .edit-field-group select {
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-family: inherit;
+            font-size: 13px;
+        }
+        .edit-field-group input:focus, .edit-field-group textarea:focus, .edit-field-group select:focus {
+            outline: none;
+            border-color: #004a99;
+            box-shadow: 0 0 0 2px rgba(0,74,153,0.1);
         }
         .modal-buttons {
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+        .modal-buttons-left {
+            display: flex;
+            justify-content: space-between;
             margin-top: 20px;
             padding-top: 15px;
             border-top: 1px solid #ddd;
@@ -212,9 +225,9 @@
     </div>
 </div>
 
-<!-- ========== ADDITIVE FIX: Customer Edit Modal ========== -->
+<!-- ========== ADDITIVE FIX: Customer Edit Modal - Shows ALL fields from the table ========== -->
 <div id="customerEditModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content" style="max-width: 800px;">
         <div style="display:flex; justify-content: space-between; align-items:center;">
             <h2 id="customerEditModalTitle">Edit Customer</h2>
             <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
@@ -228,16 +241,16 @@
     </div>
 </div>
 
-<!-- ========== ADDITIVE FIX: Product Edit Modal ========== -->
+<!-- ========== ADDITIVE FIX: Product Edit Modal - Shows ALL fields from the table ========== -->
 <div id="productEditModalNew" class="modal-overlay">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content" style="max-width: 800px;">
         <div style="display:flex; justify-content: space-between; align-items:center;">
             <h2 id="productEditModalTitleNew">Edit Product</h2>
             <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#dc3545;">Cancel</button>
         </div>
         <hr>
         <div id="productEditFields" class="edit-modal-grid"></div>
-        <div class="modal-buttons">
+        <div class="modal-buttons-left">
             <div>
                 <button id="productToggleStatusBtnNew" class="btn-top" style="background:#ffc107;">Toggle Status</button>
             </div>
@@ -340,7 +353,7 @@ function renderCustomerTable() {
     tbody.innerHTML = '';
     customers.forEach((cust, idx) => {
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button><tr>';
+        row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button></td>';
         customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -369,8 +382,9 @@ function filterCustomers() {
     document.getElementById('custCount').innerHTML = filtered.length + ' records';
 }
 
-// ========== ADDITIVE FIX: Customer Edit Modal Functions ==========
+// ========== ADDITIVE FIX: Customer Edit Modal Functions - Shows ALL fields ==========
 function openCustomerEditModal(idx) {
+    console.log('Opening customer edit modal for index:', idx);
     currentEditingCustomerIndex = idx;
     var customer = customers[idx];
     var modal = document.getElementById('customerEditModal');
@@ -379,14 +393,16 @@ function openCustomerEditModal(idx) {
     
     title.textContent = 'Edit Customer: ' + (customer.Name || 'Customer');
     
+    // Clear and rebuild ALL fields from customerHeaders
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
         var value = customer[header] || '';
+        var fieldId = 'cust_edit_' + header.replace(/ /g, '_');
         fieldsContainer.innerHTML += `
             <div class="edit-field-group">
-                <label>${escapeHtml(header)}</label>
-                <input type="text" id="cust_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+                <label>${escapeHtmlForModal(header)}</label>
+                <input type="text" id="${fieldId}" value="${escapeHtmlForModal(value)}" placeholder="Enter ${escapeHtmlForModal(header)}">
             </div>
         `;
     }
@@ -400,8 +416,12 @@ function closeCustomerEditModal() {
 }
 
 function saveCustomerEdit() {
-    if (currentEditingCustomerIndex === -1) return;
+    if (currentEditingCustomerIndex === -1) {
+        showToast('No customer selected', true);
+        return;
+    }
     
+    // Save ALL fields back to the customer object
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
         var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
@@ -412,17 +432,17 @@ function saveCustomerEdit() {
     
     renderCustomerTable();
     closeCustomerEditModal();
-    showToast('Customer saved', false);
+    showToast('Customer saved successfully', false);
 }
 
-function escapeHtml(str) {
+function escapeHtmlForModal(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, function(m) {
         if (m === '&') return '&amp;';
         if (m === '<') return '&lt;';
         if (m === '>') return '&gt;';
         return m;
-    });
+    }).replace(/"/g, '&quot;');
 }
 
 // ============================================================
@@ -509,8 +529,9 @@ function filterProducts() {
     document.getElementById('prodCount').innerHTML = filtered.length + ' records';
 }
 
-// ========== ADDITIVE FIX: Product Edit Modal Functions ==========
+// ========== ADDITIVE FIX: Product Edit Modal Functions - Shows ALL fields ==========
 function openProductEditModalNew(idx) {
+    console.log('Opening product edit modal for index:', idx);
     currentEditingProductIndex = idx;
     currentEditingProductOriginal = JSON.parse(JSON.stringify(currentProdList[idx]));
     var product = currentProdList[idx];
@@ -520,15 +541,17 @@ function openProductEditModalNew(idx) {
     
     title.textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
     
+    // Clear and rebuild ALL fields from product headers (excluding Status)
     fieldsContainer.innerHTML = '';
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
-        if (header === 'Status') continue;
+        if (header === 'Status') continue; // Status is handled by toggle button
         var value = product[header] || '';
+        var fieldId = 'prod_edit_' + header.replace(/ /g, '_');
         fieldsContainer.innerHTML += `
             <div class="edit-field-group">
-                <label>${escapeHtml(header)}</label>
-                <input type="text" id="prod_edit_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}">
+                <label>${escapeHtmlForModal(header)}</label>
+                <input type="text" id="${fieldId}" value="${escapeHtmlForModal(value)}" placeholder="Enter ${escapeHtmlForModal(header)}">
             </div>
         `;
     }
@@ -543,8 +566,12 @@ function closeProductEditModalNew() {
 }
 
 function saveProductEditNew() {
-    if (currentEditingProductIndex === -1) return;
+    if (currentEditingProductIndex === -1) {
+        showToast('No product selected', true);
+        return;
+    }
     
+    // Save ALL fields back to the product object
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
         if (header === 'Status') continue;
@@ -557,11 +584,14 @@ function saveProductEditNew() {
     renderProductTable();
     localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(currentProdList));
     closeProductEditModalNew();
-    showToast('Product saved', false);
+    showToast('Product saved successfully', false);
 }
 
 function toggleProductStatusNew() {
-    if (currentEditingProductIndex === -1) return;
+    if (currentEditingProductIndex === -1) {
+        showToast('No product selected', true);
+        return;
+    }
     
     var newStatus = currentProdList[currentEditingProductIndex].Status === 'Active' ? 'Inactive' : 'Active';
     currentProdList[currentEditingProductIndex].Status = newStatus;
@@ -1017,7 +1047,15 @@ document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
 document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
 document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
 
-console.log('LogiFlow Delivery System Ready - Edit modals enabled');
+// ========== ADDITIVE FIX: Ensure modals close when clicking outside ==========
+window.onclick = function(event) {
+    var customerModal = document.getElementById('customerEditModal');
+    var productModal = document.getElementById('productEditModalNew');
+    if (event.target === customerModal) closeCustomerEditModal();
+    if (event.target === productModal) closeProductEditModalNew();
+};
+
+console.log('LogiFlow Delivery System Ready - Edit modals show ALL fields from tables');
 </script>
 </body>
 </html>
