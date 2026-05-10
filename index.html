@@ -46,9 +46,6 @@
         .loading-content { background: white; padding: 20px; border-radius: 8px; text-align: center; min-width: 300px; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #004a99; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .emergency-buttons { position: fixed; bottom: 15px; right: 15px; z-index: 9999; display: flex; gap: 8px; }
-        .emergency-buttons button { background: #004a99; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .emergency-buttons button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
@@ -122,7 +119,7 @@
                 <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'stopQty', 'stopUnit')">Add Water</button>
                 <button class="btn-top" style="background:#6f4e37;" onclick="addProductToCart('stopCoffeeDropdown', 'stopQty', 'stopUnit')">Add Coffee</button>
             </div>
-            <table class="cart-table"><thead><tr style="font-size:0.8rem; color:#666;"><th>Item</th><th>Qty</th><th>Unit</th><th>Action</th></tr></thead><tbody id="cartItemsBody"></tbody></table>
+            <table class="cart-table"><thead><tr style="font-size:0.8rem; color:#666;"><th>Item</th><th>Qty</th><th>Unit</th><th>Action</th></tr></thead><tbody id="cartItemsBody"></tbody>能有
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
             <div class="form-group"><label>Received By (Name)</label><input type="text" id="receivedBy" placeholder="Required" style="font-size:1.1rem; padding:10px;"></div>
@@ -152,19 +149,18 @@
             <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             <button id="btnEndOfDay" class="mgmt-nav-btn" onclick="alert('End of Day')">End of Day</button>
             <button id="btnLiveView" class="mgmt-nav-btn" onclick="managerLiveView()">Live View</button>
-            <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="alert('Call in Order')">Call in Order</button>
+            <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="managerCallInOrder()">Call in Order</button>
             <button id="btnBackup" class="mgmt-nav-btn" onclick="alert('Backup')">Back up</button>
             <button id="btnViewSlips" class="mgmt-nav-btn" onclick="alert('View Slips')">View Slips</button>
             <button id="btnViewPastLogs" class="mgmt-nav-btn" onclick="alert('Past Logs')">View Past Stop Logs</button>
             <button id="btnUserMgmt" class="mgmt-nav-btn" onclick="alert('User Management')">User Management</button>
         </div>
-        <div id="custView" style="display: block;"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table></div>
+        <div id="custView" style="display: block;"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody>能有</div>
         <div id="prodView" style="display: none;">
             <div style="margin-bottom:15px;">
-                <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
-                <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
+                <button class="btn-top" onclick="loadProductFile('Products')" style="background:#6f4e37;">Load Products</button>
             </div>
-            <div style="overflow-x: auto;"><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody></table></div>
+            <div style="overflow-x: auto;"><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody>能有</div>
         </div>
     </div>
 </div>
@@ -241,7 +237,7 @@ function updateGoogleStatus() {
         statusSpan.innerHTML = 'Connected: ' + userEmail;
         statusSpan.style.color = '#90ff90';
     } else {
-        statusSpan.innerHTML = 'Sign in with Google to save PDFs';
+        statusSpan.innerHTML = 'Sign in with Google to save';
         statusSpan.style.color = '#ffc107';
     }
 }
@@ -263,6 +259,11 @@ function initializeGoogleSignIn() {
                         accessToken = tokenResponse.access_token;
                         showToast('Signed in as ' + userEmail, false);
                         updateGoogleStatus();
+                        // Refresh products if they were waiting
+                        if (currentProductFile === 'Products') {
+                            loadProductFile('Products');
+                        }
+                        loadCustomersFromSheets();
                     }
                 }
             });
@@ -273,78 +274,73 @@ function initializeGoogleSignIn() {
 }
 
 // ============================================================
-// LOAD PRODUCTS FROM GITHUB
+// LOAD PRODUCTS FROM GOOGLE SHEETS
 // ============================================================
-async function fetchFromGitHub(path) {
-    try {
-        var response = await fetch(GITHUB_RAW + path + '?t=' + Date.now());
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return await response.text();
-    } catch (e) {
-        console.error('Failed to fetch ' + path, e);
-        return null;
-    }
-}
-
-function saveProductsToLocalStorage() {
-    if (!currentProductFile) return;
-    var data = { headers: currentProdHeaders, products: currentProdList, file: currentProductFile, timestamp: new Date().toISOString() };
-    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
-}
-
-function loadProductsFromLocalStorage(fileName) {
-    var saved = localStorage.getItem('logiflow_products_' + fileName);
-    if (saved) {
-        try {
-            var data = JSON.parse(saved);
-            if (data.products && data.products.length > 0 && data.headers) {
-                currentProdHeaders = data.headers;
-                currentProdList = data.products;
-                currentProductFile = data.file;
-                renderProdTable();
-                showToast('Loaded from browser storage', false);
-                return true;
-            }
-        } catch(e) { console.error('LocalStorage error:', e); }
-    }
-    return false;
-}
-
 async function loadProductFile(fileName) {
     currentProductFile = fileName;
     var tbody = document.getElementById('prodTableBody');
     var theadRow = document.getElementById('prodTableHead');
-    if (loadProductsFromLocalStorage(fileName)) return;
-    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</div>';
+    tbody.innerHTML = '<table><td colspan="10">Loading products from Google Sheets...</div>';
+    
+    if (!accessToken) {
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load products.</div>';
+        return;
+    }
+    
     try {
-        var text = await fetchFromGitHub('Products/' + fileName);
-        if (!text) throw new Error('File not found');
-        var lines = text.split('\n').filter(function(l) { return l.trim(); });
-        if (lines.length > 0) {
-            currentProdHeaders = lines[0].split(',').map(function(h) { return h.trim(); }).filter(function(h) { return h !== ''; });
-            if (currentProdHeaders.indexOf('Status') === -1) currentProdHeaders.push('Status');
-            var headerHtml = '<th>Action</th>';
-            for (var h = 0; h < currentProdHeaders.length; h++) { headerHtml += '<th>' + currentProdHeaders[h] + '</th>'; }
-            theadRow.innerHTML = headerHtml;
-            currentProdList = [];
-            for (var i = 1; i < lines.length; i++) {
-                var vals = lines[i].split(',');
-                var pObj = {};
-                for (var j = 0; j < currentProdHeaders.length; j++) {
-                    var header = currentProdHeaders[j];
-                    if (header !== 'Status') pObj[header] = (vals[j] || '').trim();
-                }
-                pObj.Status = pObj.Status || 'Active';
-                var firstHeader = currentProdHeaders[0];
-                if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') currentProdList.push(pObj);
-            }
-            renderProdTable();
-            saveProductsToLocalStorage();
-            showToast('Loaded from GitHub', false);
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+        var response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load products');
+        
+        var data = await response.json();
+        var values = data.values;
+        
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No data found in Products tab</div>';
+            return;
         }
-    } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
-        showToast('Error loading products from GitHub', true);
+        
+        // First row is headers
+        currentProdHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        if (currentProdHeaders.indexOf('Status') === -1) currentProdHeaders.push('Status');
+        
+        // Build header HTML
+        var headerHtml = '<th>Action</th>';
+        for (var h = 0; h < currentProdHeaders.length; h++) {
+            headerHtml += '<th>' + currentProdHeaders[h] + '</th>';
+        }
+        theadRow.innerHTML = headerHtml;
+        
+        // Build product list
+        currentProdList = [];
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var pObj = {};
+            for (var j = 0; j < currentProdHeaders.length && j < row.length; j++) {
+                var header = currentProdHeaders[j];
+                if (header !== 'Status') {
+                    pObj[header] = row[j] ? row[j].trim() : '';
+                }
+            }
+            pObj.Status = pObj.Status || 'Active';
+            // Skip "NOT DELIVERED" placeholder
+            var firstHeader = currentProdHeaders[0];
+            if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') {
+                currentProdList.push(pObj);
+            }
+        }
+        
+        renderProdTable();
+        showToast('Products loaded from Google Sheets', false);
+        
+    } catch (err) {
+        console.error('Error loading products:', err);
+        tbody.innerHTML = '<tr><td colspan="10">Error loading products. Please check your Google sign-in.</div>';
+        showToast('Error loading products: ' + err.message, true);
     }
 }
 
@@ -356,8 +352,10 @@ function renderProdTable() {
         var isDeactivated = (pObj.Status === 'Deactivated');
         var tr = document.createElement('tr');
         if (isDeactivated) tr.className = 'deactivated-row';
-        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button><button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleProductStatus(' + idx + ')">' + (pObj.Status === 'Active' ? 'Deactivate' : 'Activate') + '</button></tr>';
-        for (var h = 0; h < currentProdHeaders.length; h++) { tr.innerHTML += '<td>' + (pObj[currentProdHeaders[h]] || '') + '</td>'; }
+        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button><button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleProductStatus(' + idx + ')">' + (pObj.Status === 'Active' ? 'Deactivate' : 'Activate') + '</button></td>';
+        for (var h = 0; h < currentProdHeaders.length; h++) {
+            tr.innerHTML += '<td>' + (pObj[currentProdHeaders[h]] || '') + '</td>';
+        }
         tbody.appendChild(tr);
     }
 }
@@ -365,8 +363,55 @@ function renderProdTable() {
 window.toggleProductStatus = function(idx) {
     currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
     renderProdTable();
-    saveProductsToLocalStorage();
+    saveProductToSheet(idx);
 };
+
+async function saveProductToSheet(productIndex) {
+    if (!accessToken) {
+        showToast('Please sign in with Google to save', true);
+        return;
+    }
+    
+    try {
+        var headers = currentProdHeaders.filter(function(h) { return h !== 'Status'; });
+        var values = [headers];
+        
+        for (var i = 0; i < currentProdList.length; i++) {
+            var row = [];
+            for (var j = 0; j < headers.length; j++) {
+                row.push(currentProdList[i][headers[j]] || '');
+            }
+            values.push(row);
+        }
+        
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
+        
+        // Clear existing data
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z:clear`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        // Write new data
+        var response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': 'Bearer ' + accessToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: values })
+        });
+        
+        if (response.ok) {
+            showToast('Product saved to Google Sheets', false);
+        } else {
+            throw new Error('Save failed');
+        }
+    } catch (err) {
+        console.error('Save error:', err);
+        showToast('Error saving to Google Sheets', true);
+    }
+}
 
 window.openProductEditModal = function(idx) {
     currentEditingProductIndex = idx;
@@ -394,12 +439,73 @@ window.saveProductEdit = function() {
         if (input) currentProdList[currentEditingProductIndex][header] = input.value;
     }
     renderProdTable();
-    saveProductsToLocalStorage();
+    saveProductToSheet(currentEditingProductIndex);
     closeProductEditModal();
-    showToast('Product saved to browser storage', false);
+    showToast('Product saved to Google Sheets', false);
 };
 
 window.toggleProductStatusFromModal = function() { if (currentEditingProductIndex !== -1) { toggleProductStatus(currentEditingProductIndex); openProductEditModal(currentEditingProductIndex); } };
+
+// ============================================================
+// LOAD CUSTOMERS FROM GOOGLE SHEETS
+// ============================================================
+async function loadCustomersFromSheets() {
+    var tbody = document.getElementById('custTableBody');
+    var thead = document.getElementById('custTableHead');
+    tbody.innerHTML = '<tr><td colspan="10">Loading customers from Google Sheets...</div>';
+    
+    if (!accessToken) {
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load customers.</div>';
+        return;
+    }
+    
+    try {
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load customers');
+        
+        var data = await response.json();
+        var values = data.values;
+        
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No data found in Customers tab</div>';
+            return;
+        }
+        
+        var headers = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        
+        var headerHtml = '<th>Action</th>';
+        for (var h = 0; h < headers.length; h++) {
+            headerHtml += '<th>' + headers[h] + '</th>';
+        }
+        thead.innerHTML = headerHtml;
+        
+        tbody.innerHTML = '';
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var rowHtml = '<tr>';
+            rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer not yet implemented\')">Edit</button></td>';
+            for (var j = 0; j < headers.length && j < row.length; j++) {
+                rowHtml += '<td>' + (row[j] ? row[j].trim() : '') + '</td>';
+            }
+            for (var j = row.length; j < headers.length; j++) {
+                rowHtml += '<td>&nbsp;</td>';
+            }
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        }
+        showToast('Loaded ' + (values.length - 1) + ' customers from Google Sheets', false);
+        
+    } catch (err) {
+        console.error('Error loading customers:', err);
+        tbody.innerHTML = '<tr><td colspan="10">Error loading customers. Please check your Google sign-in.</div>';
+        showToast('Error loading customers: ' + err.message, true);
+    }
+}
 
 // ============================================================
 // SAVE PDF TO GOOGLE DRIVE
@@ -423,7 +529,7 @@ async function savePDFToDrive(fileName, dataUrl) {
 }
 
 // ============================================================
-// SAVE TO GOOGLE SHEETS
+// SAVE TO GOOGLE SHEETS (Trip Log)
 // ============================================================
 async function appendToGoogleSheets(rowData) {
     if (!accessToken) { showToast('Please sign in with Google first', true); return false; }
@@ -542,7 +648,7 @@ window.validateAndFinishStop = async function() {
 };
 
 // ============================================================
-// ROUTE NAVIGATION
+// ROUTE NAVIGATION - LOAD ROUTES FROM GITHUB
 // ============================================================
 window.startRouteFlow = function() { var name = prompt('Driver Name (Mandatory):'); if (!name) { alert('Driver Name is required.'); return; } driverName = name; alert('Route started. Driver: ' + driverName + '\nGoogle sign-in required to save delivery records.'); };
 window.finishRouteFlow = function() { if (confirm('End route?')) { driverName = ''; alert('Route finished.'); } };
@@ -616,6 +722,34 @@ document.getElementById('routeDropdown').onchange = async function() {
                 document.getElementById('btnActivateSig').textContent = 'CLICK TO SIGN';
                 document.getElementById('receivedBy').value = '';
                 async function loadDropdown(fName, targetId) {
+                    if (accessToken) {
+                        try {
+                            var sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+                            var sheetResp = await fetch(sheetUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+                            if (sheetResp.ok) {
+                                var sheetData = await sheetResp.json();
+                                var productValues = sheetData.values;
+                                if (productValues && productValues.length > 1) {
+                                    var productHeaders = productValues[0];
+                                    var descIdx = 0;
+                                    for (var p = 0; p < productHeaders.length; p++) { if (productHeaders[p].toLowerCase().indexOf('item') !== -1) { descIdx = p; break; } }
+                                    var target = document.getElementById(targetId);
+                                    target.innerHTML = '<option value="">Select product...</option>';
+                                    for (var l = 1; l < productValues.length; l++) {
+                                        var productName = productValues[l][descIdx] ? productValues[l][descIdx].trim() : '';
+                                        if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
+                                            var opt = document.createElement('option');
+                                            opt.value = productName;
+                                            opt.textContent = productName;
+                                            target.appendChild(opt);
+                                        }
+                                    }
+                                    return;
+                                }
+                            }
+                        } catch(e) { console.warn('Sheet load error:', e); }
+                    }
+                    // Fallback to GitHub
                     var githubResp = await fetch(GITHUB_RAW + 'Products/' + fName + '?t=' + Date.now());
                     if (githubResp.ok) {
                         var txt = await githubResp.text();
@@ -644,61 +778,6 @@ document.getElementById('routeDropdown').onchange = async function() {
 };
 
 // ============================================================
-// CUSTOMER MAINTENANCE
-// ============================================================
-async function loadCustomerMaintenance() {
-    var tbody = document.getElementById('custTableBody');
-    var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
-    try {
-        var routesResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
-        var files = await routesResponse.json();
-        var allCustomers = [];
-        var allHeaders = [];
-        for (var f = 0; f < files.length; f++) {
-            if (files[f].name.endsWith('.csv')) {
-                var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
-                var csvText = await csvResponse.text();
-                var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
-                if (lines.length < 2) continue;
-                var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-                if (allHeaders.length === 0) {
-                    allHeaders = headers;
-                    var headerHtml = '<th>Action</th><th>Routes</th>';
-                    for (var h = 0; h < allHeaders.length; h++) headerHtml += '<th>' + allHeaders[h] + '</th>';
-                    thead.innerHTML = headerHtml;
-                }
-                for (var i = 1; i < lines.length; i++) {
-                    var vals = lines[i].split(',');
-                    var rowObj = {};
-                    for (var j = 0; j < allHeaders.length; j++) rowObj[allHeaders[j]] = (vals[j] || '').trim();
-                    var companyName = rowObj.Company || rowObj.Name || '';
-                    var existingIdx = -1;
-                    for (var c = 0; c < allCustomers.length; c++) { if ((allCustomers[c].Company || allCustomers[c].Name) === companyName && companyName !== '') { existingIdx = c; break; } }
-                    if (existingIdx >= 0) {
-                        if (!allCustomers[existingIdx]._routes) allCustomers[existingIdx]._routes = [];
-                        if (allCustomers[existingIdx]._routes.indexOf(files[f].name.replace('.csv', '')) === -1) allCustomers[existingIdx]._routes.push(files[f].name.replace('.csv', ''));
-                    } else if (companyName !== '') { rowObj._routes = [files[f].name.replace('.csv', '')]; allCustomers.push(rowObj); }
-                }
-            }
-        }
-        tbody.innerHTML = '';
-        for (var idx = 0; idx < allCustomers.length; idx++) {
-            var cust = allCustomers[idx];
-            var routesList = cust._routes ? cust._routes.join(', ') : 'None';
-            var row = '<tr>';
-            row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit: ' + (cust.Company || cust.Name || 'Customer') + '\')">Edit</button></td>';
-            row += '<td style="font-size:11px;">' + routesList + '</td>';
-            for (var h = 0; h < allHeaders.length; h++) row += '<td>' + (cust[allHeaders[h]] || '') + '</td>';
-            row += '</tr>';
-            tbody.innerHTML += row;
-        }
-        if (allCustomers.length === 0) tbody.innerHTML = '</table><td colspan="10">No customer data found.</div>';
-        else showToast('Loaded ' + allCustomers.length + ' customers', false);
-    } catch (e) { console.error('Error loading customers:', e); tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>'; }
-}
-
-// ============================================================
 // LIVE VIEW FUNCTION
 // ============================================================
 window.managerLiveView = function() {
@@ -709,7 +788,7 @@ window.managerLiveView = function() {
         <div class="modal-content" style="max-width:1000px;">
             <div style="display:flex; justify-content:space-between;"><h2>Live View - Trip Logs</h2><button onclick="this.closest('.modal-overlay').remove()" class="btn-top" style="background:#dc3545;">Close</button></div>
             <hr>
-            <div id="liveViewSummary">Loading trip logs from GitHub...</div>
+            <div id="liveViewSummary">Loading trip logs...</div>
             <div id="liveViewFiles" style="max-height:400px; overflow-y:auto;"></div>
         </div>
     `;
@@ -717,15 +796,22 @@ window.managerLiveView = function() {
     (async function() {
         var summaryDiv = document.getElementById('liveViewSummary');
         var filesDiv = document.getElementById('liveViewFiles');
+        if (!accessToken) {
+            summaryDiv.innerHTML = 'Please sign in with Google to view trip logs.';
+            return;
+        }
         try {
-            var response = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/trip-reports');
-            if (!response.ok) throw new Error('No trip-reports folder found');
-            var files = await response.json();
+            var query = `name contains 'Trip-log' and trashed = false`;
+            var searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime,modifiedTime)&orderBy=modifiedTime desc`;
+            var response = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            if (!response.ok) throw new Error('Failed to search Drive');
+            var result = await response.json();
+            var files = result.files || [];
             if (files.length === 0) { summaryDiv.innerHTML = 'No trip logs found. Complete a delivery to create logs.'; return; }
             summaryDiv.innerHTML = 'Found ' + files.length + ' log file(s). Click any file to view.';
             var html = '<div style="display:flex; flex-direction:column; gap:5px;">';
             for (var i = 0; i < files.length; i++) {
-                html += `<button class="btn-top" style="text-align:left;" onclick="loadTripLogFile('${files[i].download_url}', '${files[i].name}')">📄 ${files[i].name}</button>`;
+                html += `<button class="btn-top" style="text-align:left;" onclick="loadTripLogFromDrive('${files[i].id}', '${files[i].name}')">📄 ${files[i].name}</button>`;
             }
             html += '</div><div id="tripLogContent" style="margin-top:15px;"></div>';
             filesDiv.innerHTML = html;
@@ -733,28 +819,36 @@ window.managerLiveView = function() {
     })();
 };
 
-window.loadTripLogFile = async function(url, name) {
+window.loadTripLogFromDrive = async function(fileId, fileName) {
     var contentDiv = document.getElementById('tripLogContent');
     if (!contentDiv) return;
     contentDiv.innerHTML = '<div style="text-align:center;"><div class="loading-spinner"></div>Loading...</div>';
     try {
-        var response = await fetch(url + '?t=' + Date.now());
+        var exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text%2Fplain`;
+        var response = await fetch(exportUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
         var text = await response.text();
         var lines = text.split('\n').filter(function(l) { return l.trim(); });
         if (lines.length === 0) { contentDiv.innerHTML = 'File is empty'; return; }
         var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-        var tableHtml = '<h4>' + name + '</h4><div style="overflow-x:auto;"><table class="mgmt-table" style="font-size:11px;"><thead><tr>';
+        var tableHtml = '<h4>' + fileName + '</h4><div style="overflow-x:auto;"><table class="mgmt-table" style="font-size:11px;"><thead><tr>';
         for (var h = 0; h < headers.length; h++) tableHtml += '<th>' + headers[h] + '</th>';
-        tableHtml += '</tr></thead><tbody>';
+        tableHtml += '</thead><tbody>';
         for (var i = 1; i < lines.length; i++) {
             var vals = lines[i].split(',');
-            tableHtml += '<td>';
+            tableHtml += '<tr>';
             for (var v = 0; v < headers.length; v++) tableHtml += '<td>' + (vals[v] || '').trim() + '</td>';
             tableHtml += '</tr>';
         }
         tableHtml += '</tbody></table></div>';
         contentDiv.innerHTML = tableHtml;
     } catch(e) { contentDiv.innerHTML = 'Error loading file: ' + e.message; }
+};
+
+// ============================================================
+// CALL IN ORDER FUNCTION
+// ============================================================
+window.managerCallInOrder = function() {
+    alert('Call in Order feature - Will be implemented in next update');
 };
 
 // ============================================================
@@ -766,501 +860,15 @@ function init() {
     var map = L.map('map').setView([55.17, -118.79], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' }).addTo(map);
     window.map = map;
-    document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; loadCustomerMaintenance(); };
-    document.getElementById('btnShowCust').onclick = function() { document.getElementById('custView').style.display = 'block'; document.getElementById('prodView').style.display = 'none'; loadCustomerMaintenance(); };
-    document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; loadProductFile('Coffee.csv'); };
-    document.getElementById('btnForceRefresh').onclick = function() { loadGitHubRoutes(); loadCustomerMaintenance(); };
+    document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; loadCustomersFromSheets(); };
+    document.getElementById('btnShowCust').onclick = function() { document.getElementById('custView').style.display = 'block'; document.getElementById('prodView').style.display = 'none'; loadCustomersFromSheets(); };
+    document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; loadProductFile('Products'); };
+    document.getElementById('btnForceRefresh').onclick = function() { loadGitHubRoutes(); if(accessToken) loadCustomersFromSheets(); };
     setTimeout(function() { if (window.map) window.map.invalidateSize(); }, 500);
 }
 
 init();
 </script>
 
-<!-- Emergency Buttons -->
-<div class="emergency-buttons">
-    <button onclick="if(window.map){window.map.invalidateSize();}else{location.reload();}">🔄 Refresh Map</button>
-    <button onclick="if(window.map){window.map.setView([55.17,-118.79],12);window.map.invalidateSize();}">📍 Reset View</button>
-</div>
-<!-- ========== ADDITIVE FIX: Call in Order Modal Styles ========== -->
-<style>
-.modal-window {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 800px;
-    max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-}
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-.modal-header h2 { margin: 0; color: #004a99; }
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 28px;
-    cursor: pointer;
-    color: #999;
-}
-.modal-close:hover { color: #dc3545; }
-.modal-section {
-    margin-bottom: 20px;
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-.modal-section label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-}
-.modal-section input, .modal-section textarea, .modal-section select {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-bottom: 10px;
-}
-.modal-section textarea { min-height: 60px; }
-.product-row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-}
-.product-row select { flex: 2; margin-bottom: 0; }
-.product-row input { width: 80px; margin-bottom: 0; }
-.product-row button { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-.add-product-btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding-top: 15px;
-    border-top: 1px solid #ddd;
-    margin-top: 20px;
-}
-.btn-secondary { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-.btn-primary { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-.btn-primary:hover { background: #218838; }
-.btn-secondary:hover { background: #5a6268; }
-</style>
-
-<!-- ========== ADDITIVE FIX: Call in Order Modal HTML ========== -->
-<div id="callinModal" class="modal-overlay" style="display:none;">
-  <div class="modal-window">
-
-    <div class="modal-header">
-      <h2><i class="fas fa-phone-alt"></i> Call‑In Order</h2>
-      <button class="modal-close" onclick="closeCallInModal()">×</button>
-    </div>
-
-    <div class="modal-body">
-
-      <!-- CUSTOMER INFO -->
-      <div class="modal-section">
-        <label><i class="fas fa-user"></i> Customer Name</label>
-        <input id="ci_name" type="text" placeholder="Enter customer name">
-        
-        <label><i class="fas fa-phone"></i> Phone Number</label>
-        <input id="ci_phone" type="text" placeholder="Enter phone number">
-
-        <label><i class="fas fa-calendar"></i> Delivery Date</label>
-        <input id="ci_date" type="date" value="">
-        
-        <label><i class="fas fa-route"></i> Assign to Route</label>
-        <select id="ci_route">
-          <option value="">-- Select Route --</option>
-        </select>
-      </div>
-
-      <!-- PRODUCT LIST -->
-      <div class="modal-section">
-        <h3><i class="fas fa-boxes"></i> Products</h3>
-        <div id="ci_productList"></div>
-        <button class="add-product-btn" onclick="addNewProductRow()"><i class="fas fa-plus"></i> Add Product</button>
-      </div>
-
-      <!-- NOTES -->
-      <div class="modal-section">
-        <label><i class="fas fa-sticky-note"></i> Special Instructions / Notes</label>
-        <textarea id="ci_notes" placeholder="Any special instructions for delivery..."></textarea>
-      </div>
-
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeCallInModal()"><i class="fas fa-times"></i> Cancel</button>
-      <button class="btn-primary" onclick="saveCallInOrder()"><i class="fas fa-save"></i> Save Order</button>
-    </div>
-
-  </div>
-</div>
-
-<!-- ========== ADDITIVE FIX: Call in Order JavaScript ========== -->
-<script>
-// Call in Order - Global variables
-var callInProductList = [];
-var callInAllProducts = { water: [], coffee: [] };
-
-// Load products for dropdowns
-async function loadCallInProducts() {
-    try {
-        // Load Water products
-        var waterResp = await fetch(GITHUB_RAW + 'Products/Water.csv?t=' + Date.now());
-        if (waterResp.ok) {
-            var waterText = await waterResp.text();
-            var waterLines = waterText.split('\n').filter(l => l.trim());
-            if (waterLines.length > 1) {
-                var waterHeaders = waterLines[0].split(',');
-                var nameIdx = waterHeaders.findIndex(h => h.toLowerCase().includes('product') || h.toLowerCase().includes('item'));
-                if (nameIdx === -1) nameIdx = 0;
-                for (var i = 1; i < waterLines.length; i++) {
-                    var vals = waterLines[i].split(',');
-                    var productName = vals[nameIdx] ? vals[nameIdx].trim() : '';
-                    if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
-                        callInAllProducts.water.push({ name: productName, type: 'water' });
-                    }
-                }
-            }
-        }
-        
-        // Load Coffee products
-        var coffeeResp = await fetch(GITHUB_RAW + 'Products/Coffee.csv?t=' + Date.now());
-        if (coffeeResp.ok) {
-            var coffeeText = await coffeeResp.text();
-            var coffeeLines = coffeeText.split('\n').filter(l => l.trim());
-            if (coffeeLines.length > 1) {
-                var coffeeHeaders = coffeeLines[0].split(',');
-                var nameIdx = coffeeHeaders.findIndex(h => h.toLowerCase().includes('product') || h.toLowerCase().includes('item'));
-                if (nameIdx === -1) nameIdx = 0;
-                for (var i = 1; i < coffeeLines.length; i++) {
-                    var vals = coffeeLines[i].split(',');
-                    var productName = vals[nameIdx] ? vals[nameIdx].trim() : '';
-                    if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
-                        callInAllProducts.coffee.push({ name: productName, type: 'coffee' });
-                    }
-                }
-            }
-        }
-        
-        // Load routes for dropdown
-        var routesResp = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
-        if (routesResp.ok) {
-            var routesFiles = await routesResp.json();
-            var routeSelect = document.getElementById('ci_route');
-            for (var i = 0; i < routesFiles.length; i++) {
-                if (routesFiles[i].name.endsWith('.csv')) {
-                    var opt = document.createElement('option');
-                    opt.value = routesFiles[i].name.replace('.csv', '');
-                    opt.textContent = routesFiles[i].name.replace('.csv', '');
-                    routeSelect.appendChild(opt);
-                }
-            }
-        }
-        
-        console.log('Call in products loaded:', callInAllProducts);
-    } catch(e) {
-        console.error('Error loading products for call in:', e);
-    }
-}
-
-// Add a new product row to the order
-function addNewProductRow() {
-    var productListDiv = document.getElementById('ci_productList');
-    var rowId = 'product_row_' + Date.now() + '_' + Math.random();
-    
-    var waterOptions = '<option value="">-- Select Product --</option><optgroup label="Water Products">';
-    for (var i = 0; i < callInAllProducts.water.length; i++) {
-        waterOptions += '<option value="water|' + callInAllProducts.water[i].name + '">' + callInAllProducts.water[i].name + '</option>';
-    }
-    waterOptions += '</optgroup><optgroup label="Coffee Products">';
-    for (var i = 0; i < callInAllProducts.coffee.length; i++) {
-        waterOptions += '<option value="coffee|' + callInAllProducts.coffee[i].name + '">' + callInAllProducts.coffee[i].name + '</option>';
-    }
-    waterOptions += '</optgroup>';
-    
-    var rowHtml = `
-        <div class="product-row" id="${rowId}">
-            <select class="product-select" style="flex:2;" onchange="updateProductRow(this)">
-                ${waterOptions}
-            </select>
-            <input type="number" class="product-qty" placeholder="Qty" value="1" style="width:80px;">
-            <input type="text" class="product-unit" placeholder="Unit" style="width:100px;">
-            <button onclick="removeProductRow('${rowId}')"><i class="fas fa-trash"></i></button>
-        </div>
-    `;
-    productListDiv.insertAdjacentHTML('beforeend', rowHtml);
-    callInProductList.push({ id: rowId, product: '', qty: 1, unit: '' });
-}
-
-function updateProductRow(selectElement) {
-    var rowDiv = selectElement.closest('.product-row');
-    var rowId = rowDiv.id;
-    var selectedValue = selectElement.value;
-    var parts = selectedValue.split('|');
-    var productName = parts[1] || '';
-    
-    var qtyInput = rowDiv.querySelector('.product-qty');
-    var unitInput = rowDiv.querySelector('.product-unit');
-    
-    for (var i = 0; i < callInProductList.length; i++) {
-        if (callInProductList[i].id === rowId) {
-            callInProductList[i].product = productName;
-            callInProductList[i].qty = parseInt(qtyInput.value) || 1;
-            callInProductList[i].unit = unitInput.value;
-            break;
-        }
-    }
-}
-
-function removeProductRow(rowId) {
-    var row = document.getElementById(rowId);
-    if (row) row.remove();
-    for (var i = 0; i < callInProductList.length; i++) {
-        if (callInProductList[i].id === rowId) {
-            callInProductList.splice(i, 1);
-            break;
-        }
-    }
-}
-
-function updateAllProductRows() {
-    var rows = document.querySelectorAll('#ci_productList .product-row');
-    callInProductList = [];
-    rows.forEach(function(row) {
-        var select = row.querySelector('.product-select');
-        var qtyInput = row.querySelector('.product-qty');
-        var unitInput = row.querySelector('.product-unit');
-        var selectedValue = select ? select.value : '';
-        var parts = selectedValue.split('|');
-        callInProductList.push({
-            id: row.id,
-            product: parts[1] || '',
-            qty: qtyInput ? parseInt(qtyInput.value) || 1 : 1,
-            unit: unitInput ? unitInput.value : ''
-        });
-    });
-}
-
-// Open Call in Order modal
-window.managerCallInOrder = async function() {
-    // Load products if not already loaded
-    if (callInAllProducts.water.length === 0 && callInAllProducts.coffee.length === 0) {
-        await loadCallInProducts();
-    }
-    
-    // Set default date to today
-    var today = new Date();
-    var year = today.getFullYear();
-    var month = String(today.getMonth() + 1).padStart(2, '0');
-    var day = String(today.getDate()).padStart(2, '0');
-    document.getElementById('ci_date').value = year + '-' + month + '-' + day;
-    
-    // Clear previous entries
-    document.getElementById('ci_name').value = '';
-    document.getElementById('ci_phone').value = '';
-    document.getElementById('ci_notes').value = '';
-    document.getElementById('ci_productList').innerHTML = '';
-    callInProductList = [];
-    
-    // Add one empty product row
-    addNewProductRow();
-    
-    // Show modal
-    document.getElementById('callinModal').style.display = 'flex';
-};
-
-// Close Call in Order modal
-window.closeCallInModal = function() {
-    document.getElementById('callinModal').style.display = 'none';
-};
-
-// Save Call in Order
-window.saveCallInOrder = async function() {
-    updateAllProductRows();
-    
-    var customerName = document.getElementById('ci_name').value.trim();
-    var phone = document.getElementById('ci_phone').value.trim();
-    var deliveryDate = document.getElementById('ci_date').value;
-    var assignedRoute = document.getElementById('ci_route').value;
-    var notes = document.getElementById('ci_notes').value;
-    
-    if (!customerName) {
-        alert('Please enter a customer name.');
-        return;
-    }
-    
-    if (callInProductList.length === 0 || callInProductList.every(p => !p.product)) {
-        alert('Please add at least one product to the order.');
-        return;
-    }
-    
-    // Filter out empty products
-    var validProducts = callInProductList.filter(p => p.product && p.product !== '');
-    
-    if (validProducts.length === 0) {
-        alert('Please add at least one product to the order.');
-        return;
-    }
-    
-    // Create order object
-    var order = {
-        orderId: 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-        customerName: customerName,
-        phone: phone,
-        deliveryDate: deliveryDate,
-        assignedRoute: assignedRoute || 'Unassigned',
-        notes: notes,
-        products: validProducts.map(p => ({ name: p.product, qty: p.qty, unit: p.unit || 'ea' })),
-        status: 'Pending',
-        createdAt: new Date().toISOString(),
-        createdBy: userEmail || 'Unknown'
-    };
-    
-    // Save to localStorage
-    var existingOrders = localStorage.getItem('logiflow_callin_orders');
-    var orders = existingOrders ? JSON.parse(existingOrders) : [];
-    orders.push(order);
-    localStorage.setItem('logiflow_callin_orders', JSON.stringify(orders));
-    
-    // Also append to a Google Sheet if signed in
-    if (accessToken) {
-        try {
-            var sheetRow = [
-                order.orderId,
-                order.customerName,
-                order.phone,
-                order.deliveryDate,
-                order.assignedRoute,
-                order.products.map(p => p.name + ' x' + p.qty).join('; '),
-                order.notes,
-                order.status,
-                order.createdAt,
-                order.createdBy
-            ];
-            await appendToCallInSheet(sheetRow);
-            showToast('Order saved to Google Sheets!', false);
-        } catch(e) {
-            console.warn('Could not save to Google Sheets:', e);
-        }
-    }
-    
-    // Display order summary
-    var productList = validProducts.map(p => '- ' + p.name + ' x' + p.qty + ' (' + (p.unit || 'ea') + ')').join('\n');
-    alert('✅ Order Saved!\n\n' +
-          'Order ID: ' + order.orderId + '\n' +
-          'Customer: ' + customerName + '\n' +
-          'Phone: ' + phone + '\n' +
-          'Delivery Date: ' + deliveryDate + '\n' +
-          'Route: ' + (assignedRoute || 'Unassigned') + '\n\n' +
-          'Products:\n' + productList + '\n\n' +
-          'Notes: ' + (notes || 'None') + '\n\n' +
-          'The order has been saved. You can view it in the Orders section.');
-    
-    closeCallInModal();
-};
-
-// Append to Call In Orders sheet
-async function appendToCallInSheet(rowData) {
-    if (!accessToken) return false;
-    try {
-        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + GOOGLE_SHEET_ID + '/values/CallInOrders!A:J:append?valueInputOption=USER_ENTERED';
-        var response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values: [rowData] })
-        });
-        return response.ok;
-    } catch(e) { return false; }
-}
-
-// Add a button to view orders (optional)
-function addOrdersViewButton() {
-    var managerDiv = document.querySelector('#mgrModal .modal-content');
-    if (managerDiv) {
-        var ordersBtn = document.createElement('button');
-        ordersBtn.id = 'btnViewOrders';
-        ordersBtn.className = 'mgmt-nav-btn';
-        ordersBtn.innerHTML = 'View Orders';
-        ordersBtn.onclick = function() { viewCallInOrders(); };
-        var buttonContainer = document.querySelector('#mgrModal .modal-content div:first-child');
-        if (buttonContainer) buttonContainer.appendChild(ordersBtn);
-    }
-}
-
-// View saved orders
-window.viewCallInOrders = function() {
-    var existingOrders = localStorage.getItem('logiflow_callin_orders');
-    var orders = existingOrders ? JSON.parse(existingOrders) : [];
-    
-    if (orders.length === 0) {
-        alert('No orders found.');
-        return;
-    }
-    
-    var orderList = orders.map(function(o, idx) {
-        return (idx + 1) + '. ' + o.orderId + ' - ' + o.customerName + ' - ' + o.deliveryDate + ' - ' + o.status;
-    }).join('\n');
-    
-    alert('📋 Saved Orders:\n\n' + orderList + '\n\n(Check browser console for details)');
-    console.log('All orders:', orders);
-};
-
-// Override the original managerCallInOrder if it exists
-if (typeof window.originalManagerCallInOrder === 'undefined') {
-    window.originalManagerCallInOrder = window.managerCallInOrder;
-}
-window.managerCallInOrder = window.managerCallInOrder || function() { window.managerCallInOrder(); };
-
-console.log('Call in Order feature fully loaded');
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
-    <!-- ========== ADDITIVE FIX: Remove Emergency Buttons ========== -->
-<script>
-(function removeEmergencyButtons() {
-    // Function to find and remove the emergency buttons container
-    function removeButtons() {
-        var buttonsContainer = document.querySelector('.emergency-buttons');
-        if (buttonsContainer) {
-            buttonsContainer.remove();
-            console.log('Emergency buttons removed');
-            return true;
-        }
-        return false;
-    }
-    
-    // Try immediately
-    if (!removeButtons()) {
-        // If not found, wait for DOM to be fully loaded
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', removeButtons);
-        } else {
-            // Try again after a short delay
-            setTimeout(removeButtons, 500);
-        }
-    }
-    
-    // Also try to remove any floating buttons that might appear later
-    var observer = new MutationObserver(function(mutations) {
-        var buttons = document.querySelector('.emergency-buttons');
-        if (buttons) {
-            buttons.remove();
-            observer.disconnect();
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-})();
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
