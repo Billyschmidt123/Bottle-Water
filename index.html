@@ -120,6 +120,28 @@
             background: #dc3545;
             color: white;
         }
+        /* Retry button styles */
+        .retry-signin-btn {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            z-index: 10000;
+            background: #ffc107;
+            color: #333;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        .retry-signin-btn:hover {
+            background: #e0a800;
+        }
     </style>
 </head>
 <body>
@@ -215,10 +237,10 @@
                         <th>Qty</th>
                         <th>Unit</th>
                         <th>Action</th>
-                     </>
+                     </tr>
                 </thead>
                 <tbody id="cartItemsBody"></tbody>
-            </table>
+             </table>
         </div>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
@@ -266,7 +288,7 @@
             <table class="mgmt-table">
                 <thead id="custTableHead"></thead>
                 <tbody id="custTableBody"></tbody>
-            </table>
+             </table>
         </div>
         <div id="prodView" style="display: none;">
             <div style="margin-bottom:15px;">
@@ -277,7 +299,7 @@
                 <table class="mgmt-table">
                     <thead id="prodTableHead"></thead>
                     <tbody id="prodTableBody"></tbody>
-                </table>
+                 </table>
             </div>
         </div>
     </div>
@@ -313,6 +335,10 @@
         </div>
     </div>
 </div>
+
+<button id="retrySignInBtn" class="retry-signin-btn">
+    <i class="fas fa-sync-alt"></i> Retry Google Sign-In
+</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -369,9 +395,13 @@ function updateOnlineStatus(connected) {
     if (connected && accessToken && userEmail) {
         statusSpan.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Online Storage Active';
         statusSpan.className = 'online-status active';
+        document.getElementById('retrySignInBtn').style.display = 'none';
     } else {
         statusSpan.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Offline';
         statusSpan.className = 'online-status inactive';
+        if (accessToken === null && userEmail === null) {
+            document.getElementById('retrySignInBtn').style.display = 'flex';
+        }
     }
 }
 
@@ -447,32 +477,55 @@ function showPinModal() {
 // GOOGLE SIGN-IN (Auto after PIN)
 // ============================================================
 function initializeGoogleSignIn() {
+    showToast('Opening Google Sign-In...', false);
+    
     google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        auto_select: true,
+        auto_select: false,
         callback: function(response) {
-            var payload = JSON.parse(atob(response.credential.split('.')[1]));
-            userEmail = payload.email;
-            
-            var tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-                callback: function(tokenResponse) {
-                    if (tokenResponse.access_token) {
-                        accessToken = tokenResponse.access_token;
-                        showToast('Connected: ' + userEmail, false);
-                        updateOnlineStatus(true);
-                        loadProductFile('Coffee.csv');
-                        loadCustomersFromSheets();
+            try {
+                var payload = JSON.parse(atob(response.credential.split('.')[1]));
+                userEmail = payload.email;
+                showToast('Google auth successful for: ' + userEmail, false);
+                
+                var tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+                    callback: function(tokenResponse) {
+                        if (tokenResponse.access_token) {
+                            accessToken = tokenResponse.access_token;
+                            showToast('Connected: ' + userEmail, false);
+                            updateOnlineStatus(true);
+                            loadProductFile('Coffee.csv');
+                            loadCustomersFromSheets();
+                        } else {
+                            showToast('Failed to get access token', true);
+                            updateOnlineStatus(false);
+                        }
+                    },
+                    error_callback: function(error) {
+                        console.error('Token error:', error);
+                        showToast('Token error: ' + JSON.stringify(error), true);
+                        updateOnlineStatus(false);
                     }
-                }
-            });
-            tokenClient.requestAccessToken();
+                });
+                tokenClient.requestAccessToken();
+            } catch(e) {
+                console.error('Sign-in error:', e);
+                showToast('Sign-in error: ' + e.message, true);
+                updateOnlineStatus(false);
+            }
         }
     });
     
-    // Auto-sign in
-    google.accounts.id.prompt();
+    // Use popup mode instead of prompt
+    google.accounts.id.prompt(function(notification) {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('Prompt not displayed:', notification);
+            showToast('Click the Retry button to sign in', false);
+            document.getElementById('retrySignInBtn').style.display = 'flex';
+        }
+    });
 }
 
 // ============================================================
@@ -533,7 +586,7 @@ async function loadProductFile(fileName) {
     }
     
     // Fall back to GitHub
-    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</div>';
+    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</td></tr>';
     
     try {
         var text = await fetchFromGitHub('Products/' + fileName);
@@ -572,7 +625,7 @@ async function loadProductFile(fileName) {
             showToast('Loaded from GitHub', false);
         }
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
+        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</td></tr>';
         showToast('Error loading products from GitHub', true);
     }
 }
@@ -1195,7 +1248,7 @@ async function loadCustomersFromSheets() {
         tbody.innerHTML = '';
         for (var i = 1; i < values.length; i++) {
             var row = values[i];
-            var rowHtml = '<td>';
+            var rowHtml = '<tr>';
             rowHtml += '<td><button class="btn-top" style="padding:4px;" onclick="editCustomerFromTable(' + (i-1) + ')">Edit</button></td>';
             for (var j = 0; j < headers.length && j < row.length; j++) {
                 rowHtml += '<td>' + (row[j] ? row[j].trim() : '') + '</td>';
@@ -1228,17 +1281,20 @@ function init() {
     
     document.getElementById('btnManager').onclick = function() {
         document.getElementById('mgrModal').style.display = 'flex';
-        loadCustomersFromSheets();
+        if (accessToken) loadCustomersFromSheets();
+        else showToast('Please sign in with Google first', true);
     };
     document.getElementById('btnShowCust').onclick = function() {
         document.getElementById('custView').style.display = 'block';
         document.getElementById('prodView').style.display = 'none';
-        loadCustomersFromSheets();
+        if (accessToken) loadCustomersFromSheets();
+        else showToast('Please sign in with Google first', true);
     };
     document.getElementById('btnShowProd').onclick = function() {
         document.getElementById('custView').style.display = 'none';
         document.getElementById('prodView').style.display = 'block';
-        loadProductFile('Coffee.csv');
+        if (accessToken) loadProductFile('Coffee.csv');
+        else showToast('Please sign in with Google first', true);
     };
     document.getElementById('btnForceRefresh').onclick = function() {
         loadGitHubRoutes();
@@ -1401,7 +1457,7 @@ init();
                             '<tr class="payment-row">' +
                                 '<td colspan="2" class="payment-options">' +
                                     '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
-                                '</tr>' +
+                                '</td>' +
                                 '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</div>' +
                                 '<td style="border: 1px solid #000;">&nbsp;</div>' +
                             '</tr>' +
@@ -2377,7 +2433,7 @@ init();
         var tbody = document.getElementById('enhancedCustomerBody');
         
         // Build header with sort indicators
-        var headerHtml = '<tr>';
+        var headerHtml = '<table>';
         headerHtml += '<th style="width:80px;">Action</th>';
         for (var i = 0; i < enhancedHeaders.length; i++) {
             var header = enhancedHeaders[i];
@@ -2467,7 +2523,8 @@ init();
             showCustBtn.classList.add('active');
             var prodBtn = document.getElementById('btnShowProd');
             if (prodBtn) prodBtn.classList.remove('active');
-            loadEnhancedCustomers();
+            if (accessToken) loadEnhancedCustomers();
+            else showToast('Please sign in with Google first', true);
         };
     }
     
@@ -2670,7 +2727,7 @@ init();
         document.getElementById('refreshProductsBtn').onclick = function() { loadEnhancedProducts(); };
         
         if (!accessToken) {
-            document.getElementById('enhancedProductBody').innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
+            document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
             document.getElementById('productRecordCount').textContent = '0 records';
             return;
         }
@@ -2808,7 +2865,8 @@ init();
             showProdBtn.classList.add('active');
             var custBtn = document.getElementById('btnShowCust');
             if (custBtn) custBtn.classList.remove('active');
-            loadEnhancedProducts();
+            if (accessToken) loadEnhancedProducts();
+            else showToast('Please sign in with Google first', true);
         };
     }
     
@@ -2830,7 +2888,8 @@ init();
                 modal.style.display = 'flex';
                 // Load enhanced customer table by default
                 setTimeout(function() {
-                    loadEnhancedCustomers();
+                    if (accessToken) loadEnhancedCustomers();
+                    else showToast('Please sign in with Google first', true);
                 }, 100);
             }
         };
@@ -2915,13 +2974,12 @@ init();
         // Load customers using the enhanced function if available, otherwise the original
         if (typeof loadEnhancedCustomers === 'function') {
             console.log('Loading enhanced customer table');
-            loadEnhancedCustomers();
+            if (accessToken) loadEnhancedCustomers();
+            else showToast('Please sign in with Google first', true);
         } else if (typeof loadCustomersFromSheets === 'function') {
             console.log('Loading customers from sheets');
-            loadCustomersFromSheets();
-        } else if (typeof loadCustomerMaintenance === 'function') {
-            console.log('Loading customer maintenance');
-            loadCustomerMaintenance();
+            if (accessToken) loadCustomersFromSheets();
+            else showToast('Please sign in with Google first', true);
         } else {
             console.log('No customer load function found, using fallback');
             // Fallback: try to load via Google Sheets API directly
@@ -2930,7 +2988,7 @@ init();
             } else {
                 var tbody = document.getElementById('custTableBody');
                 if (tbody) {
-                    tbody.innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
+                    tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
                 }
             }
         }
@@ -3094,50 +3152,14 @@ init();
             if (prodBtn) prodBtn.classList.remove('active');
             
             // Load customers from Google Sheets
-            if (typeof loadEnhancedCustomers === 'function') {
-                loadEnhancedCustomers();
-            } else if (typeof loadCustomersFromSheets === 'function') {
-                loadCustomersFromSheets();
-            } else {
-                console.log('Customer table connection: using fallback');
-                if (accessToken) {
-                    (async function() {
-                        var tbody = document.getElementById('custTableBody');
-                        var thead = document.getElementById('custTableHead');
-                        if (tbody) {
-                            tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
-                            try {
-                                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
-                                var response = await fetch(url, {
-                                    headers: { 'Authorization': 'Bearer ' + accessToken }
-                                });
-                                var data = await response.json();
-                                var values = data.values;
-                                if (values && values.length > 0) {
-                                    var headers = values[0];
-                                    var headerHtml = '<th>Action</th>';
-                                    for (var h = 0; h < headers.length; h++) {
-                                        headerHtml += '<th>' + (headers[h] || '') + '</th>';
-                                    }
-                                    if (thead) thead.innerHTML = headerHtml;
-                                    tbody.innerHTML = '';
-                                    for (var i = 1; i < values.length; i++) {
-                                        var row = values[i];
-                                        var rowHtml = '<tr>';
-                                        rowHtml += '<td><button class="btn-top" style="padding:4px;">Edit</button></td>';
-                                        for (var j = 0; j < headers.length; j++) {
-                                            rowHtml += '<td>' + (row[j] || '') + '</td>';
-                                        }
-                                        rowHtml += '</tr>';
-                                        tbody.innerHTML += rowHtml;
-                                    }
-                                }
-                            } catch(err) {
-                                tbody.innerHTML = '<tr><td colspan="10">Error loading customers</div>';
-                            }
-                        }
-                    })();
+            if (accessToken) {
+                if (typeof loadEnhancedCustomers === 'function') {
+                    loadEnhancedCustomers();
+                } else if (typeof loadCustomersFromSheets === 'function') {
+                    loadCustomersFromSheets();
                 }
+            } else {
+                showToast('Please sign in with Google first', true);
             }
         };
     }
@@ -3155,10 +3177,14 @@ init();
             if (custBtnElem) custBtnElem.classList.remove('active');
             
             // Load products (default to Coffee.csv)
-            if (typeof loadEnhancedProducts === 'function') {
-                loadEnhancedProducts();
-            } else if (typeof loadProductFile === 'function') {
-                loadProductFile('Coffee.csv');
+            if (accessToken) {
+                if (typeof loadEnhancedProducts === 'function') {
+                    loadEnhancedProducts();
+                } else if (typeof loadProductFile === 'function') {
+                    loadProductFile('Coffee.csv');
+                }
+            } else {
+                showToast('Please sign in with Google first', true);
             }
         };
     }
@@ -3167,65 +3193,21 @@ init();
 })();
 </script>
 
-<!-- ========== ADDITIVE FIX: Fix config.js missing - Define Default Config ========== -->
+<!-- ========== ADDITIVE FIX: Retry Sign-In Button Handler ========== -->
 <script>
-(function ensureConfigExists() {
-    // If config.js didn't load, define LOGIFLOW_CONFIG with defaults
-    if (typeof LOGIFLOW_CONFIG === 'undefined') {
-        window.LOGIFLOW_CONFIG = {
-            REPO_OWNER: 'Billyschmidt123',
-            REPO_NAME: 'Bottle-Water',
-            GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-            GOOGLE_SHEET_ID: '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA',
-            PDF_FOLDER_ID: '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk',
-            ACCESS_PIN: '1234'
+(function setupRetrySignIn() {
+    var retryBtn = document.getElementById('retrySignInBtn');
+    if (retryBtn) {
+        retryBtn.onclick = function() {
+            console.log('Retry sign-in clicked');
+            showToast('Retrying Google Sign-In...', false);
+            if (typeof initializeGoogleSignIn === 'function') {
+                initializeGoogleSignIn();
+            } else {
+                showToast('Sign-in function not available', true);
+            }
         };
-        console.log('Config file missing - using default configuration values');
-        showToast('Using default configuration (config.js not found)', false);
-    } else {
-        console.log('Config file loaded successfully');
     }
-    
-    // Also re-initialize the constants if they weren't set
-    if (typeof REPO_OWNER === 'undefined') {
-        // The constants will be redefined, but we need to ensure the main script picks them up
-        // The main script already has fallback logic, so this just ensures LOGIFLOW_CONFIG exists
-    }
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Override PIN Handler to Use Default Config ========== -->
-<script>
-(function ensurePinWorksWithDefaultConfig() {
-    // Wait for the original showPinModal to be defined
-    var checkInterval = setInterval(function() {
-        if (typeof window.showPinModal === 'function') {
-            clearInterval(checkInterval);
-            
-            // Store original
-            var originalShowPinModal = window.showPinModal;
-            
-            // Override to ensure correct PIN is used from config
-            window.showPinModal = function() {
-                // Ensure LOGIFLOW_CONFIG exists
-                if (typeof LOGIFLOW_CONFIG === 'undefined') {
-                    window.LOGIFLOW_CONFIG = {
-                        REPO_OWNER: 'Billyschmidt123',
-                        REPO_NAME: 'Bottle-Water',
-                        GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-                        GOOGLE_SHEET_ID: '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA',
-                        PDF_FOLDER_ID: '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk',
-                        ACCESS_PIN: '1234'
-                    };
-                }
-                
-                // Call original
-                originalShowPinModal();
-            };
-            
-            console.log('PIN modal handler updated with default config support');
-        }
-    }, 500);
 })();
 </script>
 
