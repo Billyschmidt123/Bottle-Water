@@ -1113,6 +1113,142 @@ document.getElementById('emergencyManagerBtn').onclick = function() {
 };
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
+<!-- ========== ADDITIVE FIX: Force Manager Panel to Open ========== -->
+<script>
+(function forceManagerPanel() {
+    // Function to ensure manager button opens the modal
+    function fixManagerButton() {
+        var managerBtn = document.getElementById('btnManager');
+        if (!managerBtn) {
+            setTimeout(fixManagerButton, 200);
+            return;
+        }
+        
+        // Remove any existing handlers and add new one
+        var newBtn = managerBtn.cloneNode(true);
+        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
+        
+        newBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('Manager button clicked - opening panel');
+            
+            // Get the modal
+            var modal = document.getElementById('mgrModal');
+            if (modal) {
+                // Force display to flex
+                modal.style.display = 'flex';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                
+                // Load data after modal is open
+                setTimeout(function() {
+                    if (typeof loadCustomersFromSheets === 'function') {
+                        loadCustomersFromSheets();
+                    }
+                    if (typeof loadProductFile === 'function') {
+                        loadProductFile();
+                    }
+                }, 100);
+            } else {
+                console.error('Manager modal not found');
+                alert('Manager modal not found. Please refresh the page.');
+            }
+        };
+        
+        console.log('Manager button fixed - will open modal');
+    }
+    
+    // Also fix the emergency button
+    function fixEmergencyButton() {
+        var emergencyBtn = document.getElementById('emergencyManagerBtn');
+        if (emergencyBtn) {
+            emergencyBtn.onclick = function() {
+                var modal = document.getElementById('mgrModal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    modal.style.visibility = 'visible';
+                    modal.style.opacity = '1';
+                    if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
+                    if (typeof loadProductFile === 'function') loadProductFile();
+                }
+            };
+        }
+    }
+    
+    // Run when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            fixManagerButton();
+            fixEmergencyButton();
+        });
+    } else {
+        fixManagerButton();
+        fixEmergencyButton();
+    }
+})();
+</script>
 
+<!-- ========== ADDITIVE FIX: Ensure Modal Close Button Works ========== -->
+<script>
+(function fixModalClose() {
+    function fixCloseButton() {
+        var modal = document.getElementById('mgrModal');
+        if (!modal) {
+            setTimeout(fixCloseButton, 200);
+            return;
+        }
+        
+        // Find the exit button inside the modal
+        var exitBtn = modal.querySelector('.btn-top[style*="background:#dc3545"]');
+        if (exitBtn) {
+            exitBtn.onclick = function() {
+                modal.style.display = 'none';
+            };
+        }
+        
+        // Also close when clicking outside the modal content
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fixCloseButton);
+    } else {
+        fixCloseButton();
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Add a Visible Manager Button in Corner ========== -->
+<div style="position: fixed; bottom: 15px; right: 15px; z-index: 9999; display: flex; gap: 8px;">
+    <button id="manualManagerBtn" style="background: #28a745; color: white; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        📋 OPEN MANAGER
+    </button>
+</div>
+<script>
+(function addManualButton() {
+    var btn = document.getElementById('manualManagerBtn');
+    if (btn) {
+        btn.onclick = function() {
+            var modal = document.getElementById('mgrModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
+                if (typeof loadProductFile === 'function') loadProductFile();
+            } else {
+                alert('Modal not found. Please refresh the page.');
+            }
+        };
+    }
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
