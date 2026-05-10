@@ -705,7 +705,7 @@ window.validateAndFinishStop = async function() {
     var productRows = '';
     for (var i = 0; i < deliveryCart.length; i++) {
         var item = deliveryCart[i];
-        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
+        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</tr><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '<td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     var emptyRows = '';
@@ -1002,7 +1002,7 @@ document.getElementById('routeDropdown').onchange = async function() {
 async function loadCustomerMaintenance() {
     var tbody = document.getElementById('custTableBody');
     var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
+    tbody.innerHTML = '</table><td colspan="10">Loading customers...</div>';
     
     try {
         var routesResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
@@ -1042,9 +1042,9 @@ async function loadCustomerMaintenance() {
         for (var idx = 0; idx < allCustomers.length; idx++) {
             var customer = allCustomers[idx];
             var row = '<tr>';
-            row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit: ' + (customer.Company || customer.Name || 'Customer') + '\')">Edit</button></td>';
+            row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit: ' + (customer.Company || customer.Name || 'Customer') + '\')">Edit</button></tr>';
             for (var h = 0; h < allHeaders.length; h++) {
-                row += '</tr>' + (customer[allHeaders[h]] || '') + '</td>';
+                row += '<td>' + (customer[allHeaders[h]] || '') + '</td>';
             }
             row += '</tr>';
             tbody.innerHTML += row;
@@ -1093,7 +1093,6 @@ function init() {
 
 init();
 </script>
-
 <!-- ========== ADDITIVE FIX: PDF Size 8.5 x 11 inches - Fits on One Page ========== -->
 <script>
 (function fixPDFSize() {
@@ -1247,8 +1246,8 @@ init();
                                 '<td colspan="2" class="payment-options">' +
                                     '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
                                 '</td>' +
-                                '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</div>' +
-                                '<td style="border: 1px solid #000;">&nbsp;</div>' +
+                                '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</td>' +
+                                '<td style="border: 1px solid #000;">&nbsp;</td>' +
                             '</tr>' +
                         '</tbody>' +
                     '</table>' +
@@ -1321,114 +1320,7 @@ init();
     }, 500);
 })();
 </script>
-
-<!-- ========== ADDITIVE FIX: Working Manager Button - Opens Dedicated Manager Page ========== -->
-<style>
-.working-manager-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 10000;
-    background: #004a99;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 50px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 14px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.working-manager-btn:hover {
-    background: #003a7a;
-}
-</style>
-
-<button id="workingManagerBtn" class="working-manager-btn">
-    <i class="fas fa-cog"></i> OPEN MANAGER
-</button>
-
-<script>
-(function createWorkingManager() {
-    console.log('Creating working manager button...');
-    
-    var managerBtn = document.getElementById('btnManager');
-    var workingBtn = document.getElementById('workingManagerBtn');
-    
-    // Function to open manager page
-    function openManagerPage() {
-        // Create a full manager page dynamically
-        var managerWindow = window.open('', '_blank');
-        if (!managerWindow) {
-            alert('Please allow pop-ups to open the Manager page.');
-            return;
-        }
-        
-        managerWindow.document.write('<!DOCTYPE html><html><head><title>Manager Control Panel</title>');
-        managerWindow.document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">');
-        managerWindow.document.write('<style>');
-        managerWindow.document.write('body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f4f7f9; }');
-        managerWindow.document.write('.header { background: #004a99; color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }');
-        managerWindow.document.write('.btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-bottom: 30px; }');
-        managerWindow.document.write('.manager-btn { background: white; border: none; padding: 20px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.3s; }');
-        managerWindow.document.write('.manager-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }');
-        managerWindow.document.write('.content-area { background: white; border-radius: 8px; padding: 20px; min-height: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }');
-        managerWindow.document.write('.close-btn { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; float: right; }');
-        managerWindow.document.write('.fa, .fas { margin-right: 8px; }');
-        managerWindow.document.write('</style>');
-        managerWindow.document.write('</head><body>');
-        managerWindow.document.write('<div class="header"><h1><i class="fas fa-cogs"></i> Manager Control Panel</h1><button class="close-btn" onclick="window.close()">Close</button></div>');
-        managerWindow.document.write('<div class="btn-grid">');
-        managerWindow.document.write('<button class="manager-btn" id="btnEOD"><i class="fas fa-calendar-day"></i> End of Day</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnLiveView"><i class="fas fa-eye"></i> Live View</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnCallOrder"><i class="fas fa-phone-alt"></i> Call in Order</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnBackup"><i class="fas fa-database"></i> Backup</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnViewSlips"><i class="fas fa-file-pdf"></i> View Slips</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnPastLogs"><i class="fas fa-history"></i> Past Logs</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnUserMgmt"><i class="fas fa-users"></i> User Management</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnCustomerMgmt"><i class="fas fa-building"></i> Customer Maintenance</button>');
-        managerWindow.document.write('<button class="manager-btn" id="btnProductMgmt"><i class="fas fa-boxes"></i> Product Maintenance</button>');
-        managerWindow.document.write('</div>');
-        managerWindow.document.write('<div id="contentArea" class="content-area"><p style="color: #666; text-align: center;">Select a function from the buttons above.</p></div>');
-        managerWindow.document.write('<script>');
-        managerWindow.document.write('function showMessage(msg) { document.getElementById("contentArea").innerHTML = "<div style=\\"background:#d4edda; padding:15px; border-radius:5px;\\">" + msg + "</div>"; }');
-        managerWindow.document.write('document.getElementById("btnEOD").onclick = function() { showMessage("End of Day Report Generated. Check TripLog sheet for details."); };');
-        managerWindow.document.write('document.getElementById("btnLiveView").onclick = function() { showMessage("Live View: Trip logs available in Google Drive folder."); };');
-        managerWindow.document.write('document.getElementById("btnCallOrder").onclick = function() { var name = prompt("Enter customer name:"); if(name) showMessage("Order saved for: " + name); };');
-        managerWindow.document.write('document.getElementById("btnBackup").onclick = function() { showMessage("Backup completed. Data saved to Google Drive."); };');
-        managerWindow.document.write('document.getElementById("btnViewSlips").onclick = function() { showMessage("Delivery slips are saved in your Google Drive folder."); };');
-        managerWindow.document.write('document.getElementById("btnPastLogs").onclick = function() { showMessage("Past logs available in TripLog tab of Google Sheets."); };');
-        managerWindow.document.write('document.getElementById("btnUserMgmt").onclick = function() { var email = prompt("Enter email to add as driver:"); if(email) showMessage("User added: " + email); };');
-        managerWindow.document.write('document.getElementById("btnCustomerMgmt").onclick = function() { showMessage("Customers are stored in Google Sheets.<br><br><a href=\\"https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID + '\\" target=\\"_blank\\">Open Customer Sheet</a>"); };');
-        managerWindow.document.write('document.getElementById("btnProductMgmt").onclick = function() { showMessage("Products are stored in Google Sheets.<br><br><a href=\\"https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID + '\\" target=\\"_blank\\">Open Product Sheet</a>"); };');
-        managerWindow.document.write('<\/script>');
-        managerWindow.document.write('</body></html>');
-        managerWindow.document.close();
-    }
-    
-    // Attach to floating button
-    if (workingBtn) {
-        workingBtn.onclick = openManagerPage;
-    }
-    
-    // Also override original manager button
-    if (managerBtn) {
-        var newBtn = managerBtn.cloneNode(true);
-        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
-        newBtn.onclick = function(e) {
-            e.preventDefault();
-            openManagerPage();
-        };
-    }
-    
-    console.log('Working manager button created - click to open manager page');
-})();
-</script>
-
 <!-- ========== END OF ADDITIVE FIX ========== -->
-
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
