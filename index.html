@@ -1,146 +1,786 @@
-<!-- ========== ADDITIVE FIX: Ensure Map Loads Correctly ========== -->
-<script>
-(function fixMapLoading() {
-    // Wait for DOM to be fully loaded
-    function initMapIfNeeded() {
-        // Check if map container exists but map hasn't been initialized
-        var mapContainer = document.getElementById('map');
-        if (!mapContainer) {
-            console.error('Map container not found');
-            return;
-        }
-        
-        // Check if map already exists
-        if (typeof window.map !== 'undefined' && window.map) {
-            console.log('Map already exists, invalidating size');
-            window.map.invalidateSize();
-            return;
-        }
-        
-        // Check if L (Leaflet) is available
-        if (typeof L === 'undefined') {
-            console.log('Leaflet not loaded yet, waiting...');
-            setTimeout(initMapIfNeeded, 500);
-            return;
-        }
-        
-        try {
-            // Create new map
-            var map = L.map('map').setView([55.17, -118.79], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-            }).addTo(map);
-            
-            // Store globally
-            window.map = map;
-            console.log('Map initialized successfully');
-            
-            // Force a resize after a short delay to ensure proper rendering
-            setTimeout(function() {
-                if (window.map) window.map.invalidateSize();
-            }, 200);
-            
-        } catch (err) {
-            console.error('Error creating map:', err);
-        }
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiFlow Delivery System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
-    // Try to initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initMapIfNeeded);
-    } else {
-        initMapIfNeeded();
-    }
-    
-    // Also try again after all scripts load
-    window.addEventListener('load', function() {
-        setTimeout(initMapIfNeeded, 100);
-    });
-    
-    console.log('Map loading fix applied');
-})();
-</script>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
+        header { background: #004a99; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .main-container { display: flex; flex: 1; overflow: hidden; min-height: 500px; }
+        #map { flex: 1; height: 100%; min-height: 400px; background: #e9ecef; width: 100%; }
+        .side-panel { width: 350px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; box-shadow: -2px 0 5px rgba(0,0,0,0.05); }
+        .panel-header { padding: 15px; border-bottom: 1px solid #eee; background: #fff; }
+        .stop-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .btn-top { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: 'Segoe UI', sans-serif; }
+        .btn-top:hover { background: #0056b3; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 0.85rem; color: #666; margin-bottom: 4px; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .mgmt-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .mgmt-table th, .mgmt-table td { border: 1px solid #eee; padding: 8px; text-align: left; }
+        .mgmt-table th { background: #f8f9fa; position: sticky; top: 0; }
+        .mgmt-nav-btn { padding: 10px 20px; border: none; background: #eee; cursor: pointer; border-radius: 4px 4px 0 0; margin-right: 5px; }
+        .mgmt-nav-btn.active { background: #007bff; color: white; }
+        .deactivated-row { opacity: 0.5; background: #f8d7da !important; }
+        .edit-input { width: 90%; padding: 4px; }
+        #sig-canvas { border: 2px dashed #ccc; background: #eee; cursor: crosshair; touch-action: none; width: 100%; height: 150px; }
+        .cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .cart-table th, .cart-table td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+        .driver-nav-bar { background: #e9ecef; padding: 10px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #dee2e6; font-family: 'Segoe UI', sans-serif; }
+        .info-bar { background: #fff; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #495057; }
+        .btn-nav { padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; gap: 5px; font-family: 'Segoe UI', sans-serif; }
+        .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; z-index: 2000; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); animation: fadeOut 3s ease-in-out forwards; }
+        .toast-error { background: #dc3545; }
+        .modal-button-group { margin-top: 30px; display: flex; gap: 15px; justify-content: center; }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .loading-content { background: white; padding: 20px; border-radius: 8px; text-align: center; min-width: 300px; }
+        .loading-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #004a99; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .emergency-buttons { position: fixed; bottom: 15px; right: 15px; z-index: 9999; display: flex; gap: 8px; }
+        .emergency-buttons button { background: #004a99; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .emergency-buttons button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
 
-<!-- ========== ADDITIVE FIX: Ensure Route Dropdown Populates ========== -->
+<header>
+    <div style="display:flex; align-items:center; gap:15px;">
+        <h1 style="margin:0; font-size:1.5rem;">LogiFlow Delivery</h1>
+        <select id="routeDropdown" class="btn-top" style="background:#0056b3;"></select>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div id="googleSignInDiv"></div>
+        <span id="googleStatus" style="font-size:12px; margin-left:10px; padding:4px 8px; border-radius:4px; background:#2d2d2d;"></span>
+        <button id="btnManager" class="btn-top" style="background:#6c757d;">Manager</button>
+        <button id="btnForceRefresh" class="btn-top" style="background:#17a2b8;"><i class="fas fa-sync"></i></button>
+    </div>
+</header>
+
+<div class="driver-nav-bar">
+    <button id="btnStartRoute" class="btn-nav" style="background: #28a745;" onclick="startRouteFlow()">START ROUTE</button>
+    <button id="btnFinishRoute" class="btn-nav" style="background: #dc3545;" onclick="finishRouteFlow()">FINISH</button>
+    <button class="btn-nav" style="background: #6f4e37;" onclick="openDirections()"><i class="fas fa-directions"></i> DIRECTIONS</button>
+    <div style="display: flex; gap: 5px;">
+        <button class="btn-nav" style="background: #007bff;" onclick="navigateStop(-1)"><i class="fas fa-chevron-left"></i></button>
+        <button class="btn-nav" style="background: #007bff;" onclick="navigateStop(1)"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <div id="navAddressBar" class="info-bar">Address: ---</div>
+    <div id="navPhoneBar" class="info-bar" style="flex-grow: 0; min-width: 150px;">Phone: ---</div>
+</div>
+
+<div class="main-container">
+    <div id="map"></div>
+    <div class="side-panel">
+        <div class="panel-header">
+            <h3 id="currentRouteTitle" style="margin:0 0 10px 0;">Select a Route</h3>
+            <div style="font-size:0.9rem; color:#666;">
+                <span id="currentAddress">---</span><br>
+                <span id="currentPhone">---</span>
+            </div>
+        </div>
+        <div id="stopList" class="stop-list">
+            <p style="text-align:center; color:#999; margin-top:20px;">No route loaded.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Stop Modal -->
+<div id="stopModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 800px;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 id="stopModalTitle" style="margin:0;">Delivery Stop</h2>
+            <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#dc3545;">Cancel</button>
+        </div>
+        <hr>
+        <div style="margin-bottom:20px;">
+            <h4 style="margin:0 0 10px 0; color:#004a99;">Customer Information</h4>
+            <div style="font-size:0.9rem; line-height:1.6; background:#f8f9fa; padding:10px; border-radius:4px;">
+                <strong>Address:</strong> <span id="metaAddress"></span><br>
+                <strong>Phone:</strong> <span id="metaPhone"></span><br>
+                <strong>Email:</strong> <span id="metaEmail"></span><br>
+                <strong>Special Order:</strong> <span id="metaSpecOrder"></span><br>
+                <strong>Special Instructions:</strong> <span id="metaSpecInst"></span>
+            </div>
+        </div>
+        <div style="background:#f0f7ff; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #cfe2ff;">
+            <h4 style="margin:0 0 10px 0; color:#004a99;">Product Entry</h4>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div class="form-group"><label>Water Items</label><select id="stopProductDropdown" style="width:200px;"></select></div>
+                <div class="form-group"><label>Coffee Items</label><select id="stopCoffeeDropdown" style="width:200px;"></select></div>
+                <div class="form-group" style="width:60px;"><label>Qty</label><input type="number" id="stopQty" value="1"></div>
+                <div class="form-group" style="width:80px;"><label>Units</label><input type="text" id="stopUnit" placeholder="ea"></div>
+                <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'stopQty', 'stopUnit')">Add Water</button>
+                <button class="btn-top" style="background:#6f4e37;" onclick="addProductToCart('stopCoffeeDropdown', 'stopQty', 'stopUnit')">Add Coffee</button>
+            </div>
+            <table class="cart-table"><thead><tr style="font-size:0.8rem; color:#666;"><th>Item</th><th>Qty</th><th>Unit</th><th>Action</th></tr></thead><tbody id="cartItemsBody"></tbody></table>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div class="form-group"><label>Received By (Name)</label><input type="text" id="receivedBy" placeholder="Required" style="font-size:1.1rem; padding:10px;"></div>
+            <div style="text-align:right;">
+                <label style="display:block; text-align:left; font-size:0.85rem; color:#666; margin-bottom:4px;">Signature</label>
+                <canvas id="sig-canvas"></canvas>
+                <div style="margin-top:5px;"><button id="btnActivateSig" class="btn-top" onclick="activateSignatureBox()">CLICK TO SIGN</button><button class="btn-top" style="background:#6c757d;" onclick="clearSignatureCanvas()">Clear</button></div>
+            </div>
+        </div>
+        <div class="modal-button-group">
+            <button class="btn-top" style="background:#dc3545; padding:12px 24px; font-size:1.1rem; flex: 1;" onclick="markNotDelivered()">NOT DELIVERED</button>
+            <button class="btn-top" style="background:#28a745; padding:12px 24px; font-size:1.1rem; flex: 2;" onclick="validateAndFinishStop()">COMPLETE DELIVERY & SAVE SLIP</button>
+        </div>
+    </div>
+</div>
+
+<!-- Manager Modal -->
+<div id="mgrModal" class="modal-overlay">
+    <div class="modal-content">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2>Manager Control Panel</h2>
+            <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
+        </div>
+        <hr>
+        <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 5px;">
+            <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
+            <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
+            <button id="btnEndOfDay" class="mgmt-nav-btn" onclick="alert('End of Day')">End of Day</button>
+            <button id="btnLiveView" class="mgmt-nav-btn" onclick="managerLiveView()">Live View</button>
+            <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="alert('Call in Order')">Call in Order</button>
+            <button id="btnBackup" class="mgmt-nav-btn" onclick="alert('Backup')">Back up</button>
+            <button id="btnViewSlips" class="mgmt-nav-btn" onclick="alert('View Slips')">View Slips</button>
+            <button id="btnViewPastLogs" class="mgmt-nav-btn" onclick="alert('Past Logs')">View Past Stop Logs</button>
+            <button id="btnUserMgmt" class="mgmt-nav-btn" onclick="alert('User Management')">User Management</button>
+        </div>
+        <div id="custView" style="display: block;"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table></div>
+        <div id="prodView" style="display: none;">
+            <div style="margin-bottom:15px;">
+                <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
+                <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
+            </div>
+            <div style="overflow-x: auto;"><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody></table></div>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 800px;">
+        <h2 id="editModalTitle">Edit Record</h2><hr>
+        <div id="editFormFields" class="form-grid"></div>
+        <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+            <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+            <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
+        </div>
+    </div>
+</div>
+
+<div id="productEditModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 id="productEditModalTitle" style="margin:0;">Edit Product</h2>
+            <button onclick="closeProductEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+        </div>
+        <hr>
+        <div id="productEditFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
+        <div style="margin-top:20px; display:flex; justify-content:space-between; gap:10px;">
+            <button class="btn-top" style="background:#ffc107;" onclick="toggleProductStatusFromModal()">TOGGLE STATUS</button>
+            <div><button onclick="closeProductEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button><button class="btn-top" style="background:#28a745;" onclick="saveProductEdit()">SAVE CHANGES</button></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
+
+<!-- ===== MAIN APPLICATION SCRIPT ===== -->
 <script>
-(function fixRouteLoading() {
-    // Function to manually load routes if dropdown is empty
-    function ensureRoutesLoaded() {
-        var dropdown = document.getElementById('routeDropdown');
-        if (!dropdown) return;
-        
-        // If dropdown already has options, do nothing
-        if (dropdown.children.length > 1) return;
-        
-        console.log('Route dropdown empty, manually loading routes...');
-        
-        // Add loading option
-        dropdown.innerHTML = '<option value="">Loading routes...</option>';
-        
-        // Fetch routes from GitHub
-        fetch('https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes')
-            .then(function(response) {
-                if (!response.ok) throw new Error('Failed to load routes');
-                return response.json();
-            })
-            .then(function(files) {
-                dropdown.innerHTML = '<option value="">Select Route...</option>';
-                var hasRoutes = false;
-                
-                for (var f = 0; f < files.length; f++) {
-                    if (files[f].name.endsWith('.csv')) {
-                        hasRoutes = true;
-                        var opt = document.createElement('option');
-                        opt.value = files[f].name;
-                        opt.textContent = files[f].name.replace('.csv', '');
-                        dropdown.appendChild(opt);
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const REPO_OWNER = 'Billyschmidt123';
+const REPO_NAME = 'Bottle-Water';
+const GITHUB_RAW = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/main/';
+const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
+
+// Global variables
+var accessToken = null;
+var userEmail = null;
+var currentProdList = [];
+var currentProdHeaders = [];
+var currentProductFile = '';
+var deliveryCart = [];
+var isSigBlank = true;
+var driverName = "";
+var currentStopIndex = -1;
+var currentRouteStops = [];
+var currentEditingProductIndex = -1;
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+function showToast(message, isError) {
+    var toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    if (isError) toast.classList.add('toast-error');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+}
+
+function updateGoogleStatus() {
+    var statusSpan = document.getElementById('googleStatus');
+    if (accessToken && userEmail) {
+        statusSpan.innerHTML = 'Connected: ' + userEmail;
+        statusSpan.style.color = '#90ff90';
+    } else {
+        statusSpan.innerHTML = 'Sign in with Google to save PDFs';
+        statusSpan.style.color = '#ffc107';
+    }
+}
+
+// ============================================================
+// GOOGLE SIGN-IN
+// ============================================================
+function initializeGoogleSignIn() {
+    google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: function(response) {
+            var payload = JSON.parse(atob(response.credential.split('.')[1]));
+            userEmail = payload.email;
+            var tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+                callback: function(tokenResponse) {
+                    if (tokenResponse.access_token) {
+                        accessToken = tokenResponse.access_token;
+                        showToast('Signed in as ' + userEmail, false);
+                        updateGoogleStatus();
                     }
                 }
-                
-                if (!hasRoutes) {
-                    dropdown.innerHTML = '<option value="">No routes found</option>';
-                    console.warn('No route CSV files found in /routes folder');
-                } else {
-                    console.log('Routes loaded successfully');
-                }
-            })
-            .catch(function(err) {
-                console.error('Error loading routes:', err);
-                dropdown.innerHTML = '<option value="">Error loading routes</option>';
             });
+            tokenClient.requestAccessToken();
+        }
+    });
+    google.accounts.id.renderButton(document.getElementById('googleSignInDiv'), { theme: 'outline', size: 'medium', text: 'signin_with' });
+}
+
+// ============================================================
+// LOAD PRODUCTS FROM GITHUB
+// ============================================================
+async function fetchFromGitHub(path) {
+    try {
+        var response = await fetch(GITHUB_RAW + path + '?t=' + Date.now());
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return await response.text();
+    } catch (e) {
+        console.error('Failed to fetch ' + path, e);
+        return null;
     }
-    
-    // Run when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', ensureRoutesLoaded);
-    } else {
-        ensureRoutesLoaded();
+}
+
+function saveProductsToLocalStorage() {
+    if (!currentProductFile) return;
+    var data = { headers: currentProdHeaders, products: currentProdList, file: currentProductFile, timestamp: new Date().toISOString() };
+    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
+}
+
+function loadProductsFromLocalStorage(fileName) {
+    var saved = localStorage.getItem('logiflow_products_' + fileName);
+    if (saved) {
+        try {
+            var data = JSON.parse(saved);
+            if (data.products && data.products.length > 0 && data.headers) {
+                currentProdHeaders = data.headers;
+                currentProdList = data.products;
+                currentProductFile = data.file;
+                renderProdTable();
+                showToast('Loaded from browser storage', false);
+                return true;
+            }
+        } catch(e) { console.error('LocalStorage error:', e); }
     }
-})();
+    return false;
+}
+
+async function loadProductFile(fileName) {
+    currentProductFile = fileName;
+    var tbody = document.getElementById('prodTableBody');
+    var theadRow = document.getElementById('prodTableHead');
+    if (loadProductsFromLocalStorage(fileName)) return;
+    tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</div>';
+    try {
+        var text = await fetchFromGitHub('Products/' + fileName);
+        if (!text) throw new Error('File not found');
+        var lines = text.split('\n').filter(function(l) { return l.trim(); });
+        if (lines.length > 0) {
+            currentProdHeaders = lines[0].split(',').map(function(h) { return h.trim(); }).filter(function(h) { return h !== ''; });
+            if (currentProdHeaders.indexOf('Status') === -1) currentProdHeaders.push('Status');
+            var headerHtml = '<th>Action</th>';
+            for (var h = 0; h < currentProdHeaders.length; h++) { headerHtml += '<th>' + currentProdHeaders[h] + '</th>'; }
+            theadRow.innerHTML = headerHtml;
+            currentProdList = [];
+            for (var i = 1; i < lines.length; i++) {
+                var vals = lines[i].split(',');
+                var pObj = {};
+                for (var j = 0; j < currentProdHeaders.length; j++) {
+                    var header = currentProdHeaders[j];
+                    if (header !== 'Status') pObj[header] = (vals[j] || '').trim();
+                }
+                pObj.Status = pObj.Status || 'Active';
+                var firstHeader = currentProdHeaders[0];
+                if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') currentProdList.push(pObj);
+            }
+            renderProdTable();
+            saveProductsToLocalStorage();
+            showToast('Loaded from GitHub', false);
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
+        showToast('Error loading products from GitHub', true);
+    }
+}
+
+function renderProdTable() {
+    var tbody = document.getElementById('prodTableBody');
+    tbody.innerHTML = '';
+    for (var idx = 0; idx < currentProdList.length; idx++) {
+        var pObj = currentProdList[idx];
+        var isDeactivated = (pObj.Status === 'Deactivated');
+        var tr = document.createElement('tr');
+        if (isDeactivated) tr.className = 'deactivated-row';
+        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button><button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleProductStatus(' + idx + ')">' + (pObj.Status === 'Active' ? 'Deactivate' : 'Activate') + '</button></tr>';
+        for (var h = 0; h < currentProdHeaders.length; h++) { tr.innerHTML += '<td>' + (pObj[currentProdHeaders[h]] || '') + '</td>'; }
+        tbody.appendChild(tr);
+    }
+}
+
+window.toggleProductStatus = function(idx) {
+    currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
+    renderProdTable();
+    saveProductsToLocalStorage();
+};
+
+window.openProductEditModal = function(idx) {
+    currentEditingProductIndex = idx;
+    var product = currentProdList[idx];
+    var container = document.getElementById('productEditFormFields');
+    container.innerHTML = '';
+    for (var i = 0; i < currentProdHeaders.length; i++) {
+        var header = currentProdHeaders[i];
+        if (header === 'Status') continue;
+        var value = product[header] || '';
+        container.innerHTML += '<div class="form-group"><label>' + header + '</label><input type="text" id="product_edit_' + header.replace(/ /g, '_') + '" value="' + value.replace(/"/g, '&quot;') + '"></div>';
+    }
+    document.getElementById('productEditModalTitle').textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
+    document.getElementById('productEditModal').style.display = 'flex';
+};
+
+window.closeProductEditModal = function() { document.getElementById('productEditModal').style.display = 'none'; currentEditingProductIndex = -1; };
+
+window.saveProductEdit = function() {
+    if (currentEditingProductIndex === -1) { alert('No product selected'); return; }
+    for (var i = 0; i < currentProdHeaders.length; i++) {
+        var header = currentProdHeaders[i];
+        if (header === 'Status') continue;
+        var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
+        if (input) currentProdList[currentEditingProductIndex][header] = input.value;
+    }
+    renderProdTable();
+    saveProductsToLocalStorage();
+    closeProductEditModal();
+    showToast('Product saved to browser storage', false);
+};
+
+window.toggleProductStatusFromModal = function() { if (currentEditingProductIndex !== -1) { toggleProductStatus(currentEditingProductIndex); openProductEditModal(currentEditingProductIndex); } };
+
+// ============================================================
+// SAVE PDF TO GOOGLE DRIVE
+// ============================================================
+async function savePDFToDrive(fileName, dataUrl) {
+    if (!accessToken) { showToast('Please sign in with Google first', true); return false; }
+    try {
+        var base64Content = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : dataUrl;
+        var binaryString = atob(base64Content);
+        var bytes = new Uint8Array(binaryString.length);
+        for (var i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+        var blob = new Blob([bytes], { type: 'application/pdf' });
+        var formData = new FormData();
+        var metadata = { name: fileName, mimeType: 'application/pdf', parents: [GOOGLE_DRIVE_FOLDER_ID] };
+        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        formData.append('file', blob, fileName);
+        var response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: formData });
+        if (response.ok) { showToast('PDF saved to Google Drive: ' + fileName, false); return true; }
+        else { var error = await response.json(); showToast('Failed to save PDF: ' + (error.error ? error.error.message : 'Unknown error'), true); return false; }
+    } catch (err) { console.error('Drive save error:', err); showToast('Error saving to Drive: ' + err.message, true); return false; }
+}
+
+// ============================================================
+// SAVE TO GOOGLE SHEETS
+// ============================================================
+async function appendToGoogleSheets(rowData) {
+    if (!accessToken) { showToast('Please sign in with Google first', true); return false; }
+    try {
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + GOOGLE_SHEET_ID + '/values/TripLog!A:G:append?valueInputOption=USER_ENTERED';
+        var response = await fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [rowData] }) });
+        if (response.ok) return true;
+        else { var error = await response.json(); console.error('Sheets error:', error); return false; }
+    } catch (err) { console.error('Sheets error:', err); return false; }
+}
+
+// ============================================================
+// DELIVERY FUNCTIONS
+// ============================================================
+window.activateSignatureBox = function() {
+    var canvas = document.getElementById('sig-canvas');
+    var ctx = canvas.getContext('2d');
+    canvas.style.pointerEvents = 'auto';
+    canvas.style.opacity = '1';
+    canvas.style.background = '#fff';
+    document.getElementById('btnActivateSig').style.background = '#28a745';
+    document.getElementById('btnActivateSig').textContent = 'READY TO SIGN';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    isSigBlank = true;
+    var drawing = false;
+    canvas.onmousedown = function() { drawing = true; ctx.beginPath(); isSigBlank = false; };
+    canvas.onmouseup = function() { drawing = false; };
+    canvas.onmousemove = function(e) { if (!drawing) return; var rect = canvas.getBoundingClientRect(); ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top); ctx.stroke(); ctx.beginPath(); ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top); };
+};
+
+window.clearSignatureCanvas = function() { var canvas = document.getElementById('sig-canvas'); var ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); isSigBlank = true; };
+
+window.addProductToCart = function(dropdownId, qtyId, unitId) {
+    var dropdown = document.getElementById(dropdownId);
+    var qty = parseInt(document.getElementById(qtyId).value);
+    var units = document.getElementById(unitId).value;
+    var itemName = dropdown.value;
+    if (!itemName || itemName === '') return;
+    var existing = null;
+    for (var i = 0; i < deliveryCart.length; i++) { if (deliveryCart[i].name === itemName) { existing = deliveryCart[i]; break; } }
+    if (existing) existing.qty += qty;
+    else deliveryCart.push({ name: itemName, qty: qty, units: units });
+    document.getElementById(qtyId).value = 1;
+    document.getElementById(unitId).value = '';
+    dropdown.selectedIndex = 0;
+    renderDeliveryCart();
+};
+
+window.removeFromCart = function(idx) { deliveryCart.splice(idx, 1); renderDeliveryCart(); };
+
+function renderDeliveryCart() {
+    var body = document.getElementById('cartItemsBody');
+    if (deliveryCart.length === 0) { body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</div>'; return; }
+    var html = '';
+    for (var i = 0; i < deliveryCart.length; i++) { var item = deliveryCart[i]; html += '<tr><td style="padding:8px;">' + item.name + '</div><td style="text-align:center; padding:8px;">' + item.qty + '</div><td style="padding:8px;">' + item.units + '</div><td style="text-align:center;"><button onclick="removeFromCart(' + i + ')" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></div>' + '</tr>'; }
+    body.innerHTML = html;
+}
+
+window.markNotDelivered = async function() {
+    var reason = prompt('Reason for non-delivery (Mandatory):');
+    if (!reason) { alert('Reason is mandatory.'); return; }
+    var customerName = document.getElementById('stopModalTitle').textContent.replace('Delivery: ', '');
+    var timestamp = new Date().toLocaleString();
+    var rowData = [driverName, 'N/A', timestamp, customerName, 'N/A', 'Not Delivered', reason];
+    var saved = await appendToGoogleSheets(rowData);
+    if (saved) alert('Delivery marked as NOT DELIVERED\nReason: ' + reason + '\nLogged to Google Sheets.');
+    else alert('Delivery marked as NOT DELIVERED\nReason: ' + reason + '\nBut could not save to Google Sheets. Please check your Google sign-in.');
+    document.getElementById('stopModal').style.display = 'none';
+};
+
+window.validateAndFinishStop = async function() {
+    var receiverName = document.getElementById('receivedBy').value.trim();
+    if (!receiverName) { alert('Please enter the name of the person receiving the delivery.'); return; }
+    if (isSigBlank) { alert('A signature is required to complete the delivery.'); return; }
+    var customerName = document.getElementById('stopModalTitle').textContent.replace('Delivery: ', '');
+    var address = document.getElementById('metaAddress').textContent;
+    var instructions = document.getElementById('metaSpecInst').textContent;
+    var sigImage = document.getElementById('sig-canvas').toDataURL();
+    var slipNum = Math.floor(100000 + Math.random() * 900000);
+    var fileName = customerName.replace(/\s+/g, '_') + '_Slip_' + slipNum + '.pdf';
+    var timestamp = new Date().toLocaleString();
+    var logRow = [driverName, receiverName, timestamp, customerName, slipNum, 'Delivered', 'N/A'];
+    showToast('Saving delivery record...', false);
+    var sheetSaved = await appendToGoogleSheets(logRow);
+    if (!sheetSaved) alert('Warning: Could not save to Google Sheets. Please check your Google sign-in.');
+    var productRows = '';
+    for (var i = 0; i < deliveryCart.length; i++) { var item = deliveryCart[i]; productRows += '<tr><td style="border:1px solid #000; padding:3px; text-align:center;">' + item.qty + '</td><td style="border:1px solid #000; padding:3px;">' + item.name + '</td><td style="border:1px solid #000; padding:3px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:3px;">&nbsp;</div></tr>'; }
+    var emptyRows = '';
+    for (var i = deliveryCart.length; i < 8; i++) emptyRows += '<tr><td style="border:1px solid #000; padding:3px;">&nbsp;</td><td style="border:1px solid #000; padding:3px;">&nbsp;</td><td style="border:1px solid #000; padding:3px;">&nbsp;</td><td style="border:1px solid #000; text-align:right; padding:3px;">&nbsp;</div></tr>';
+    var dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    var pdfHTML = '<div style="width:100%; max-width:620px; margin:0 auto; padding:10px; font-family:\'Courier New\', Courier, monospace; font-size:10px;">' +
+        '<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><div style="width:55%;"><div style="font-size:18px; font-weight:bold;">Culligan Water</div><div style="font-size:8px;">BOTTLE WATER</div><div style="margin-top:5px; font-size:7px;">598316 ALBERTA LTD.<br>12001-99 AVENUE<br>GRANDE PRAIRIE AB T8W 0J7</div></div>' +
+        '<div style="width:40%; text-align:right;"><div style="border-bottom:1px solid #000; margin-bottom:3px; font-size:8px;"><span style="float:left;">DATE</span> <strong>' + dateFormatted + '</strong><div style="clear:both;"></div></div>' +
+        '<div style="border:1px solid red; padding:3px; text-align:center;"><div style="font-size:11px; font-weight:bold;">DELIVERY SLIP</div><div style="font-size:13px; font-weight:bold;">' + slipNum + '</div><div style="font-size:6px;">NOT YOUR INVOICE</div></div></div></div>' +
+        '<div style="margin-bottom:8px;"><div><strong>SOLD TO:</strong> ' + customerName + '</div><div><strong>ADDRESS:</strong> ' + address + '</div></div>' +
+        (instructions ? '<div style="margin-bottom:8px; padding:3px; background:#f9f9f9;"><strong>INSTRUCTIONS:</strong> ' + instructions + '</div>' : '') +
+        '<table style="width:100%; border-collapse:collapse; margin:6px 0;"><thead><tr style="background:#eee;"><th style="border:1px solid #000; padding:3px; text-align:center;">QTY</th><th style="border:1px solid #000; padding:3px; text-align:left;">DESCRIPTION</th><th style="border:1px solid #000; padding:3px; text-align:left;">UNIT</th><th style="border:1px solid #000; padding:3px; text-align:right;">TOTAL</th></tr></thead><tbody>' + productRows + emptyRows + '</tbody></table>' +
+        '<div style="display:flex; justify-content:space-between; margin-top:8px;"><div style="width:45%;"><div style="border-bottom:1px solid #000; margin-top:15px;"></div><img src="' + sigImage + '" style="max-height:40px; max-width:180px; margin-top:-12px;"><div style="font-size:7px; text-align:center;">SIGNATURE</div></div>' +
+        '<div style="width:45%;"><div style="border-bottom:1px solid #000; text-align:center; font-weight:bold; padding-bottom:2px;">' + receiverName + '</div><div style="font-size:7px; text-align:center;">RECEIVED BY</div></div></div>' +
+        '<div style="margin-top:10px; font-size:6px; text-align:center;">G.S.T. #8991131088 RT | NET 30 DAYS | 2% MONTHLY INTEREST</div></div>';
+    var opt = { margin: [0.4, 0.4, 0.4, 0.4], filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 1.5, letterRendering: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+    try {
+        var pdfBlob = await html2pdf().set(opt).from(pdfHTML).output('blob');
+        var reader = new FileReader();
+        reader.readAsDataURL(pdfBlob);
+        reader.onloadend = async function() {
+            showToast('Saving PDF to Google Drive...', false);
+            var driveSaved = await savePDFToDrive(fileName, reader.result);
+            if (driveSaved && sheetSaved) alert('SUCCESS!\nDelivery completed and saved to Google Drive and Sheets.\nSlip Number: ' + slipNum);
+            else if (driveSaved) alert('PDF saved to Google Drive: ' + fileName + '\nSheet log failed - check permissions.');
+            else if (sheetSaved) { alert('Delivery recorded to Google Sheets.\nPDF could not be saved to Drive.\nPDF downloaded to your computer.'); var link = document.createElement('a'); link.download = fileName; link.href = reader.result; link.click(); }
+            else { alert('Delivery completed but NOT saved to cloud.\nPDF downloaded to your computer.\nPlease sign in with Google to enable cloud save.'); var link = document.createElement('a'); link.download = fileName; link.href = reader.result; link.click(); }
+            document.getElementById('stopModal').style.display = 'none';
+        };
+    } catch (err) { alert('Error generating PDF: ' + err); }
+};
+
+// ============================================================
+// ROUTE NAVIGATION
+// ============================================================
+window.startRouteFlow = function() { var name = prompt('Driver Name (Mandatory):'); if (!name) { alert('Driver Name is required.'); return; } driverName = name; alert('Route started. Driver: ' + driverName + '\nGoogle sign-in required to save delivery records.'); };
+window.finishRouteFlow = function() { if (confirm('End route?')) { driverName = ''; alert('Route finished.'); } };
+window.navigateStop = function(dir) { if (currentRouteStops.length === 0) return; currentStopIndex = Math.max(0, Math.min(currentRouteStops.length - 1, currentStopIndex + dir)); var stop = currentRouteStops[currentStopIndex]; document.getElementById('navAddressBar').textContent = 'Address: ' + stop.addr; document.getElementById('navPhoneBar').textContent = 'Phone: ' + stop.phone; };
+window.openDirections = function() { if (currentStopIndex === -1) return; window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(currentRouteStops[currentStopIndex].addr), '_blank'); };
+
+async function loadGitHubRoutes() {
+    try {
+        var response = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
+        var files = await response.json();
+        var dropdown = document.getElementById('routeDropdown');
+        dropdown.innerHTML = '<option value="">Select Route...</option>';
+        for (var f = 0; f < files.length; f++) { if (files[f].name.endsWith('.csv')) { var opt = document.createElement('option'); opt.value = files[f].name; opt.textContent = files[f].name.replace('.csv', ''); dropdown.appendChild(opt); } }
+    } catch (e) { console.error('Error loading routes:', e); showToast('Error loading routes from GitHub', true); }
+}
+
+document.getElementById('routeDropdown').onchange = async function() {
+    var fileName = this.value;
+    if (!fileName) return;
+    var stopList = document.getElementById('stopList');
+    stopList.innerHTML = 'Loading stops...';
+    var response = await fetch('https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/main/routes/' + fileName + '?t=' + Date.now());
+    var text = await response.text();
+    var lines = text.split('\n').filter(function(l) { return l.trim(); });
+    if (lines.length < 2) { stopList.innerHTML = 'No data in route file.'; return; }
+    var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+    var nameIdx = -1, addrIdx = -1, phoneIdx = -1;
+    for (var h = 0; h < headers.length; h++) {
+        if (headers[h].toLowerCase().indexOf('name') !== -1 || headers[h].toLowerCase() === 'company') nameIdx = h;
+        if (headers[h].toLowerCase().indexOf('address') !== -1) addrIdx = h;
+        if (headers[h].toLowerCase().indexOf('phone') !== -1) phoneIdx = h;
+    }
+    stopList.innerHTML = '';
+    currentRouteStops = [];
+    currentStopIndex = -1;
+    for (var i = 1; i < lines.length; i++) {
+        var vals = lines[i].split(',');
+        var displayName = (nameIdx >= 0 ? vals[nameIdx] : vals[0]) || 'Unknown';
+        var addr = (addrIdx >= 0 ? vals[addrIdx] : vals[1]) || 'No Address';
+        var phone = (phoneIdx >= 0 ? vals[phoneIdx] : '--') || '--';
+        var rowData = {};
+        for (var h = 0; h < headers.length; h++) rowData[headers[h]] = (vals[h] || '').trim();
+        currentRouteStops.push({ name: displayName, addr: addr, phone: phone, data: rowData });
+        var div = document.createElement('div');
+        div.style.cssText = 'padding:10px; border-bottom:1px solid #eee; cursor:pointer;';
+        div.innerHTML = '<strong>' + (i) + '. ' + displayName + '</strong><br><small>' + addr + '</small>';
+        div.onclick = (function(idx, rowData, addr, phone, displayName) {
+            return function() {
+                if (!driverName) { alert('You must click START ROUTE first.'); return; }
+                currentStopIndex = idx;
+                document.getElementById('currentAddress').textContent = addr;
+                document.getElementById('currentPhone').textContent = phone;
+                document.getElementById('navAddressBar').textContent = 'Address: ' + addr;
+                document.getElementById('navPhoneBar').textContent = 'Phone: ' + phone;
+                document.getElementById('stopModalTitle').textContent = 'Delivery: ' + displayName;
+                document.getElementById('metaAddress').textContent = addr;
+                document.getElementById('metaPhone').textContent = phone;
+                document.getElementById('metaEmail').textContent = rowData.Email || '--';
+                document.getElementById('metaSpecOrder').textContent = rowData['Special Order'] || '--';
+                document.getElementById('metaSpecInst').textContent = rowData['Special Instructions'] || '--';
+                deliveryCart = [];
+                renderDeliveryCart();
+                var canvas = document.getElementById('sig-canvas');
+                var ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                isSigBlank = true;
+                canvas.style.pointerEvents = 'none';
+                canvas.style.opacity = '0.6';
+                canvas.style.background = '#eee';
+                document.getElementById('btnActivateSig').style.background = '#007bff';
+                document.getElementById('btnActivateSig').textContent = 'CLICK TO SIGN';
+                document.getElementById('receivedBy').value = '';
+                async function loadDropdown(fName, targetId) {
+                    var githubResp = await fetch(GITHUB_RAW + 'Products/' + fName + '?t=' + Date.now());
+                    if (githubResp.ok) {
+                        var txt = await githubResp.text();
+                        var productLines = txt.split('\n').filter(function(l) { return l.trim(); });
+                        if (productLines.length > 1) {
+                            var productHeaders = productLines[0].split(',');
+                            var descIdx = 0;
+                            for (var p = 0; p < productHeaders.length; p++) { if (productHeaders[p].toLowerCase().indexOf('item') !== -1) { descIdx = p; break; } }
+                            var target = document.getElementById(targetId);
+                            target.innerHTML = '<option value="">Select product...</option>';
+                            for (var l = 1; l < productLines.length; l++) {
+                                var productVals = productLines[l].split(',');
+                                var productName = productVals[descIdx] || productVals[0];
+                                if (productName && productName.toLowerCase() !== 'not delivered' && productName !== '') { var opt = document.createElement('option'); opt.value = productName; opt.textContent = productName; target.appendChild(opt); }
+                            }
+                        }
+                    } else { var target = document.getElementById(targetId); target.innerHTML = '<option value="">Error loading products</option>'; }
+                }
+                loadDropdown('Water.csv', 'stopProductDropdown');
+                loadDropdown('Coffee.csv', 'stopCoffeeDropdown');
+                document.getElementById('stopModal').style.display = 'flex';
+            };
+        })(i - 1, rowData, addr, phone, displayName);
+        stopList.appendChild(div);
+    }
+};
+
+// ============================================================
+// CUSTOMER MAINTENANCE
+// ============================================================
+async function loadCustomerMaintenance() {
+    var tbody = document.getElementById('custTableBody');
+    var thead = document.getElementById('custTableHead');
+    tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
+    try {
+        var routesResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
+        var files = await routesResponse.json();
+        var allCustomers = [];
+        var allHeaders = [];
+        for (var f = 0; f < files.length; f++) {
+            if (files[f].name.endsWith('.csv')) {
+                var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
+                var csvText = await csvResponse.text();
+                var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
+                if (lines.length < 2) continue;
+                var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+                if (allHeaders.length === 0) {
+                    allHeaders = headers;
+                    var headerHtml = '<th>Action</th><th>Routes</th>';
+                    for (var h = 0; h < allHeaders.length; h++) headerHtml += '<th>' + allHeaders[h] + '</th>';
+                    thead.innerHTML = headerHtml;
+                }
+                for (var i = 1; i < lines.length; i++) {
+                    var vals = lines[i].split(',');
+                    var rowObj = {};
+                    for (var j = 0; j < allHeaders.length; j++) rowObj[allHeaders[j]] = (vals[j] || '').trim();
+                    var companyName = rowObj.Company || rowObj.Name || '';
+                    var existingIdx = -1;
+                    for (var c = 0; c < allCustomers.length; c++) { if ((allCustomers[c].Company || allCustomers[c].Name) === companyName && companyName !== '') { existingIdx = c; break; } }
+                    if (existingIdx >= 0) {
+                        if (!allCustomers[existingIdx]._routes) allCustomers[existingIdx]._routes = [];
+                        if (allCustomers[existingIdx]._routes.indexOf(files[f].name.replace('.csv', '')) === -1) allCustomers[existingIdx]._routes.push(files[f].name.replace('.csv', ''));
+                    } else if (companyName !== '') { rowObj._routes = [files[f].name.replace('.csv', '')]; allCustomers.push(rowObj); }
+                }
+            }
+        }
+        tbody.innerHTML = '';
+        for (var idx = 0; idx < allCustomers.length; idx++) {
+            var cust = allCustomers[idx];
+            var routesList = cust._routes ? cust._routes.join(', ') : 'None';
+            var row = '<tr>';
+            row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit: ' + (cust.Company || cust.Name || 'Customer') + '\')">Edit</button></td>';
+            row += '<td style="font-size:11px;">' + routesList + '</td>';
+            for (var h = 0; h < allHeaders.length; h++) row += '<td>' + (cust[allHeaders[h]] || '') + '</td>';
+            row += '</tr>';
+            tbody.innerHTML += row;
+        }
+        if (allCustomers.length === 0) tbody.innerHTML = '</table><td colspan="10">No customer data found.</div>';
+        else showToast('Loaded ' + allCustomers.length + ' customers', false);
+    } catch (e) { console.error('Error loading customers:', e); tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>'; }
+}
+
+// ============================================================
+// LIVE VIEW FUNCTION
+// ============================================================
+window.managerLiveView = function() {
+    var liveViewModal = document.createElement('div');
+    liveViewModal.className = 'modal-overlay';
+    liveViewModal.style.display = 'flex';
+    liveViewModal.innerHTML = `
+        <div class="modal-content" style="max-width:1000px;">
+            <div style="display:flex; justify-content:space-between;"><h2>Live View - Trip Logs</h2><button onclick="this.closest('.modal-overlay').remove()" class="btn-top" style="background:#dc3545;">Close</button></div>
+            <hr>
+            <div id="liveViewSummary">Loading trip logs from GitHub...</div>
+            <div id="liveViewFiles" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
+    `;
+    document.body.appendChild(liveViewModal);
+    (async function() {
+        var summaryDiv = document.getElementById('liveViewSummary');
+        var filesDiv = document.getElementById('liveViewFiles');
+        try {
+            var response = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/trip-reports');
+            if (!response.ok) throw new Error('No trip-reports folder found');
+            var files = await response.json();
+            if (files.length === 0) { summaryDiv.innerHTML = 'No trip logs found. Complete a delivery to create logs.'; return; }
+            summaryDiv.innerHTML = 'Found ' + files.length + ' log file(s). Click any file to view.';
+            var html = '<div style="display:flex; flex-direction:column; gap:5px;">';
+            for (var i = 0; i < files.length; i++) {
+                html += `<button class="btn-top" style="text-align:left;" onclick="loadTripLogFile('${files[i].download_url}', '${files[i].name}')">📄 ${files[i].name}</button>`;
+            }
+            html += '</div><div id="tripLogContent" style="margin-top:15px;"></div>';
+            filesDiv.innerHTML = html;
+        } catch(e) { summaryDiv.innerHTML = 'Error: ' + e.message; }
+    })();
+};
+
+window.loadTripLogFile = async function(url, name) {
+    var contentDiv = document.getElementById('tripLogContent');
+    if (!contentDiv) return;
+    contentDiv.innerHTML = '<div style="text-align:center;"><div class="loading-spinner"></div>Loading...</div>';
+    try {
+        var response = await fetch(url + '?t=' + Date.now());
+        var text = await response.text();
+        var lines = text.split('\n').filter(function(l) { return l.trim(); });
+        if (lines.length === 0) { contentDiv.innerHTML = 'File is empty'; return; }
+        var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+        var tableHtml = '<h4>' + name + '</h4><div style="overflow-x:auto;"><table class="mgmt-table" style="font-size:11px;"><thead><tr>';
+        for (var h = 0; h < headers.length; h++) tableHtml += '<th>' + headers[h] + '</th>';
+        tableHtml += '</tr></thead><tbody>';
+        for (var i = 1; i < lines.length; i++) {
+            var vals = lines[i].split(',');
+            tableHtml += '<td>';
+            for (var v = 0; v < headers.length; v++) tableHtml += '<td>' + (vals[v] || '').trim() + '</td>';
+            tableHtml += '</tr>';
+        }
+        tableHtml += '</tbody></table></div>';
+        contentDiv.innerHTML = tableHtml;
+    } catch(e) { contentDiv.innerHTML = 'Error loading file: ' + e.message; }
+};
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+    initializeGoogleSignIn();
+    loadGitHubRoutes();
+    var map = L.map('map').setView([55.17, -118.79], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' }).addTo(map);
+    window.map = map;
+    document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; loadCustomerMaintenance(); };
+    document.getElementById('btnShowCust').onclick = function() { document.getElementById('custView').style.display = 'block'; document.getElementById('prodView').style.display = 'none'; loadCustomerMaintenance(); };
+    document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; loadProductFile('Coffee.csv'); };
+    document.getElementById('btnForceRefresh').onclick = function() { loadGitHubRoutes(); loadCustomerMaintenance(); };
+    setTimeout(function() { if (window.map) window.map.invalidateSize(); }, 500);
+}
+
+init();
 </script>
 
-<!-- ========== ADDITIVE FIX: Fix Side Panel Display ========== -->
-<style>
-/* Ensure map container has proper dimensions */
-#map {
-    width: 100%;
-    height: 100%;
-    min-height: 400px;
-    background: #e9ecef;
-}
-.main-container {
-    min-height: 500px;
-}
-.side-panel {
-    background: white;
-    border-left: 1px solid #ccc;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-.stop-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-}
-</style>
+<!-- Emergency Buttons -->
+<div class="emergency-buttons">
+    <button onclick="if(window.map){window.map.invalidateSize();}else{location.reload();}">🔄 Refresh Map</button>
+    <button onclick="if(window.map){window.map.setView([55.17,-118.79],12);window.map.invalidateSize();}">📍 Reset View</button>
+</div>
+
+</body>
+</html>
