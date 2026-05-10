@@ -1564,6 +1564,555 @@ init();
 </script>
 
 <!-- ========== END OF ADDITIVE FIX ========== -->
+<!-- ========== ADDITIVE FIX: Customer Edit Modal using Google Sheet Headers ========== -->
+<style>
+.modal-form-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 10px;
+}
+.modal-form-group {
+    display: flex;
+    flex-direction: column;
+}
+.modal-form-group label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+    font-size: 12px;
+}
+.modal-form-group input, .modal-form-group select, .modal-form-group textarea {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+}
+.modal-form-group input:focus, .modal-form-group select:focus {
+    outline: none;
+    border-color: #004a99;
+}
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+</style>
 
+<script>
+(function addCustomerEditModal() {
+    // Create Customer Edit Modal if it doesn't exist
+    if (!document.getElementById('customerEditModalNew')) {
+        var modalHtml = `
+            <div id="customerEditModalNew" class="modal-overlay">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
+                        <h2 id="customerEditModalTitleNew" style="margin:0;">Edit Customer</h2>
+                        <button onclick="closeCustomerEditModalNew()" class="btn-top" style="background:#dc3545;">Cancel</button>
+                    </div>
+                    <div id="customerEditFormContainer" class="modal-form-container"></div>
+                    <div class="form-actions">
+                        <button onclick="closeCustomerEditModalNew()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                        <button id="saveCustomerChangesBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    // Global variable to track current customer being edited
+    window.currentEditingCustomerData = null;
+    window.currentEditingCustomerIndex = -1;
+    window.currentCustomerHeaders = [];
+    
+    // Function to open customer edit modal
+    window.openCustomerEditModalNew = function(customerData, customerIndex, headers) {
+        window.currentEditingCustomerData = JSON.parse(JSON.stringify(customerData));
+        window.currentEditingCustomerIndex = customerIndex;
+        window.currentCustomerHeaders = headers;
+        
+        var container = document.getElementById('customerEditFormContainer');
+        var title = document.getElementById('customerEditModalTitleNew');
+        
+        if (!container) return;
+        
+        title.textContent = 'Edit Customer: ' + (customerData.Company || customerData.Name || 'Customer');
+        
+        // Build form fields based on headers
+        container.innerHTML = '';
+        for (var i = 0; i < headers.length; i++) {
+            var header = headers[i];
+            var value = customerData[header] || '';
+            var fieldType = 'text';
+            
+            // Determine field type based on header name
+            if (header.toLowerCase().includes('email')) fieldType = 'email';
+            if (header.toLowerCase().includes('phone')) fieldType = 'tel';
+            if (header.toLowerCase().includes('postal')) fieldType = 'text';
+            
+            container.innerHTML += `
+                <div class="modal-form-group">
+                    <label>${escapeHtml(header)}</label>
+                    <input type="${fieldType}" id="cust_field_${header.replace(/ /g, '_')}" value="${escapeHtml(value)}" placeholder="Enter ${escapeHtml(header)}">
+                </div>
+            `;
+        }
+        
+        document.getElementById('customerEditModalNew').style.display = 'flex';
+    };
+    
+    window.closeCustomerEditModalNew = function() {
+        document.getElementById('customerEditModalNew').style.display = 'none';
+        window.currentEditingCustomerData = null;
+        window.currentEditingCustomerIndex = -1;
+    };
+    
+    window.saveCustomerChanges = async function() {
+        if (!window.currentEditingCustomerData) {
+            alert('No customer data to save');
+            return;
+        }
+        
+        // Collect values from form
+        for (var i = 0; i < window.currentCustomerHeaders.length; i++) {
+            var header = window.currentCustomerHeaders[i];
+            var input = document.getElementById('cust_field_' + header.replace(/ /g, '_'));
+            if (input) {
+                window.currentEditingCustomerData[header] = input.value;
+            }
+        }
+        
+        // Save to Google Sheets
+        if (accessToken) {
+            try {
+                // First, get current sheet data
+                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+                var response = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                var data = await response.json();
+                var values = data.values || [];
+                
+                // Update the specific row
+                var rowIndex = window.currentEditingCustomerIndex + 1; // +1 because row 1 is headers
+                if (rowIndex < values.length) {
+                    for (var i = 0; i < window.currentCustomerHeaders.length; i++) {
+                        var header = window.currentCustomerHeaders[i];
+                        values[rowIndex][i] = window.currentEditingCustomerData[header] || '';
+                    }
+                }
+                
+                // Write back to sheet
+                var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z?valueInputOption=RAW`;
+                await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: values })
+                });
+                
+                showToast('Customer saved to Google Sheets', false);
+                closeCustomerEditModalNew();
+                // Refresh the customer table
+                if (typeof loadCustomersFromSheets === 'function') {
+                    loadCustomersFromSheets();
+                }
+            } catch (err) {
+                showToast('Error saving customer: ' + err.message, true);
+            }
+        } else {
+            showToast('Please sign in with Google first', true);
+        }
+    };
+    
+    document.getElementById('saveCustomerChangesBtn').onclick = window.saveCustomerChanges;
+    
+    // Helper function
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Product Edit Modal using Google Sheet Headers ========== -->
+<script>
+(function addProductEditModal() {
+    // Create Product Edit Modal if it doesn't exist
+    if (!document.getElementById('productEditModalNew')) {
+        var modalHtml = `
+            <div id="productEditModalNew" class="modal-overlay">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
+                        <h2 id="productEditModalTitleNew" style="margin:0;">Edit Product</h2>
+                        <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#dc3545;">Cancel</button>
+                    </div>
+                    <div id="productEditFormContainer" class="modal-form-container"></div>
+                    <div class="form-actions">
+                        <div>
+                            <button id="productToggleStatusBtn" class="btn-top" style="background:#ffc107; margin-right:10px;">Toggle Status</button>
+                        </div>
+                        <div>
+                            <button onclick="closeProductEditModalNew()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                            <button id="saveProductChangesBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    // Global variable to track current product being edited
+    window.currentEditingProductData = null;
+    window.currentEditingProductIdx = -1;
+    window.currentProductHeadersList = [];
+    
+    // Function to open product edit modal
+    window.openProductEditModalNew = function(productData, productIndex, headers) {
+        window.currentEditingProductData = JSON.parse(JSON.stringify(productData));
+        window.currentEditingProductIdx = productIndex;
+        window.currentProductHeadersList = headers;
+        
+        var container = document.getElementById('productEditFormContainer');
+        var title = document.getElementById('productEditModalTitleNew');
+        
+        if (!container) return;
+        
+        title.textContent = 'Edit Product: ' + (productData.Product || productData.Item || 'Product');
+        
+        // Build form fields based on headers (exclude Status)
+        container.innerHTML = '';
+        for (var i = 0; i < headers.length; i++) {
+            var header = headers[i];
+            if (header === 'Status') continue;
+            var value = productData[header] || '';
+            
+            container.innerHTML += `
+                <div class="modal-form-group">
+                    <label>${escapeHtmlProduct(header)}</label>
+                    <input type="text" id="prod_field_${header.replace(/ /g, '_')}" value="${escapeHtmlProduct(value)}" placeholder="Enter ${escapeHtmlProduct(header)}">
+                </div>
+            `;
+        }
+        
+        document.getElementById('productEditModalNew').style.display = 'flex';
+    };
+    
+    window.closeProductEditModalNew = function() {
+        document.getElementById('productEditModalNew').style.display = 'none';
+        window.currentEditingProductData = null;
+        window.currentEditingProductIdx = -1;
+    };
+    
+    window.toggleProductStatusNew = async function() {
+        if (!window.currentEditingProductData) return;
+        
+        // Toggle status
+        var newStatus = window.currentEditingProductData.Status === 'Active' ? 'Deactivated' : 'Active';
+        window.currentEditingProductData.Status = newStatus;
+        
+        // Save to Google Sheets
+        if (accessToken) {
+            try {
+                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+                var response = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                var data = await response.json();
+                var values = data.values || [];
+                
+                // Find Status column index
+                var headers = values[0];
+                var statusIndex = -1;
+                for (var i = 0; i < headers.length; i++) {
+                    if (headers[i] === 'Status') { statusIndex = i; break; }
+                }
+                
+                // Update the specific row
+                var rowIndex = window.currentEditingProductIdx + 1;
+                if (rowIndex < values.length && statusIndex >= 0) {
+                    values[rowIndex][statusIndex] = newStatus;
+                }
+                
+                // Write back to sheet
+                var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
+                await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: values })
+                });
+                
+                showToast('Product status toggled to ' + newStatus, false);
+                // Refresh the product table
+                if (typeof loadProductFile === 'function') {
+                    loadProductFile(currentProductFile || 'Coffee.csv');
+                }
+                // Update the displayed status in modal
+                var statusDisplay = document.getElementById('productStatusDisplay');
+                if (statusDisplay) statusDisplay.textContent = newStatus;
+            } catch (err) {
+                showToast('Error toggling status: ' + err.message, true);
+            }
+        }
+    };
+    
+    window.saveProductChangesNew = async function() {
+        if (!window.currentEditingProductData) {
+            alert('No product data to save');
+            return;
+        }
+        
+        // Collect values from form
+        for (var i = 0; i < window.currentProductHeadersList.length; i++) {
+            var header = window.currentProductHeadersList[i];
+            if (header === 'Status') continue;
+            var input = document.getElementById('prod_field_' + header.replace(/ /g, '_'));
+            if (input) {
+                window.currentEditingProductData[header] = input.value;
+            }
+        }
+        
+        // Save to Google Sheets
+        if (accessToken) {
+            try {
+                var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+                var response = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                var data = await response.json();
+                var values = data.values || [];
+                
+                // Update the specific row
+                var rowIndex = window.currentEditingProductIdx + 1;
+                if (rowIndex < values.length) {
+                    for (var i = 0; i < window.currentProductHeadersList.length; i++) {
+                        var header = window.currentProductHeadersList[i];
+                        if (header !== 'Status') {
+                            for (var j = 0; j < values[rowIndex].length; j++) {
+                                if (values[0][j] === header) {
+                                    values[rowIndex][j] = window.currentEditingProductData[header] || '';
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z?valueInputOption=RAW`;
+                await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: values })
+                });
+                
+                showToast('Product saved to Google Sheets', false);
+                closeProductEditModalNew();
+                // Refresh the product table
+                if (typeof loadProductFile === 'function') {
+                    loadProductFile(currentProductFile || 'Coffee.csv');
+                }
+            } catch (err) {
+                showToast('Error saving product: ' + err.message, true);
+            }
+        } else {
+            showToast('Please sign in with Google first', true);
+        }
+    };
+    
+    document.getElementById('saveProductChangesBtn').onclick = window.saveProductChangesNew;
+    var toggleBtn = document.getElementById('productToggleStatusBtn');
+    if (toggleBtn) toggleBtn.onclick = window.toggleProductStatusNew;
+    
+    function escapeHtmlProduct(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Override Customer Table Edit Buttons ========== -->
+<script>
+(function overrideCustomerEditButtons() {
+    // Wait for customer table to be populated
+    var checkInterval = setInterval(function() {
+        var editButtons = document.querySelectorAll('#custTableBody .btn-top');
+        if (editButtons.length > 0) {
+            clearInterval(checkInterval);
+            
+            // Replace edit button click handlers
+            for (var i = 0; i < editButtons.length; i++) {
+                var btn = editButtons[i];
+                if (btn.textContent === 'Edit') {
+                    var oldClick = btn.onclick;
+                    btn.onclick = (function(idx) {
+                        return function() {
+                            // Get customer data from the row
+                            var row = this.closest('tr');
+                            var cells = row.querySelectorAll('td');
+                            var headers = [];
+                            var thead = document.getElementById('custTableHead');
+                            var headerCells = thead.querySelectorAll('th');
+                            for (var h = 1; h < headerCells.length; h++) {
+                                headers.push(headerCells[h].textContent);
+                            }
+                            
+                            var customerData = {};
+                            for (var h = 0; h < headers.length && h < cells.length - 1; h++) {
+                                customerData[headers[h]] = cells[h + 1].textContent;
+                            }
+                            
+                            openCustomerEditModalNew(customerData, idx, headers);
+                        };
+                    })(i);
+                }
+            }
+        }
+    }, 1000);
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Override Product Table Edit Buttons ========== -->
+<script>
+(function overrideProductEditButtons() {
+    // Function to override product edit buttons
+    function overrideButtons() {
+        var editButtons = document.querySelectorAll('#prodTableBody .btn-top');
+        for (var i = 0; i < editButtons.length; i++) {
+            var btn = editButtons[i];
+            if (btn.textContent === 'Edit') {
+                btn.onclick = (function(idx) {
+                    return function() {
+                        if (currentProdList && currentProdList[idx]) {
+                            openProductEditModalNew(currentProdList[idx], idx, currentProdHeaders);
+                        }
+                    };
+                })(i);
+            }
+        }
+    }
+    
+    // Watch for product table changes
+    var observer = new MutationObserver(function() {
+        overrideButtons();
+    });
+    
+    var prodTable = document.getElementById('prodTableBody');
+    if (prodTable) {
+        observer.observe(prodTable, { childList: true, subtree: true });
+    }
+    
+    // Initial override
+    setTimeout(overrideButtons, 1000);
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Enhanced Customer Loading with Edit Capability ========== -->
+<script>
+(function enhanceCustomerLoading() {
+    // Override the loadCustomersFromSheets function to include edit capability
+    var originalLoadCustomers = window.loadCustomersFromSheets;
+    if (originalLoadCustomers) {
+        window.loadCustomersFromSheets = async function() {
+            await originalLoadCustomers();
+            
+            // After loading, replace edit button handlers
+            setTimeout(function() {
+                var editButtons = document.querySelectorAll('#custTableBody .btn-top');
+                for (var i = 0; i < editButtons.length; i++) {
+                    var btn = editButtons[i];
+                    if (btn.textContent === 'Edit') {
+                        btn.onclick = (function(idx) {
+                            return function() {
+                                // Get customer data from the row
+                                var row = this.closest('tr');
+                                var cells = row.querySelectorAll('td');
+                                var headers = [];
+                                var thead = document.getElementById('custTableHead');
+                                var headerCells = thead.querySelectorAll('th');
+                                for (var h = 1; h < headerCells.length; h++) {
+                                    headers.push(headerCells[h].textContent);
+                                }
+                                
+                                var customerData = {};
+                                for (var h = 0; h < headers.length && h < cells.length - 1; h++) {
+                                    customerData[headers[h]] = cells[h + 1].textContent;
+                                }
+                                
+                                openCustomerEditModalNew(customerData, idx, headers);
+                            };
+                        })(i);
+                    }
+                }
+            }, 500);
+        };
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Styles for Modals ========== -->
+<style>
+.modal-form-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 10px;
+}
+.modal-form-group {
+    display: flex;
+    flex-direction: column;
+}
+.modal-form-group label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+    font-size: 12px;
+}
+.modal-form-group input, .modal-form-group select, .modal-form-group textarea {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+}
+.modal-form-group input:focus, .modal-form-group select:focus {
+    outline: none;
+    border-color: #004a99;
+}
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+</style>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
