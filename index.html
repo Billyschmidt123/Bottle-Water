@@ -1,627 +1,479 @@
-<!-- ========== ADDITIVE FIX: Customer Edit Modal with Loading Bar ========== -->
+<!-- ========== ADDITIVE FIX: Live View Functionality (Fixed) ========== -->
 <style>
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
+.live-view-modal {
+    max-width: 1200px !important;
+    width: 95% !important;
+}
+.live-view-table {
     width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.live-view-table th, .live-view-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+.live-view-table th {
+    background: #004a99;
+    color: white;
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+}
+.live-view-table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+.live-view-table tr:hover {
+    background: #e7f3ff;
+}
+.live-view-controls {
     display: flex;
-    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
     align-items: center;
-    z-index: 9999;
+    flex-wrap: wrap;
 }
-.loading-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
-    min-width: 300px;
+.date-picker-input {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
 }
-.loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #004a99;
+.refresh-btn {
+    background: #17a2b8;
+}
+.refresh-btn:hover {
+    background: #138496;
+}
+.auto-refresh-checkbox {
+    margin-left: 15px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.live-view-summary {
+    background: #e9ecef;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+.loading-spinner-small {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #004a99;
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto 15px auto;
+    margin-right: 10px;
+    vertical-align: middle;
 }
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-.loading-progress {
-    width: 100%;
-    height: 8px;
-    background: #eee;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 10px 0;
-}
-.loading-progress-bar {
-    height: 100%;
-    background: #28a745;
-    width: 0%;
-    transition: width 0.3s;
-}
-.loading-text {
-    font-size: 14px;
-    color: #333;
-    margin: 10px 0;
-}
-.customer-route-list {
-    max-height: 250px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin: 10px 0;
-}
-.route-item {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.route-item:hover {
-    background: #f5f5f5;
-}
-.route-name {
-    font-weight: bold;
-}
-.route-status {
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 10px;
-}
-.route-status.active {
-    background: #d4edda;
-    color: #155724;
-}
-.route-actions button {
-    margin-left: 5px;
-    padding: 3px 8px;
-    font-size: 11px;
-}
-.add-route-section {
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #ddd;
-}
 </style>
 
 <script>
-(function fixCustomerEditAndLoading() {
-    // Global variables for customer management
-    var allRouteData = {};
-    var allRouteFilesList = [];
-    var currentEditCustomer = null;
-    var customerSaveCallback = null;
+(function fixLiveView() {
+    // Live View state
+    var liveViewModal = null;
+    var autoRefreshInterval = null;
     
-    // Show loading overlay
-    function showLoading(message, showProgress) {
-        var existing = document.getElementById('customLoadingOverlay');
-        if (existing) existing.remove();
-        
-        var overlay = document.createElement('div');
-        overlay.id = 'customLoadingOverlay';
-        overlay.className = 'loading-overlay';
-        overlay.innerHTML = `
-            <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <div class="loading-text">${message || 'Loading...'}</div>
-                ${showProgress ? '<div class="loading-progress"><div class="loading-progress-bar" id="loadingProgressBar"></div></div>' : ''}
-            </div>
-        `;
-        document.body.appendChild(overlay);
-    }
-    
-    function updateLoadingProgress(percent) {
-        var bar = document.getElementById('loadingProgressBar');
-        if (bar) bar.style.width = percent + '%';
-    }
-    
-    function hideLoading() {
-        var overlay = document.getElementById('customLoadingOverlay');
-        if (overlay) overlay.remove();
-    }
-    
-    function showToastMessage(message, isError) {
-        var toast = document.createElement('div');
-        toast.className = 'toast-notification';
-        if (isError) toast.classList.add('toast-error');
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
-    }
-    
-    // Load all route files
-    async function loadAllRouteFiles() {
-        showLoading('Loading route files...', true);
-        updateLoadingProgress(10);
-        
-        try {
-            var response = await fetch('https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes');
-            var files = await response.json();
-            updateLoadingProgress(30);
-            
-            allRouteFilesList = [];
-            allRouteData = {};
-            
-            var totalFiles = files.filter(function(f) { return f.name.endsWith('.csv'); }).length;
-            var processed = 0;
-            
-            for (var f = 0; f < files.length; f++) {
-                if (files[f].name.endsWith('.csv')) {
-                    var routeName = files[f].name.replace('.csv', '');
-                    var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
-                    var csvText = await csvResponse.text();
-                    allRouteData[routeName] = {
-                        content: csvText,
-                        sha: files[f].sha,
-                        name: files[f].name,
-                        url: files[f].download_url
-                    };
-                    allRouteFilesList.push(routeName);
-                    processed++;
-                    updateLoadingProgress(30 + (processed / totalFiles) * 60);
-                }
-            }
-            
-            updateLoadingProgress(100);
-            setTimeout(hideLoading, 500);
-            showToastMessage('Loaded ' + allRouteFilesList.length + ' route files', false);
-            return true;
-        } catch(e) {
-            hideLoading();
-            showToastMessage('Error loading routes: ' + e.message, true);
-            return false;
+    // Helper to get global token from window or check periodically
+    function getAccessToken() {
+        // Try to get from window if exposed
+        if (typeof window.accessToken !== 'undefined' && window.accessToken) {
+            return window.accessToken;
         }
+        // Try to get from the main scope via the token client
+        if (typeof accessToken !== 'undefined' && accessToken) {
+            return accessToken;
+        }
+        return null;
     }
     
-    // Find routes containing a customer
-    function findCustomerInRoutes(customer) {
-        var routes = [];
-        var customerName = (customer.Company || customer.Name || '').toLowerCase();
-        var customerAddress = (customer.Address || '').toLowerCase();
-        
-        for (var routeName in allRouteData) {
-            var data = allRouteData[routeName];
-            var lines = data.content.split('\n');
-            if (lines.length < 2) continue;
-            
-            var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
-            var nameIdx = -1;
-            var addrIdx = -1;
-            for (var h = 0; h < headers.length; h++) {
-                if (headers[h] === 'company' || headers[h] === 'name') nameIdx = h;
-                if (headers[h] === 'address') addrIdx = h;
-            }
-            
-            for (var i = 1; i < lines.length; i++) {
-                var vals = lines[i].split(',');
-                var rowName = (nameIdx >= 0 && vals[nameIdx]) ? vals[nameIdx].trim().toLowerCase() : '';
-                var rowAddr = (addrIdx >= 0 && vals[addrIdx]) ? vals[addrIdx].trim().toLowerCase() : '';
-                
-                if (rowName === customerName && (customerAddress === '' || rowAddr === customerAddress || rowAddr.indexOf(customerAddress) !== -1)) {
-                    routes.push({
-                        name: routeName,
-                        lineIndex: i,
-                        line: lines[i],
-                        headers: headers,
-                        values: vals
-                    });
-                    break;
-                }
+    function getDriveFolderId() {
+        // Try to get from window
+        if (typeof window.GOOGLE_DRIVE_FOLDER_ID !== 'undefined') {
+            return window.GOOGLE_DRIVE_FOLDER_ID;
+        }
+        // Use the hardcoded value from configuration
+        return '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
+    }
+    
+    function getRepoOwner() {
+        if (typeof window.REPO_OWNER !== 'undefined') return window.REPO_OWNER;
+        return 'Billyschmidt123';
+    }
+    
+    function getRepoName() {
+        if (typeof window.REPO_NAME !== 'undefined') return window.REPO_NAME;
+        return 'Bottle-Water';
+    }
+    
+    // Override the managerLiveView function
+    window.managerLiveView = function() {
+        openLiveViewModal();
+    };
+    
+    // Create and open the Live View modal
+    function openLiveViewModal() {
+        // Remove existing modal if present
+        if (liveViewModal) {
+            liveViewModal.remove();
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
             }
         }
-        return routes;
-    }
-    
-    // Save route content back to GitHub
-    async function saveRouteToGitHub(routeName, newContent) {
-        var route = allRouteData[routeName];
-        if (!route) return false;
         
-        try {
-            var fileUrl = 'https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes/' + route.name;
-            var fileResponse = await fetch(fileUrl);
-            var fileData = await fileResponse.json();
-            
-            var updateResponse = await fetch(fileUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + window.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: 'Update route: ' + routeName,
-                    content: btoa(unescape(encodeURIComponent(newContent))),
-                    sha: fileData.sha
-                })
-            });
-            
-            if (updateResponse.ok) {
-                route.content = newContent;
-                route.sha = (await updateResponse.json()).content.sha;
-                return true;
-            }
-            return false;
-        } catch(e) {
-            console.error('Save error:', e);
-            return false;
-        }
-    }
-    
-    // Open customer edit modal with route management
-    window.openCustomerEditModalWithRoutes = async function(customer, index) {
-        currentEditCustomer = customer;
-        
-        await loadAllRouteFiles();
-        var customerRoutes = findCustomerInRoutes(customer);
-        
-        var modalHtml = `
-            <div id="customerEditRoutesModal" class="modal-overlay" style="display:flex;">
-                <div class="modal-content" style="max-width: 700px;">
-                    <div style="display:flex; justify-content: space-between; align-items:center;">
-                        <h2 style="margin:0;">Edit Customer: ${customer.Company || customer.Name || 'Customer'}</h2>
-                        <button onclick="closeCustomerRoutesModal()" class="btn-top" style="background:#dc3545;">Close</button>
-                    </div>
-                    <hr>
-                    <div style="background:#f8f9fa; padding:10px; border-radius:4px; margin-bottom:15px;">
-                        <p><strong>Company:</strong> ${customer.Company || customer.Name || 'N/A'}</p>
-                        <p><strong>Address:</strong> ${customer.Address || 'N/A'}</p>
-                        <p><strong>Phone:</strong> ${customer.Phone || 'N/A'}</p>
-                        <p><strong>Email:</strong> ${customer.Email || 'N/A'}</p>
-                    </div>
-                    <h4>Assigned Routes</h4>
-                    <div id="customerRoutesList" class="customer-route-list">
-                        ${customerRoutes.length === 0 ? '<div style="padding:20px; text-align:center; color:#999;">Not assigned to any routes</div>' : ''}
-                    </div>
-                    <div class="add-route-section">
-                        <label>Add to Route: </label>
-                        <select id="addToRouteSelect" style="width:200px; padding:6px;"></select>
-                        <button id="addToRouteBtn" class="btn-top" style="background:#28a745;">Add to Route</button>
-                    </div>
-                    <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                        <button onclick="closeCustomerRoutesModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-                        <button id="saveAllRouteChangesBtn" class="btn-top" style="background:#28a745;">Save All Changes</button>
-                    </div>
+        // Create modal
+        liveViewModal = document.createElement('div');
+        liveViewModal.id = 'liveViewModal';
+        liveViewModal.className = 'modal-overlay';
+        liveViewModal.style.display = 'flex';
+        liveViewModal.innerHTML = `
+            <div class="modal-content live-view-modal">
+                <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
+                    <h2 style="margin:0;">Live View - Trip Logs</h2>
+                    <button onclick="closeLiveViewModal()" class="btn-top" style="background:#dc3545;">Close</button>
+                </div>
+                <hr>
+                <div class="live-view-controls">
+                    <input type="date" id="liveViewDatePicker" class="date-picker-input" value="${getTodayDate()}">
+                    <button id="liveViewSearchBtn" class="btn-top">Search Trip Logs</button>
+                    <button id="liveViewRefreshBtn" class="btn-top refresh-btn">Refresh</button>
+                    <label class="auto-refresh-checkbox">
+                        <input type="checkbox" id="autoRefreshCheckbox"> Auto-refresh (30 sec)
+                    </label>
+                    <span id="liveViewStatus" style="margin-left: auto; font-size:12px; color:#666;"></span>
+                </div>
+                <div id="liveViewSummary" class="live-view-summary">
+                    📅 Select a date and click "Search Trip Logs" to view delivery records...
+                </div>
+                <div style="overflow-x: auto; max-height: 60vh; overflow-y: auto;">
+                    <table id="liveViewTable" class="live-view-table">
+                        <thead id="liveViewTableHead">
+                            <tr><th>No data</th></tr>
+                        </thead>
+                        <tbody id="liveViewTableBody">
+                            <tr><td style="text-align:center;">Select a date to search</td></tr>
+                        </tbody>
+                    能有
                 </div>
             </div>
         `;
+        document.body.appendChild(liveViewModal);
         
-        // Remove existing modal if present
-        var existingModal = document.getElementById('customerEditRoutesModal');
-        if (existingModal) existingModal.remove();
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        // Populate routes list
-        var routesListDiv = document.getElementById('customerRoutesList');
-        if (customerRoutes.length > 0) {
-            var listHtml = '';
-            for (var i = 0; i < customerRoutes.length; i++) {
-                var r = customerRoutes[i];
-                listHtml += `
-                    <div class="route-item" data-route="${r.name}" data-line="${r.lineIndex}">
-                        <div>
-                            <span class="route-name">${r.name}</span>
-                        </div>
-                        <div class="route-actions">
-                            <button class="btn-top" style="background:#ffc107; padding:3px 8px;" onclick="deactivateCustomerInRoute('${r.name}', ${r.lineIndex})">Deactivate</button>
-                            <button class="btn-top" style="background:#dc3545; padding:3px 8px;" onclick="removeCustomerFromRouteFile('${r.name}', ${r.lineIndex})">Remove</button>
-                        </div>
-                    </div>
-                `;
-            }
-            routesListDiv.innerHTML = listHtml;
-        }
-        
-        // Populate add route dropdown
-        var addSelect = document.getElementById('addToRouteSelect');
-        addSelect.innerHTML = '<option value="">Select a route...</option>';
-        for (var i = 0; i < allRouteFilesList.length; i++) {
-            var alreadyIn = false;
-            for (var j = 0; j < customerRoutes.length; j++) {
-                if (customerRoutes[j].name === allRouteFilesList[i]) {
-                    alreadyIn = true;
-                    break;
+        // Set up event listeners
+        document.getElementById('liveViewSearchBtn').onclick = function() {
+            searchTripLogs();
+        };
+        document.getElementById('liveViewRefreshBtn').onclick = function() {
+            searchTripLogs();
+        };
+        document.getElementById('autoRefreshCheckbox').onchange = function(e) {
+            if (e.target.checked) {
+                if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+                autoRefreshInterval = setInterval(function() {
+                    searchTripLogs(true);
+                }, 30000);
+                showLiveViewToast('Auto-refresh enabled (30 sec)', false);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                    showLiveViewToast('Auto-refresh disabled', false);
                 }
-            }
-            if (!alreadyIn) {
-                addSelect.innerHTML += '<option value="' + allRouteFilesList[i] + '">' + allRouteFilesList[i] + '</option>';
-            }
-        }
-        
-        // Add to route button
-        document.getElementById('addToRouteBtn').onclick = function() {
-            var selectedRoute = addSelect.value;
-            if (selectedRoute) {
-                addCustomerToRouteFile(selectedRoute, customer);
-                // Refresh modal
-                openCustomerEditModalWithRoutes(customer, index);
             }
         };
-        
-        // Save all changes button
-        document.getElementById('saveAllRouteChangesBtn').onclick = async function() {
-            showLoading('Saving changes to GitHub...', false);
-            var savedCount = 0;
-            
-            for (var routeName in allRouteData) {
-                var route = allRouteData[routeName];
-                if (route.modified) {
-                    var success = await saveRouteToGitHub(routeName, route.content);
-                    if (success) {
-                        savedCount++;
-                        route.modified = false;
-                    }
-                }
-            }
-            
-            hideLoading();
-            if (savedCount > 0) {
-                showToastMessage('Saved ' + savedCount + ' route updates to GitHub', false);
-                // Reload customer maintenance table
-                if (typeof loadCustomerMaintenance === 'function') {
-                    loadCustomerMaintenance();
-                }
-            } else {
-                showToastMessage('No changes to save', false);
-            }
-            closeCustomerRoutesModal();
-        };
-    };
+    }
     
-    // Add customer to a route
-    window.addCustomerToRouteFile = function(routeName, customer) {
-        var route = allRouteData[routeName];
-        if (!route) return;
-        
-        var lines = route.content.split('\n');
-        var headers = lines[0].split(',');
-        
-        // Build new row
-        var newRow = [];
-        for (var h = 0; h < headers.length; h++) {
-            var header = headers[h].trim().toLowerCase();
-            if (header === 'company' || header === 'name') {
-                newRow.push(customer.Company || customer.Name || '');
-            } else if (header === 'address') {
-                newRow.push(customer.Address || '');
-            } else if (header === 'phone') {
-                newRow.push(customer.Phone || '');
-            } else if (header === 'email') {
-                newRow.push(customer.Email || '');
-            } else if (header === 'active') {
-                newRow.push('TRUE');
-            } else {
-                newRow.push('');
-            }
+    // Close Live View modal
+    window.closeLiveViewModal = function() {
+        if (liveViewModal) {
+            liveViewModal.remove();
+            liveViewModal = null;
         }
-        
-        lines.push(newRow.join(','));
-        route.content = lines.join('\n');
-        route.modified = true;
-        showToastMessage('Added to route: ' + routeName, false);
-    };
-    
-    // Remove customer from route
-    window.removeCustomerFromRouteFile = function(routeName, lineIndex) {
-        if (confirm('Remove customer from ' + routeName + '? This cannot be undone.')) {
-            var route = allRouteData[routeName];
-            if (route) {
-                var lines = route.content.split('\n');
-                lines.splice(lineIndex, 1);
-                route.content = lines.join('\n');
-                route.modified = true;
-                showToastMessage('Removed from route: ' + routeName, false);
-                
-                // Refresh modal
-                if (currentEditCustomer) {
-                    openCustomerEditModalWithRoutes(currentEditCustomer, 0);
-                }
-            }
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
         }
     };
     
-    // Deactivate customer in route
-    window.deactivateCustomerInRoute = function(routeName, lineIndex) {
-        var route = allRouteData[routeName];
-        if (route) {
-            var lines = route.content.split('\n');
-            var headers = lines[0].split(',');
-            
-            var activeIdx = -1;
-            for (var h = 0; h < headers.length; h++) {
-                if (headers[h].trim().toLowerCase() === 'active') {
-                    activeIdx = h;
-                    break;
-                }
-            }
-            
-            var values = lines[lineIndex].split(',');
-            if (activeIdx >= 0) {
-                values[activeIdx] = 'FALSE';
-            } else {
-                // Add Active column
-                headers.push('Active');
-                for (var i = 1; i < lines.length; i++) {
-                    lines[i] = lines[i] + ',TRUE';
-                }
-                lines[0] = headers.join(',');
-                activeIdx = headers.length - 1;
-                values = lines[lineIndex].split(',');
-                values[activeIdx] = 'FALSE';
-            }
-            
-            lines[lineIndex] = values.join(',');
-            route.content = lines.join('\n');
-            route.modified = true;
-            showToastMessage('Deactivated in route: ' + routeName, false);
-            
-            if (currentEditCustomer) {
-                openCustomerEditModalWithRoutes(currentEditCustomer, 0);
-            }
+    // Get today's date in YYYY-MM-DD format
+    function getTodayDate() {
+        var today = new Date();
+        var year = today.getFullYear();
+        var month = String(today.getMonth() + 1).padStart(2, '0');
+        var day = String(today.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    }
+    
+    // Show toast message within Live View
+    function showLiveViewToast(message, isError) {
+        var statusSpan = document.getElementById('liveViewStatus');
+        if (statusSpan) {
+            statusSpan.innerHTML = message;
+            statusSpan.style.color = isError ? '#dc3545' : '#28a745';
+            setTimeout(function() {
+                if (statusSpan) statusSpan.innerHTML = '';
+            }, 3000);
         }
-    };
+    }
     
-    window.closeCustomerRoutesModal = function() {
-        var modal = document.getElementById('customerEditRoutesModal');
-        if (modal) modal.remove();
-        currentEditCustomer = null;
-    };
-    
-    // Override the customer maintenance loader with loading bar
-    window.loadCustomerMaintenanceWithLoading = async function() {
-        var tbody = document.getElementById('custTableBody');
-        var thead = document.getElementById('custTableHead');
+    // Search trip logs - First try Google Drive, then fallback to GitHub
+    async function searchTripLogs(isAutoRefresh) {
+        var datePicker = document.getElementById('liveViewDatePicker');
+        if (!datePicker) return;
         
-        showLoading('Loading customers from routes...', true);
-        updateLoadingProgress(10);
+        var selectedDate = datePicker.value;
+        if (!selectedDate) {
+            showLiveViewToast('Please select a date', true);
+            return;
+        }
         
+        // Show loading indicator
+        var summaryDiv = document.getElementById('liveViewSummary');
+        var tableBody = document.getElementById('liveViewTableBody');
+        if (summaryDiv) {
+            summaryDiv.innerHTML = '<span class="loading-spinner-small"></span> Searching for trip logs on ' + selectedDate + '...';
+        }
+        if (tableBody) {
+            tableBody.innerHTML = '<tr><td style="text-align:center;"><span class="loading-spinner-small"></span> Loading...</td></tr>';
+        }
+        
+        var token = getAccessToken();
+        var driveFolderId = getDriveFolderId();
+        var repoOwner = getRepoOwner();
+        var repoName = getRepoName();
+        
+        // Format date for filename search (YYYY-MM-DD)
+        var dateStr = selectedDate;
+        
+        // Try GitHub first (more reliable, no CORS)
         try {
-            await loadAllRouteFiles();
-            updateLoadingProgress(40);
+            var githubUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/trip-reports`;
+            var githubResponse = await fetch(githubUrl);
             
-            var allCustomers = [];
-            var allHeaders = [];
-            
-            var routeNames = Object.keys(allRouteData);
-            var processedRoutes = 0;
-            
-            for (var r = 0; r < routeNames.length; r++) {
-                var routeName = routeNames[r];
-                var data = allRouteData[routeName];
-                var lines = data.content.split('\n');
-                if (lines.length < 2) continue;
+            if (githubResponse.ok) {
+                var files = await githubResponse.json();
+                var matchingFiles = [];
                 
-                var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-                if (allHeaders.length === 0) {
-                    allHeaders = headers;
-                    var headerHtml = '<th>Action</th><th>Routes</th>';
-                    for (var h = 0; h < allHeaders.length; h++) {
-                        headerHtml += '<th>' + allHeaders[h] + '</th>';
-                    }
-                    thead.innerHTML = headerHtml;
-                }
-                
-                for (var i = 1; i < lines.length; i++) {
-                    var vals = lines[i].split(',');
-                    var rowObj = {};
-                    for (var j = 0; j < allHeaders.length; j++) {
-                        rowObj[allHeaders[j]] = (vals[j] || '').trim();
-                    }
-                    
-                    var companyName = rowObj.Company || rowObj.Name || '';
-                    var existingIdx = -1;
-                    for (var c = 0; c < allCustomers.length; c++) {
-                        if ((allCustomers[c].Company || allCustomers[c].Name) === companyName && companyName !== '') {
-                            existingIdx = c;
-                            break;
-                        }
-                    }
-                    
-                    if (existingIdx >= 0) {
-                        if (!allCustomers[existingIdx]._routes) allCustomers[existingIdx]._routes = [];
-                        if (allCustomers[existingIdx]._routes.indexOf(routeName) === -1) {
-                            allCustomers[existingIdx]._routes.push(routeName);
-                        }
-                    } else if (companyName !== '') {
-                        rowObj._routes = [routeName];
-                        allCustomers.push(rowObj);
+                for (var i = 0; i < files.length; i++) {
+                    var file = files[i];
+                    if (file.name.endsWith('.csv') && file.name.indexOf(dateStr) !== -1) {
+                        matchingFiles.push({
+                            name: file.name,
+                            download_url: file.download_url,
+                            modified: new Date(file.commit?.committer?.date || Date.now()).toLocaleString()
+                        });
                     }
                 }
                 
-                processedRoutes++;
-                updateLoadingProgress(40 + (processedRoutes / routeNames.length) * 50);
-            }
-            
-            updateLoadingProgress(95);
-            
-            tbody.innerHTML = '';
-            for (var idx = 0; idx < allCustomers.length; idx++) {
-                var cust = allCustomers[idx];
-                var routesList = cust._routes ? cust._routes.join(', ') : 'None';
-                var row = '<tr>';
-                row += '<td><button class="btn-top" style="padding:4px;" onclick="openCustomerEditModalWithRoutes(globalCustomerList[' + idx + '], ' + idx + ')">Edit</button></td>';
-                row += '<td style="font-size:11px;">' + routesList + '</td>';
-                for (var h = 0; h < allHeaders.length; h++) {
-                    row += '<td>' + (cust[allHeaders[h]] || '') + '</td>';
+                if (matchingFiles.length === 0) {
+                    summaryDiv.innerHTML = `📭 No trip logs found for ${selectedDate} in GitHub.<br>Complete a delivery to create a log file.`;
+                    tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No trip logs found for this date</td></tr>';
+                    return;
                 }
-                row += '</tr>';
-                tbody.innerHTML += row;
-            }
-            
-            window.globalCustomerList = allCustomers;
-            
-            updateLoadingProgress(100);
-            setTimeout(hideLoading, 500);
-            
-            if (allCustomers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10">No customer data found.</div>';
-            } else {
-                showToastMessage('Loaded ' + allCustomers.length + ' customers', false);
-            }
-        } catch (e) {
-            hideLoading();
-            showToastMessage('Error loading customers: ' + e.message, true);
-            tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>';
-        }
-    };
-    
-    // Override Manager button
-    var managerBtn = document.getElementById('btnManager');
-    if (managerBtn) {
-        var oldClick = managerBtn.onclick;
-        managerBtn.onclick = function() {
-            document.getElementById('mgrModal').style.display = 'flex';
-            window.loadCustomerMaintenanceWithLoading();
-        };
-    }
-    
-    // Override Show Cust button
-    var showCustBtn = document.getElementById('btnShowCust');
-    if (showCustBtn) {
-        showCustBtn.onclick = function() {
-            document.getElementById('custView').style.display = 'block';
-            document.getElementById('prodView').style.display = 'none';
-            window.loadCustomerMaintenanceWithLoading();
-        };
-    }
-    
-    // Fix Product Maintenance save message
-    var originalSaveProductEdit = window.saveProductEdit;
-    if (originalSaveProductEdit) {
-        window.saveProductEdit = function() {
-            if (currentEditingProductIndex === -1) {
-                alert('No product selected');
+                
+                displayFileList(matchingFiles, summaryDiv);
+                
+                // Auto-load first file
+                if (!isAutoRefresh && matchingFiles.length > 0) {
+                    loadTripLogFromUrl(matchingFiles[0].download_url, matchingFiles[0].name);
+                }
                 return;
             }
-            for (var i = 0; i < currentProdHeaders.length; i++) {
-                var header = currentProdHeaders[i];
-                if (header === 'Status') continue;
-                var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
-                if (input) currentProdList[currentEditingProductIndex][header] = input.value;
+        } catch (githubErr) {
+            console.warn('GitHub fetch failed:', githubErr);
+        }
+        
+        // Fallback to Google Drive if GitHub fails and user is signed in
+        if (!token) {
+            summaryDiv.innerHTML = '⚠️ Please sign in with Google to view trip logs.<br>Click the "Sign in with Google" button in the header, then try again.';
+            tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Not signed in. Please sign in with Google.</td></tr>';
+            return;
+        }
+        
+        try {
+            var query = `name contains 'Trip-log' and name contains '${dateStr}' and trashed = false`;
+            var searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime,modifiedTime)&orderBy=modifiedTime desc`;
+            
+            var searchResponse = await fetch(searchUrl, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            
+            if (!searchResponse.ok) {
+                throw new Error('Google Drive API error: ' + searchResponse.status);
             }
-            renderProdTable();
-            // Save to localStorage
-            var data = {
-                headers: currentProdHeaders,
-                products: currentProdList,
-                file: currentProductFile,
-                timestamp: new Date().toISOString()
-            };
-            localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
-            closeProductEditModal();
-            showToastMessage('Product saved to browser storage (refresh to keep)', false);
-        };
+            
+            var searchResult = await searchResponse.json();
+            var files = searchResult.files || [];
+            
+            if (files.length === 0) {
+                summaryDiv.innerHTML = `📭 No trip logs found for ${selectedDate} in Google Drive.<br>Complete a delivery to create a log file.`;
+                tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No trip logs found for this date</td></tr>';
+                return;
+            }
+            
+            var fileList = files.map(function(f) {
+                return {
+                    name: f.name,
+                    id: f.id,
+                    modified: f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : 'Unknown'
+                };
+            });
+            
+            displayFileList(fileList, summaryDiv);
+            
+            if (!isAutoRefresh && files.length > 0) {
+                loadTripLogFromDrive(files[0].id, files[0].name);
+            }
+            
+        } catch (err) {
+            console.error('Search error:', err);
+            summaryDiv.innerHTML = '❌ Error searching: ' + err.message + '<br>Make sure you are signed in with Google.';
+            tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Error loading data: ' + err.message + '</td></tr>';
+        }
     }
     
-    console.log('Customer edit and loading bar fix applied');
+    function displayFileList(files, summaryDiv) {
+        var fileListHtml = '<div style="margin-bottom:15px;">';
+        fileListHtml += '<strong>📁 Found ' + files.length + ' trip log(s):</strong>';
+        fileListHtml += '<table style="width:100%; border-collapse:collapse; margin-top:10px;">';
+        fileListHtml += '<tr style="background:#e9ecef;"><th style="padding:8px;">File Name</th><th style="padding:8px;">Modified</th><th style="padding:8px;">Action</th></tr>';
+        
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            fileListHtml += `
+                <tr>
+                    <td style="padding:8px; border-bottom:1px solid #eee;">${file.name}</td>
+                    <td style="padding:8px; border-bottom:1px solid #eee;">${file.modified}</td>
+                    <td style="padding:8px; border-bottom:1px solid #eee;">
+                        <button class="btn-top" style="padding:4px 8px;" onclick="loadTripLogFromUrlManual('${file.download_url || file.url || ''}', '${file.name}', '${file.id || ''}')">View Log</button>
+                    </td>
+                </tr>
+            `;
+        }
+        fileListHtml += '</table></div><div id="tripLogContentDiv"></div>';
+        summaryDiv.innerHTML = fileListHtml;
+    }
+    
+    window.loadTripLogFromUrlManual = async function(url, fileName, fileId) {
+        if (url) {
+            loadTripLogFromUrl(url, fileName);
+        } else if (fileId) {
+            loadTripLogFromDrive(fileId, fileName);
+        } else {
+            showLiveViewToast('Cannot load file - no URL or ID', true);
+        }
+    };
+    
+    async function loadTripLogFromUrl(url, fileName) {
+        var contentDiv = document.getElementById('tripLogContentDiv');
+        if (!contentDiv) return;
+        
+        contentDiv.innerHTML = '<div style="text-align:center; padding:20px;"><span class="loading-spinner-small"></span> Loading ' + fileName + '...</div>';
+        
+        try {
+            var response = await fetch(url + '?t=' + Date.now());
+            if (!response.ok) throw new Error('Failed to load');
+            
+            var csvText = await response.text();
+            displayTripLogData(csvText, fileName, contentDiv);
+            
+        } catch (err) {
+            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Error loading file: ' + err.message + '</div>';
+        }
+    }
+    
+    async function loadTripLogFromDrive(fileId, fileName) {
+        var contentDiv = document.getElementById('tripLogContentDiv');
+        if (!contentDiv) return;
+        
+        var token = getAccessToken();
+        if (!token) {
+            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Please sign in with Google first</div>';
+            return;
+        }
+        
+        contentDiv.innerHTML = '<div style="text-align:center; padding:20px;"><span class="loading-spinner-small"></span> Loading ' + fileName + '...</div>';
+        
+        try {
+            var exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text%2Fplain`;
+            var response = await fetch(exportUrl, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load file');
+            
+            var csvText = await response.text();
+            displayTripLogData(csvText, fileName, contentDiv);
+            
+        } catch (err) {
+            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Error loading file: ' + err.message + '</div>';
+        }
+    }
+    
+    function displayTripLogData(csvText, fileName, contentDiv) {
+        var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
+        
+        if (lines.length === 0) {
+            contentDiv.innerHTML = '<div style="text-align:center; color:#999;">File is empty</div>';
+            return;
+        }
+        
+        var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+        var data = [];
+        for (var i = 1; i < lines.length; i++) {
+            var values = lines[i].split(',');
+            var row = {};
+            for (var j = 0; j < headers.length && j < values.length; j++) {
+                row[headers[j]] = values[j].trim();
+            }
+            data.push(row);
+        }
+        
+        var tableHtml = '<div style="margin-top:15px;"><h4>' + fileName + '</h4>';
+        tableHtml += '<div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">';
+        tableHtml += '<table class="live-view-table" style="font-size:11px;">';
+        
+        tableHtml += '<thead><tr>';
+        for (var h = 0; h < headers.length; h++) {
+            tableHtml += '<th>' + headers[h] + '</th>';
+        }
+        tableHtml += '</thead><tbody>';
+        
+        for (var r = 0; r < data.length; r++) {
+            tableHtml += '<tr>';
+            for (var h = 0; h < headers.length; h++) {
+                var cellValue = data[r][headers[h]] || '';
+                if (headers[h] === 'Status') {
+                    var statusStyle = cellValue === 'Delivered' ? 'style="color:#28a745; font-weight:bold;"' : (cellValue === 'Not Delivered' ? 'style="color:#dc3545; font-weight:bold;"' : '');
+                    tableHtml += '<td ' + (statusStyle || '') + '>' + cellValue + '</td>';
+                } else {
+                    tableHtml += '<td>' + cellValue + '</td>';
+                }
+            }
+            tableHtml += '</tr>';
+        }
+        
+        tableHtml += '</tbody></table></div>';
+        tableHtml += '<div style="margin-top:10px; font-size:11px; color:#666;">📊 Total records: ' + data.length + '</div>';
+        tableHtml += '<button class="btn-top" style="margin-top:10px; background:#6c757d;" onclick="document.getElementById(\'tripLogContentDiv\').innerHTML = \'\'">Clear View</button>';
+        tableHtml += '</div>';
+        
+        contentDiv.innerHTML = tableHtml;
+        showLiveViewToast('Loaded ' + fileName + ' - ' + data.length + ' records', false);
+    }
+    
+    console.log('Live View fix applied - searches GitHub trip-reports folder');
 })();
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
