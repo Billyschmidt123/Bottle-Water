@@ -598,7 +598,7 @@ window.removeFromCart = function(idx) {
 function renderDeliveryCart() {
     var body = document.getElementById('cartItemsBody');
     if (deliveryCart.length === 0) {
-        body.innerHTML = '</tr><td colspan="4" style="color:#999; text-align:center;">No items added.</div>';
+        body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</div>';
         return;
     }
     var html = '';
@@ -940,6 +940,9 @@ document.getElementById('routeDropdown').onchange = async function() {
                                 }
                             }
                         }
+                    } else {
+                        var target = document.getElementById(targetId);
+                        target.innerHTML = '<option value="">Error loading products</option>';
                     }
                 }
                 loadDropdown('Water.csv', 'stopProductDropdown');
@@ -981,5 +984,113 @@ function init() {
 
 init();
 </script>
+
+<!-- ========== ADDITIVE FIX: Customer Maintenance Data Load ========== -->
+<script>
+(function fixCustomerMaintenance() {
+    // Override the loadAllCustomers function to properly load data from GitHub routes
+    if (typeof window.loadAllCustomers === 'undefined') {
+        window.loadAllCustomers = async function() {
+            var tbody = document.getElementById('custTableBody');
+            var thead = document.getElementById('custTableHead');
+            tbody.innerHTML = '<tr><td colspan="10">Loading customer data...</div>';
+            
+            try {
+                var routesResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
+                var files = await routesResponse.json();
+                var allCustomers = [];
+                var allHeaders = [];
+                
+                for (var f = 0; f < files.length; f++) {
+                    if (files[f].name.endsWith('.csv')) {
+                        var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
+                        var csvText = await csvResponse.text();
+                        var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
+                        if (lines.length < 2) continue;
+                        
+                        var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+                        if (allHeaders.length === 0) {
+                            allHeaders = headers;
+                            var headerHtml = '<th>Action</th>';
+                            for (var h = 0; h < allHeaders.length; h++) {
+                                headerHtml += '<th>' + allHeaders[h] + '</th>';
+                            }
+                            thead.innerHTML = headerHtml;
+                        }
+                        
+                        for (var i = 1; i < lines.length; i++) {
+                            var vals = lines[i].split(',');
+                            var rowObj = {};
+                            for (var j = 0; j < allHeaders.length; j++) {
+                                rowObj[allHeaders[j]] = (vals[j] || '').trim();
+                            }
+                            allCustomers.push(rowObj);
+                        }
+                    }
+                }
+                
+                tbody.innerHTML = '';
+                for (var idx = 0; idx < allCustomers.length; idx++) {
+                    var customer = allCustomers[idx];
+                    var row = '<tr>';
+                    row += '<td><button class="btn-top" style="padding:4px;" onclick="alert(\'Edit customer: ' + (customer.Company || customer.Name || idx) + '\')">Edit</button></td>';
+                    for (var h = 0; h < allHeaders.length; h++) {
+                        row += '<td>' + (customer[allHeaders[h]] || '') + '</td>';
+                    }
+                    row += '</tr>';
+                    tbody.innerHTML += row;
+                }
+                
+                if (allCustomers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10">No customer data found. Please check routes folder.</div>';
+                } else {
+                    showToast('Loaded ' + allCustomers.length + ' customers from routes', false);
+                }
+            } catch (e) {
+                console.error('Error loading customers:', e);
+                tbody.innerHTML = '<tr><td colspan="10">Error loading customer data. Check GitHub routes folder.</div>';
+                showToast('Error loading customers', true);
+            }
+        };
+    }
+    
+    // Make sure the Manager button triggers customer load
+    var originalManagerClick = document.getElementById('btnManager').onclick;
+    document.getElementById('btnManager').onclick = function() {
+        document.getElementById('mgrModal').style.display = 'flex';
+        if (typeof window.loadAllCustomers === 'function') {
+            window.loadAllCustomers();
+        }
+    };
+    
+    console.log('Customer maintenance fix applied');
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
+
+<!-- ========== ADDITIVE FIX: Safe Modal Element Access ========== -->
+<script>
+(function fixModalElements() {
+    // Safely handle potentially missing elements in the stop modal
+    var originalOpenStopModal = window.openStopModal;
+    if (originalOpenStopModal) {
+        window.openStopModal = async function(companyName, customerData) {
+            // Ensure all required elements exist before trying to set values
+            var safeCustomerData = customerData || {};
+            
+            // Safely set PO field if it exists, otherwise ignore
+            var poField = document.getElementById('editMetaPO');
+            if (poField) {
+                poField.value = safeCustomerData['Purchase order'] || '';
+            }
+            
+            // Call the original function
+            return originalOpenStopModal.call(this, companyName, safeCustomerData);
+        };
+    }
+    console.log('Modal element safety fix applied');
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
