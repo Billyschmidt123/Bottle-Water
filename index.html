@@ -1,419 +1,146 @@
-<!-- ========== ADDITIVE FIX: Live View - Search All CSV Files ========== -->
-<style>
-.live-view-modal {
-    max-width: 1200px !important;
-    width: 95% !important;
-}
-.live-view-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-.live-view-table th, .live-view-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-.live-view-table th {
-    background: #004a99;
-    color: white;
-    position: sticky;
-    top: 0;
-}
-.live-view-table tr:nth-child(even) {
-    background: #f9f9f9;
-}
-.live-view-table tr:hover {
-    background: #e7f3ff;
-}
-.live-view-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.date-picker-input {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
-}
-.live-view-summary {
-    background: #e9ecef;
-    padding: 12px;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    font-size: 13px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-.loading-spinner-small {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid #004a99;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-right: 10px;
-    vertical-align: middle;
-}
-.file-list-item {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    cursor: pointer;
-}
-.file-list-item:hover {
-    background: #e7f3ff;
-}
-.file-list-item .file-name {
-    font-weight: bold;
-}
-.file-list-item .file-date {
-    font-size: 11px;
-    color: #666;
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-</style>
-
+<!-- ========== ADDITIVE FIX: Ensure Map Loads Correctly ========== -->
 <script>
-(function fixLiveView() {
-    // Store modal reference
-    var liveViewModal = null;
-    var autoRefreshInterval = null;
-    
-    // Get repository info
-    var REPO_OWNER = 'Billyschmidt123';
-    var REPO_NAME = 'Bottle-Water';
-    
-    // Override the managerLiveView function
-    window.managerLiveView = function() {
-        console.log('Live View button clicked - opening modal');
-        openLiveViewModal();
-    };
-    
-    // Also override the original function if it exists
-    if (typeof managerLiveView !== 'undefined' && managerLiveView !== window.managerLiveView) {
-        window.originalManagerLiveView = managerLiveView;
-    }
-    
-    function openLiveViewModal() {
-        // Remove existing modal if present
-        if (liveViewModal) {
-            liveViewModal.remove();
-            liveViewModal = null;
-        }
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
+(function fixMapLoading() {
+    // Wait for DOM to be fully loaded
+    function initMapIfNeeded() {
+        // Check if map container exists but map hasn't been initialized
+        var mapContainer = document.getElementById('map');
+        if (!mapContainer) {
+            console.error('Map container not found');
+            return;
         }
         
-        // Create modal
-        liveViewModal = document.createElement('div');
-        liveViewModal.id = 'liveViewModal';
-        liveViewModal.className = 'modal-overlay';
-        liveViewModal.style.display = 'flex';
-        liveViewModal.style.zIndex = '10000';
-        liveViewModal.innerHTML = `
-            <div class="modal-content live-view-modal">
-                <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
-                    <h2 style="margin:0;">Live View - Delivery Logs</h2>
-                    <button onclick="closeLiveViewModal()" class="btn-top" style="background:#dc3545;">Close</button>
-                </div>
-                <hr>
-                <div class="live-view-controls">
-                    <input type="date" id="liveViewDatePicker" class="date-picker-input">
-                    <button id="liveViewSearchBtn" class="btn-top" style="background:#007bff;">Search Logs</button>
-                    <button id="liveViewRefreshBtn" class="btn-top" style="background:#17a2b8;">Refresh</button>
-                    <label class="auto-refresh-checkbox" style="margin-left:15px;">
-                        <input type="checkbox" id="autoRefreshCheckbox"> Auto-refresh (30s)
-                    </label>
-                    <span id="liveViewStatus" style="margin-left:auto; font-size:12px;"></span>
-                </div>
-                <div id="liveViewSummary" class="live-view-summary">
-                    <span class="loading-spinner-small"></span> Loading available log files...
-                </div>
-                <div id="liveViewContent" style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
-                    <table id="liveViewTable" class="live-view-table" style="width:100%;">
-                        <thead id="liveViewTableHead">
-                            <tr><th>Loading...</th></tr>
-                        </thead>
-                        <tbody id="liveViewTableBody">
-                            <tr><td style="text-align:center;">Searching for delivery logs...</td></tr>
-                        </tbody>
-                    能有
-                </div>
-            </div>
-        `;
-        document.body.appendChild(liveViewModal);
-        
-        // Set up event listeners
-        var searchBtn = document.getElementById('liveViewSearchBtn');
-        if (searchBtn) {
-            searchBtn.onclick = function() { searchAllLogFiles(); };
-        }
-        var refreshBtn = document.getElementById('liveViewRefreshBtn');
-        if (refreshBtn) {
-            refreshBtn.onclick = function() { searchAllLogFiles(); };
-        }
-        var autoCheckbox = document.getElementById('autoRefreshCheckbox');
-        if (autoCheckbox) {
-            autoCheckbox.onchange = function(e) {
-                if (e.target.checked) {
-                    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = setInterval(function() {
-                        searchAllLogFiles(true);
-                    }, 30000);
-                    showLiveViewStatus('Auto-refresh enabled (30 sec)', false);
-                } else {
-                    if (autoRefreshInterval) {
-                        clearInterval(autoRefreshInterval);
-                        autoRefreshInterval = null;
-                        showLiveViewStatus('Auto-refresh disabled', false);
-                    }
-                }
-            };
+        // Check if map already exists
+        if (typeof window.map !== 'undefined' && window.map) {
+            console.log('Map already exists, invalidating size');
+            window.map.invalidateSize();
+            return;
         }
         
-        // Set default date to today
-        var today = new Date();
-        var year = today.getFullYear();
-        var month = String(today.getMonth() + 1).padStart(2, '0');
-        var day = String(today.getDate()).padStart(2, '0');
-        var datePicker = document.getElementById('liveViewDatePicker');
-        if (datePicker) {
-            datePicker.value = year + '-' + month + '-' + day;
+        // Check if L (Leaflet) is available
+        if (typeof L === 'undefined') {
+            console.log('Leaflet not loaded yet, waiting...');
+            setTimeout(initMapIfNeeded, 500);
+            return;
         }
         
-        // Load initial data
-        searchAllLogFiles();
-    }
-    
-    window.closeLiveViewModal = function() {
-        if (liveViewModal) {
-            liveViewModal.remove();
-            liveViewModal = null;
-        }
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
-        }
-    };
-    
-    function showLiveViewStatus(message, isError) {
-        var statusSpan = document.getElementById('liveViewStatus');
-        if (statusSpan) {
-            statusSpan.innerHTML = message;
-            statusSpan.style.color = isError ? '#dc3545' : '#28a745';
+        try {
+            // Create new map
+            var map = L.map('map').setView([55.17, -118.79], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            }).addTo(map);
+            
+            // Store globally
+            window.map = map;
+            console.log('Map initialized successfully');
+            
+            // Force a resize after a short delay to ensure proper rendering
             setTimeout(function() {
-                if (statusSpan && statusSpan.innerHTML === message) {
-                    statusSpan.innerHTML = '';
-                }
-            }, 4000);
+                if (window.map) window.map.invalidateSize();
+            }, 200);
+            
+        } catch (err) {
+            console.error('Error creating map:', err);
         }
     }
     
-    async function searchAllLogFiles(isAutoRefresh) {
-        var summaryDiv = document.getElementById('liveViewSummary');
-        var contentDiv = document.getElementById('liveViewContent');
-        var tableBody = document.getElementById('liveViewTableBody');
-        
-        if (summaryDiv) {
-            summaryDiv.innerHTML = '<span class="loading-spinner-small"></span> Searching GitHub for log files...';
-        }
-        if (tableBody) {
-            tableBody.innerHTML = '<tr><td style="text-align:center;"><span class="loading-spinner-small"></span> Searching...</td></tr>';
-        }
-        
-        try {
-            // First, get all files from GitHub
-            var apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
-            var response = await fetch(apiUrl);
-            
-            if (!response.ok) {
-                throw new Error('GitHub API error: ' + response.status);
-            }
-            
-            var contents = await response.json();
-            var logFiles = [];
-            
-            // Look for trip-reports folder
-            var tripReportsFolder = null;
-            for (var i = 0; i < contents.length; i++) {
-                if (contents[i].name === 'trip-reports' && contents[i].type === 'dir') {
-                    tripReportsFolder = contents[i];
-                    break;
-                }
-            }
-            
-            if (tripReportsFolder) {
-                // Get files from trip-reports folder
-                var folderResponse = await fetch(tripReportsFolder.url);
-                var folderContents = await folderResponse.json();
-                
-                for (var f = 0; f < folderContents.length; f++) {
-                    if (folderContents[f].name.endsWith('.csv')) {
-                        logFiles.push({
-                            name: folderContents[f].name,
-                            url: folderContents[f].download_url,
-                            size: folderContents[f].size,
-                            modified: new Date(folderContents[f].commit?.committer?.date || Date.now()).toLocaleString()
-                        });
-                    }
-                }
-            }
-            
-            // Also check root directory for CSV files
-            for (var i = 0; i < contents.length; i++) {
-                if (contents[i].name.endsWith('.csv') && contents[i].name.toLowerCase().indexOf('trip') !== -1) {
-                    var alreadyExists = false;
-                    for (var f = 0; f < logFiles.length; f++) {
-                        if (logFiles[f].name === contents[i].name) {
-                            alreadyExists = true;
-                            break;
-                        }
-                    }
-                    if (!alreadyExists) {
-                        logFiles.push({
-                            name: contents[i].name,
-                            url: contents[i].download_url,
-                            size: contents[i].size,
-                            modified: new Date(contents[i].commit?.committer?.date || Date.now()).toLocaleString()
-                        });
-                    }
-                }
-            }
-            
-            if (logFiles.length === 0) {
-                summaryDiv.innerHTML = '📭 No log files found in GitHub repository.<br><br>📝 Trip logs are created when you complete deliveries. Each delivery creates a CSV file in the trip-reports folder.<br><br>💡 To create test data, start a route and complete a delivery.';
-                if (tableBody) {
-                    tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No log files found. Complete a delivery to generate logs.</td></tr>';
-                }
-                return;
-            }
-            
-            // Display file list
-            var fileListHtml = '<div style="margin-bottom:15px;">';
-            fileListHtml += '<strong>📁 Found ' + logFiles.length + ' log file(s):</strong><br><br>';
-            fileListHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:4px;">';
-            
-            for (var i = 0; i < logFiles.length; i++) {
-                var file = logFiles[i];
-                var fileDate = '';
-                var dateMatch = file.name.match(/\d{4}-\d{2}-\d{2}/);
-                if (dateMatch) {
-                    fileDate = ' 📅 ' + dateMatch[0];
-                }
-                fileListHtml += `
-                    <div class="file-list-item" onclick="loadAndDisplayLogFile('${file.url.replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}')">
-                        <div class="file-name">📄 ${file.name}</div>
-                        <div class="file-date">📏 ${Math.round(file.size / 1024)} KB | Modified: ${file.modified}${fileDate}</div>
-                    </div>
-                `;
-            }
-            fileListHtml += '</div></div><div id="liveViewFileContent"></div>';
-            
-            summaryDiv.innerHTML = fileListHtml;
-            
-            if (tableBody) {
-                tableBody.innerHTML = '<tr><td style="text-align:center;">Click on any log file above to view its contents.</td></tr>';
-            }
-            
-            showLiveViewStatus('Loaded ' + logFiles.length + ' log files', false);
-            
-        } catch (err) {
-            console.error('Search error:', err);
-            summaryDiv.innerHTML = '❌ Error loading files: ' + err.message + '<br><br>Make sure your GitHub repository is accessible.';
-            if (tableBody) {
-                tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Error: ' + err.message + '</td></tr>';
-            }
-        }
+    // Try to initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMapIfNeeded);
+    } else {
+        initMapIfNeeded();
     }
     
-    window.loadAndDisplayLogFile = async function(fileUrl, fileName) {
-        var contentDiv = document.getElementById('liveViewFileContent');
-        if (!contentDiv) return;
-        
-        contentDiv.innerHTML = '<div style="text-align:center; padding:20px;"><span class="loading-spinner-small"></span> Loading ' + fileName + '...</div>';
-        
-        try {
-            var response = await fetch(fileUrl + '?t=' + Date.now());
-            if (!response.ok) throw new Error('Failed to load file');
-            
-            var csvText = await response.text();
-            var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
-            
-            if (lines.length === 0) {
-                contentDiv.innerHTML = '<div style="text-align:center; color:#999;">File is empty</div>';
-                return;
-            }
-            
-            var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-            var data = [];
-            for (var i = 1; i < lines.length; i++) {
-                var values = lines[i].split(',');
-                var row = {};
-                for (var j = 0; j < headers.length && j < values.length; j++) {
-                    row[headers[j]] = values[j].trim();
-                }
-                data.push(row);
-            }
-            
-            // Build table HTML
-            var tableHtml = '<div style="margin-top:15px; border-top:2px solid #004a99; padding-top:15px;">';
-            tableHtml += '<h4>' + fileName + '</h4>';
-            tableHtml += '<div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">';
-            tableHtml += '<table class="live-view-table" style="width:100%; font-size:11px;">';
-            
-            tableHtml += '<thead><tr>';
-            for (var h = 0; h < headers.length; h++) {
-                tableHtml += '<th style="background:#004a99; color:white; padding:8px;">' + headers[h] + '</th>';
-            }
-            tableHtml += '</thead><tbody>';
-            
-            for (var r = 0; r < data.length; r++) {
-                tableHtml += '<tr>';
-                for (var h = 0; h < headers.length; h++) {
-                    var cellValue = data[r][headers[h]] || '—';
-                    if (headers[h] === 'Status') {
-                        var statusColor = cellValue === 'Delivered' ? '#28a745' : (cellValue === 'Not Delivered' ? '#dc3545' : '#333');
-                        tableHtml += '<td style="padding:6px; border:1px solid #ddd; color:' + statusColor + '; font-weight:bold;">' + cellValue + '</table>';
-                    } else {
-                        tableHtml += '<td style="padding:6px; border:1px solid #ddd;">' + cellValue + '</td>';
-                    }
-                }
-                tableHtml += '</tr>';
-            }
-            
-            tableHtml += '</tbody></table></div>';
-            tableHtml += '<div style="margin-top:10px; padding:8px; background:#e9ecef; border-radius:4px;">';
-            tableHtml += '📊 Total records: <strong>' + data.length + '</strong> | ';
-            tableHtml += '📅 File: ' + fileName;
-            tableHtml += '</div>';
-            tableHtml += '<button class="btn-top" style="margin-top:10px; background:#6c757d;" onclick="document.getElementById(\'liveViewFileContent\').innerHTML = \'\'">Clear View</button>';
-            tableHtml += '</div>';
-            
-            contentDiv.innerHTML = tableHtml;
-            showLiveViewStatus('Loaded ' + fileName + ' - ' + data.length + ' records', false);
-            
-        } catch (err) {
-            console.error('Load error:', err);
-            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Error loading file: ' + err.message + '</div>';
-        }
-    };
+    // Also try again after all scripts load
+    window.addEventListener('load', function() {
+        setTimeout(initMapIfNeeded, 100);
+    });
     
-    // Also try to find any existing managerLiveView button and attach
-    setTimeout(function() {
-        var liveViewBtn = document.getElementById('btnLiveView');
-        if (liveViewBtn) {
-            liveViewBtn.onclick = function() { openLiveViewModal(); };
-        }
-        console.log('Live View fix applied - searching for CSV files in GitHub repository');
-    }, 1000);
+    console.log('Map loading fix applied');
 })();
 </script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
+
+<!-- ========== ADDITIVE FIX: Ensure Route Dropdown Populates ========== -->
+<script>
+(function fixRouteLoading() {
+    // Function to manually load routes if dropdown is empty
+    function ensureRoutesLoaded() {
+        var dropdown = document.getElementById('routeDropdown');
+        if (!dropdown) return;
+        
+        // If dropdown already has options, do nothing
+        if (dropdown.children.length > 1) return;
+        
+        console.log('Route dropdown empty, manually loading routes...');
+        
+        // Add loading option
+        dropdown.innerHTML = '<option value="">Loading routes...</option>';
+        
+        // Fetch routes from GitHub
+        fetch('https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes')
+            .then(function(response) {
+                if (!response.ok) throw new Error('Failed to load routes');
+                return response.json();
+            })
+            .then(function(files) {
+                dropdown.innerHTML = '<option value="">Select Route...</option>';
+                var hasRoutes = false;
+                
+                for (var f = 0; f < files.length; f++) {
+                    if (files[f].name.endsWith('.csv')) {
+                        hasRoutes = true;
+                        var opt = document.createElement('option');
+                        opt.value = files[f].name;
+                        opt.textContent = files[f].name.replace('.csv', '');
+                        dropdown.appendChild(opt);
+                    }
+                }
+                
+                if (!hasRoutes) {
+                    dropdown.innerHTML = '<option value="">No routes found</option>';
+                    console.warn('No route CSV files found in /routes folder');
+                } else {
+                    console.log('Routes loaded successfully');
+                }
+            })
+            .catch(function(err) {
+                console.error('Error loading routes:', err);
+                dropdown.innerHTML = '<option value="">Error loading routes</option>';
+            });
+    }
+    
+    // Run when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureRoutesLoaded);
+    } else {
+        ensureRoutesLoaded();
+    }
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Fix Side Panel Display ========== -->
+<style>
+/* Ensure map container has proper dimensions */
+#map {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    background: #e9ecef;
+}
+.main-container {
+    min-height: 500px;
+}
+.side-panel {
+    background: white;
+    border-left: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.stop-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+</style>
