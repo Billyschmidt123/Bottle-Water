@@ -46,6 +46,114 @@
         .loading-content { background: white; padding: 20px; border-radius: 8px; text-align: center; min-width: 300px; }
         .loading-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #004a99; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Working Manager Modal Styles */
+        .working-manager-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+        }
+        .working-manager-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1100px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .working-manager-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #004a99;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+        .working-manager-header h2 {
+            margin: 0;
+            color: #004a99;
+            font-size: 24px;
+        }
+        .working-manager-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .working-manager-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .working-tab {
+            padding: 10px 24px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .working-tab.active {
+            background: #007bff;
+            color: white;
+        }
+        .working-table-container {
+            overflow-x: auto;
+            max-height: 55vh;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .working-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .working-table th, .working-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .working-table th {
+            background: #f8f9fa;
+            position: sticky;
+            top: 0;
+        }
+        .working-manager-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .working-manager-btn:hover { background: #218838; }
     </style>
 </head>
 <body>
@@ -136,93 +244,43 @@
     </div>
 </div>
 
-<!-- Manager Modal -->
-<div id="mgrModal" class="modal-overlay">
-    <div class="modal-content">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <h2>Manager Control Panel</h2>
-            <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
+<!-- ========== WORKING MANAGER MODAL ========== -->
+<div id="workingManagerModal" class="working-manager-modal">
+    <div class="working-manager-content">
+        <div class="working-manager-header">
+            <h2><i class="fas fa-tachometer-alt"></i> Manager Control Panel</h2>
+            <button id="workingManagerCloseBtn" class="working-manager-close">Close</button>
         </div>
-        <hr>
-        <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 5px;">
-            <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
-            <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
-            <button id="btnEndOfDay" class="mgmt-nav-btn" onclick="alert('End of Day')">End of Day</button>
-            <button id="btnLiveView" class="mgmt-nav-btn" onclick="managerLiveView()">Live View</button>
-            <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="managerCallInOrder()">Call in Order</button>
-            <button id="btnBackup" class="mgmt-nav-btn" onclick="alert('Backup')">Back up</button>
-            <button id="btnViewSlips" class="mgmt-nav-btn" onclick="alert('View Slips')">View Slips</button>
-            <button id="btnViewPastLogs" class="mgmt-nav-btn" onclick="alert('Past Logs')">View Past Stop Logs</button>
-            <button id="btnUserMgmt" class="mgmt-nav-btn" onclick="alert('User Management')">User Management</button>
+        <div class="working-manager-tabs">
+            <button id="workingTabCust" class="working-tab active">Customer Maintenance</button>
+            <button id="workingTabProd" class="working-tab">Product Maintenance</button>
         </div>
-        <div id="custView" style="display: block;"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody>能有</div>
-        <div id="prodView" style="display: none;">
-            <div style="margin-bottom:15px;">
-                <button class="btn-top" onclick="loadProductFile()" style="background:#6f4e37;">Load Products</button>
+        <div id="workingCustView">
+            <div class="working-table-container">
+                <table class="working-table">
+                    <thead id="workingCustHead"></thead>
+                    <tbody id="workingCustBody"></tbody>
+                能有
             </div>
-            <div style="overflow-x: auto;"><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody>能有</div>
+        </div>
+        <div id="workingProdView" style="display: none;">
+            <div style="margin-bottom: 15px;">
+                <button id="workingLoadProdBtn" class="btn-top" style="background:#28a745;">Load Products from Google Sheets</button>
+            </div>
+            <div class="working-table-container">
+                <table class="working-table">
+                    <thead id="workingProdHead"></thead>
+                    <tbody id="workingProdBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Customer Edit Modal -->
-<div id="custEditModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 700px;">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <h2 id="custEditModalTitle" style="margin:0;">Edit Customer</h2>
-            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
-        </div>
-        <hr>
-        <div id="custEditFormFields" class="form-grid" style="grid-template-columns: 1fr 1fr;"></div>
-        <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-            <button onclick="closeCustomerEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-            <button class="btn-top" style="background:#28a745;" onclick="saveCustomerEdit()">SAVE CHANGES</button>
-        </div>
-    </div>
-</div>
-
-<!-- Product Edit Modal -->
-<div id="productEditModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 600px;">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <h2 id="productEditModalTitle" style="margin:0;">Edit Product</h2>
-            <button onclick="closeProductEditModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
-        </div>
-        <hr>
-        <div id="productEditFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
-        <div style="margin-top:20px; display:flex; justify-content:space-between; gap:10px;">
-            <button class="btn-top" style="background:#ffc107;" onclick="toggleProductStatusFromModal()">TOGGLE STATUS</button>
-            <div><button onclick="closeProductEditModal()" class="btn-top" style="background:#6c757d;">Cancel</button><button class="btn-top" style="background:#28a745;" onclick="saveProductEdit()">SAVE CHANGES</button></div>
-        </div>
-    </div>
-</div>
-
-<!-- Call in Order Modal -->
-<div id="callinModal" class="modal-overlay" style="display:none;">
-    <div class="modal-content" style="max-width: 800px;">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <h2>Call In Order</h2>
-            <button onclick="closeCallInModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
-        </div>
-        <hr>
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-            <div class="form-group"><label>Customer Name</label><input type="text" id="ci_name" placeholder="Enter customer name"></div>
-            <div class="form-group"><label>Phone Number</label><input type="text" id="ci_phone" placeholder="Enter phone number"></div>
-            <div class="form-group"><label>Delivery Date</label><input type="date" id="ci_date"></div>
-            <div class="form-group"><label>Assign to Route</label><select id="ci_route"><option value="">-- Select Route --</option></select></div>
-        </div>
-        <div style="margin-top:15px;">
-            <label>Products</label>
-            <div id="ci_productList"></div>
-            <button class="btn-top" style="background:#28a745; margin-top:10px;" onclick="addNewProductRow()">+ Add Product</button>
-        </div>
-        <div class="form-group" style="margin-top:15px;"><label>Notes</label><textarea id="ci_notes" rows="3" placeholder="Special instructions..."></textarea></div>
-        <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-            <button onclick="closeCallInModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-            <button onclick="saveCallInOrder()" class="btn-top" style="background:#28a745;">Save Order</button>
-        </div>
-    </div>
-</div>
+<button id="floatingManagerBtn" class="working-manager-btn">
+    <i class="fas fa-cog"></i> MANAGER PANEL
+</button>
+<!-- ========== END WORKING MANAGER MODAL ========== -->
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
@@ -252,8 +310,6 @@ var currentEditingProductIndex = -1;
 var currentEditingCustomerIndex = -1;
 var currentCustomerList = [];
 var currentCustomerHeaders = [];
-var callInProductList = [];
-var callInAllProducts = { water: [], coffee: [] };
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -295,8 +351,6 @@ function initializeGoogleSignIn() {
                         accessToken = tokenResponse.access_token;
                         showToast('Signed in as ' + userEmail, false);
                         updateGoogleStatus();
-                        loadProductFile();
-                        loadCustomersFromSheets();
                     }
                 }
             });
@@ -305,282 +359,6 @@ function initializeGoogleSignIn() {
     });
     google.accounts.id.renderButton(document.getElementById('googleSignInDiv'), { theme: 'outline', size: 'medium', text: 'signin_with' });
 }
-
-// ============================================================
-// SAVE TO GOOGLE SHEETS (Generic function)
-// ============================================================
-async function saveToSheet(sheetName, headers, data) {
-    if (!accessToken) {
-        showToast('Please sign in with Google first', true);
-        return false;
-    }
-    
-    try {
-        var values = [headers];
-        for (var i = 0; i < data.length; i++) {
-            var row = [];
-            for (var j = 0; j < headers.length; j++) {
-                row.push(data[i][headers[j]] || '');
-            }
-            values.push(row);
-        }
-        
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:ZZZ?valueInputOption=RAW`;
-        
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:ZZZ:clear`, {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        });
-        
-        var response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Bearer ' + accessToken,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ values: values })
-        });
-        
-        if (response.ok) {
-            showToast(`${sheetName} saved to Google Sheets`, false);
-            return true;
-        } else {
-            var error = await response.json();
-            console.error('Save error:', error);
-            showToast(`Failed to save ${sheetName}`, true);
-            return false;
-        }
-    } catch (err) {
-        console.error('Save error:', err);
-        showToast(`Error saving ${sheetName}: ${err.message}`, true);
-        return false;
-    }
-}
-
-// ============================================================
-// LOAD PRODUCTS FROM GOOGLE SHEETS
-// ============================================================
-async function loadProductFile() {
-    var tbody = document.getElementById('prodTableBody');
-    var theadRow = document.getElementById('prodTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading products from Google Sheets...</div>';
-    
-    if (!accessToken) {
-        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load products.</div>';
-        return;
-    }
-    
-    try {
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
-        var response = await fetch(url, {
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        });
-        
-        if (!response.ok) throw new Error('Failed to load products');
-        
-        var data = await response.json();
-        var values = data.values;
-        
-        if (!values || values.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10">No data found in Products tab</div>';
-            return;
-        }
-        
-        currentProdHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
-        if (currentProdHeaders.indexOf('Status') === -1) currentProdHeaders.push('Status');
-        
-        var headerHtml = '<th>Action</th>';
-        for (var h = 0; h < currentProdHeaders.length; h++) {
-            headerHtml += '<th>' + currentProdHeaders[h] + '</th>';
-        }
-        theadRow.innerHTML = headerHtml;
-        
-        currentProdList = [];
-        for (var i = 1; i < values.length; i++) {
-            var row = values[i];
-            var pObj = {};
-            for (var j = 0; j < currentProdHeaders.length && j < row.length; j++) {
-                var header = currentProdHeaders[j];
-                if (header !== 'Status') {
-                    pObj[header] = row[j] ? row[j].trim() : '';
-                }
-            }
-            pObj.Status = pObj.Status || 'Active';
-            var firstHeader = currentProdHeaders[0];
-            if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') {
-                currentProdList.push(pObj);
-            }
-        }
-        
-        renderProdTable();
-        showToast('Products loaded from Google Sheets', false);
-        
-    } catch (err) {
-        console.error('Error loading products:', err);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading products. Please check your Google sign-in.</div>';
-        showToast('Error loading products: ' + err.message, true);
-    }
-}
-
-function renderProdTable() {
-    var tbody = document.getElementById('prodTableBody');
-    tbody.innerHTML = '';
-    for (var idx = 0; idx < currentProdList.length; idx++) {
-        var pObj = currentProdList[idx];
-        var isDeactivated = (pObj.Status === 'Deactivated');
-        var tr = document.createElement('tr');
-        if (isDeactivated) tr.className = 'deactivated-row';
-        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(' + idx + ')">Edit</button><button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleProductStatus(' + idx + ')">' + (pObj.Status === 'Active' ? 'Deactivate' : 'Activate') + '</button></td>';
-        for (var h = 0; h < currentProdHeaders.length; h++) {
-            tr.innerHTML += '<td>' + (pObj[currentProdHeaders[h]] || '') + '</td>';
-        }
-        tbody.appendChild(tr);
-    }
-}
-
-window.toggleProductStatus = function(idx) {
-    currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
-    renderProdTable();
-    saveToSheet('Products', currentProdHeaders.filter(function(h) { return h !== 'Status'; }), currentProdList);
-};
-
-window.openProductEditModal = function(idx) {
-    currentEditingProductIndex = idx;
-    var product = currentProdList[idx];
-    var container = document.getElementById('productEditFormFields');
-    container.innerHTML = '';
-    for (var i = 0; i < currentProdHeaders.length; i++) {
-        var header = currentProdHeaders[i];
-        if (header === 'Status') continue;
-        var value = product[header] || '';
-        container.innerHTML += '<div class="form-group"><label>' + header + '</label><input type="text" id="product_edit_' + header.replace(/ /g, '_') + '" value="' + value.replace(/"/g, '&quot;') + '"></div>';
-    }
-    document.getElementById('productEditModalTitle').textContent = 'Edit Product: ' + (product[currentProdHeaders[0]] || 'Product');
-    document.getElementById('productEditModal').style.display = 'flex';
-};
-
-window.closeProductEditModal = function() { document.getElementById('productEditModal').style.display = 'none'; currentEditingProductIndex = -1; };
-
-window.saveProductEdit = function() {
-    if (currentEditingProductIndex === -1) { alert('No product selected'); return; }
-    for (var i = 0; i < currentProdHeaders.length; i++) {
-        var header = currentProdHeaders[i];
-        if (header === 'Status') continue;
-        var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
-        if (input) currentProdList[currentEditingProductIndex][header] = input.value;
-    }
-    renderProdTable();
-    saveToSheet('Products', currentProdHeaders.filter(function(h) { return h !== 'Status'; }), currentProdList);
-    closeProductEditModal();
-    showToast('Product saved to Google Sheets', false);
-};
-
-window.toggleProductStatusFromModal = function() { if (currentEditingProductIndex !== -1) { toggleProductStatus(currentEditingProductIndex); openProductEditModal(currentEditingProductIndex); } };
-
-// ============================================================
-// LOAD CUSTOMERS FROM GOOGLE SHEETS
-// ============================================================
-async function loadCustomersFromSheets() {
-    var tbody = document.getElementById('custTableBody');
-    var thead = document.getElementById('custTableHead');
-    tbody.innerHTML = '<tr><td colspan="10">Loading customers from Google Sheets...</div>';
-    
-    if (!accessToken) {
-        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google to load customers.</div>';
-        return;
-    }
-    
-    try {
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
-        var response = await fetch(url, {
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        });
-        
-        if (!response.ok) throw new Error('Failed to load customers');
-        
-        var data = await response.json();
-        var values = data.values;
-        
-        if (!values || values.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10">No data found in Customers tab</div>';
-            return;
-        }
-        
-        currentCustomerHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
-        
-        var headerHtml = '<th>Action</th>';
-        for (var h = 0; h < currentCustomerHeaders.length; h++) {
-            headerHtml += '<th>' + currentCustomerHeaders[h] + '</th>';
-        }
-        thead.innerHTML = headerHtml;
-        
-        currentCustomerList = [];
-        for (var i = 1; i < values.length; i++) {
-            var row = values[i];
-            var custObj = {};
-            for (var j = 0; j < currentCustomerHeaders.length && j < row.length; j++) {
-                custObj[currentCustomerHeaders[j]] = row[j] ? row[j].trim() : '';
-            }
-            currentCustomerList.push(custObj);
-        }
-        
-        renderCustTable();
-        showToast('Loaded ' + currentCustomerList.length + ' customers from Google Sheets', false);
-        
-    } catch (err) {
-        console.error('Error loading customers:', err);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading customers. Please check your Google sign-in.</div>';
-        showToast('Error loading customers: ' + err.message, true);
-    }
-}
-
-function renderCustTable() {
-    var tbody = document.getElementById('custTableBody');
-    tbody.innerHTML = '';
-    for (var idx = 0; idx < currentCustomerList.length; idx++) {
-        var cust = currentCustomerList[idx];
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td><button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openCustomerEditModal(' + idx + ')">Edit</button></td>';
-        for (var h = 0; h < currentCustomerHeaders.length; h++) {
-            tr.innerHTML += '<td>' + (cust[currentCustomerHeaders[h]] || '') + '</td>';
-        }
-        tbody.appendChild(tr);
-    }
-}
-
-window.openCustomerEditModal = function(idx) {
-    currentEditingCustomerIndex = idx;
-    var customer = currentCustomerList[idx];
-    var container = document.getElementById('custEditFormFields');
-    container.innerHTML = '';
-    for (var i = 0; i < currentCustomerHeaders.length; i++) {
-        var header = currentCustomerHeaders[i];
-        var value = customer[header] || '';
-        container.innerHTML += '<div class="form-group"><label>' + header + '</label><input type="text" id="cust_edit_' + header.replace(/ /g, '_') + '" value="' + value.replace(/"/g, '&quot;') + '"></div>';
-    }
-    document.getElementById('custEditModalTitle').textContent = 'Edit Customer: ' + (customer.Company || customer.Name || 'Customer');
-    document.getElementById('custEditModal').style.display = 'flex';
-};
-
-window.closeCustomerEditModal = function() { 
-    document.getElementById('custEditModal').style.display = 'none'; 
-    currentEditingCustomerIndex = -1; 
-};
-
-window.saveCustomerEdit = function() {
-    if (currentEditingCustomerIndex === -1) { alert('No customer selected'); return; }
-    for (var i = 0; i < currentCustomerHeaders.length; i++) {
-        var header = currentCustomerHeaders[i];
-        var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
-        if (input) currentCustomerList[currentEditingCustomerIndex][header] = input.value;
-    }
-    renderCustTable();
-    saveToSheet('Customers', currentCustomerHeaders, currentCustomerList);
-    closeCustomerEditModal();
-    showToast('Customer saved to Google Sheets', false);
-};
 
 // ============================================================
 // SAVE PDF TO GOOGLE DRIVE
@@ -852,189 +630,127 @@ document.getElementById('routeDropdown').onchange = async function() {
 };
 
 // ============================================================
-// LIVE VIEW FUNCTION
+// WORKING MANAGER MODAL FUNCTIONS
 // ============================================================
-window.managerLiveView = function() {
-    var liveViewModal = document.createElement('div');
-    liveViewModal.className = 'modal-overlay';
-    liveViewModal.style.display = 'flex';
-    liveViewModal.innerHTML = `
-        <div class="modal-content" style="max-width:1000px;">
-            <div style="display:flex; justify-content:space-between;"><h2>Live View - Trip Logs</h2><button onclick="this.closest('.modal-overlay').remove()" class="btn-top" style="background:#dc3545;">Close</button></div>
-            <hr>
-            <div id="liveViewSummary">Loading trip logs...</div>
-            <div id="liveViewFiles" style="max-height:400px; overflow-y:auto;"></div>
-        </div>
-    `;
-    document.body.appendChild(liveViewModal);
-    (async function() {
-        var summaryDiv = document.getElementById('liveViewSummary');
-        var filesDiv = document.getElementById('liveViewFiles');
-        if (!accessToken) {
-            summaryDiv.innerHTML = 'Please sign in with Google to view trip logs.';
+var workingAccessToken = null;
+
+function getWorkingToken() {
+    if (typeof accessToken !== 'undefined' && accessToken) {
+        workingAccessToken = accessToken;
+        return true;
+    }
+    return false;
+}
+
+function openWorkingManager() {
+    var modal = document.getElementById('workingManagerModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        loadWorkingCustomers();
+        getWorkingToken();
+    }
+}
+
+function closeWorkingManager() {
+    var modal = document.getElementById('workingManagerModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function showWorkingCust() {
+    document.getElementById('workingCustView').style.display = 'block';
+    document.getElementById('workingProdView').style.display = 'none';
+    document.getElementById('workingTabCust').classList.add('active');
+    document.getElementById('workingTabProd').classList.remove('active');
+    loadWorkingCustomers();
+}
+
+function showWorkingProd() {
+    document.getElementById('workingCustView').style.display = 'none';
+    document.getElementById('workingProdView').style.display = 'block';
+    document.getElementById('workingTabProd').classList.add('active');
+    document.getElementById('workingTabCust').classList.remove('active');
+}
+
+async function loadWorkingCustomers() {
+    var tbody = document.getElementById('workingCustBody');
+    var thead = document.getElementById('workingCustHead');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers...</div>';
+    
+    if (!getWorkingToken()) {
+        tbody.innerHTML = '<tr><td colspan="10">Please click "Sign in with Google" in the header first.</div>';
+        return;
+    }
+    
+    try {
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + workingAccessToken } });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        var data = await response.json();
+        var values = data.values;
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No customer data found.</div>';
             return;
         }
-        try {
-            var query = `name contains 'Trip-log' and trashed = false`;
-            var searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime,modifiedTime)&orderBy=modifiedTime desc`;
-            var response = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-            if (!response.ok) throw new Error('Failed to search Drive');
-            var result = await response.json();
-            var files = result.files || [];
-            if (files.length === 0) { summaryDiv.innerHTML = 'No trip logs found. Complete a delivery to create logs.'; return; }
-            summaryDiv.innerHTML = 'Found ' + files.length + ' log file(s). Click any file to view.';
-            var html = '<div style="display:flex; flex-direction:column; gap:5px;">';
-            for (var i = 0; i < files.length; i++) {
-                html += `<button class="btn-top" style="text-align:left;" onclick="loadTripLogFromDrive('${files[i].id}', '${files[i].name}')">📄 ${files[i].name}</button>`;
-            }
-            html += '</div><div id="tripLogContent" style="margin-top:15px;"></div>';
-            filesDiv.innerHTML = html;
-        } catch(e) { summaryDiv.innerHTML = 'Error: ' + e.message; }
-    })();
-};
-
-window.loadTripLogFromDrive = async function(fileId, fileName) {
-    var contentDiv = document.getElementById('tripLogContent');
-    if (!contentDiv) return;
-    contentDiv.innerHTML = '<div style="text-align:center;"><div class="loading-spinner"></div>Loading...</div>';
-    try {
-        var exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text%2Fplain`;
-        var response = await fetch(exportUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        var text = await response.text();
-        var lines = text.split('\n').filter(function(l) { return l.trim(); });
-        if (lines.length === 0) { contentDiv.innerHTML = 'File is empty'; return; }
-        var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-        var tableHtml = '<h4>' + fileName + '</h4><div style="overflow-x:auto;"><table class="mgmt-table" style="font-size:11px;"><thead><tr>';
-        for (var h = 0; h < headers.length; h++) tableHtml += '<th>' + headers[h] + '</th>';
-        tableHtml += '</thead><tbody>';
-        for (var i = 1; i < lines.length; i++) {
-            var vals = lines[i].split(',');
-            tableHtml += '<tr>';
-            for (var v = 0; v < headers.length; v++) tableHtml += '<td>' + (vals[v] || '').trim() + '</td>';
-            tableHtml += '</tr>';
+        var headers = values[0];
+        var headerHtml = '<tr>';
+        for (var i = 0; i < headers.length; i++) headerHtml += '<th>' + (headers[i] || '') + '</th>';
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+        tbody.innerHTML = '';
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var rowHtml = '<tr>';
+            for (var j = 0; j < headers.length; j++) rowHtml += '<td>' + (row[j] || '') + '</td>';
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
         }
-        tableHtml += '</tbody>能有</div>';
-        contentDiv.innerHTML = tableHtml;
-    } catch(e) { contentDiv.innerHTML = 'Error loading file: ' + e.message; }
-};
-
-// ============================================================
-// CALL IN ORDER FUNCTION
-// ============================================================
-async function loadCallInProducts() {
-    if (!accessToken) return;
-    try {
-        var sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
-        var response = await fetch(sheetUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (response.ok) {
-            var data = await response.json();
-            var values = data.values;
-            if (values && values.length > 1) {
-                var headers = values[0];
-                var descIdx = 0;
-                for (var p = 0; p < headers.length; p++) { if (headers[p].toLowerCase().indexOf('item') !== -1) { descIdx = p; break; } }
-                callInAllProducts.water = [];
-                callInAllProducts.coffee = [];
-                for (var i = 1; i < values.length; i++) {
-                    var productName = values[i][descIdx] ? values[i][descIdx].trim() : '';
-                    if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
-                        callInAllProducts.water.push({ name: productName, type: 'water' });
-                    }
-                }
-            }
-        }
-        var routesResp = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
-        if (routesResp.ok) {
-            var routeFiles = await routesResp.json();
-            var routeSelect = document.getElementById('ci_route');
-            routeSelect.innerHTML = '<option value="">-- Select Route --</option>';
-            for (var i = 0; i < routeFiles.length; i++) {
-                if (routeFiles[i].name.endsWith('.csv')) {
-                    var opt = document.createElement('option');
-                    opt.value = routeFiles[i].name.replace('.csv', '');
-                    opt.textContent = routeFiles[i].name.replace('.csv', '');
-                    routeSelect.appendChild(opt);
-                }
-            }
-        }
-    } catch(e) { console.error('Error loading call in products:', e); }
-}
-
-function addNewProductRow() {
-    var productListDiv = document.getElementById('ci_productList');
-    var rowId = 'product_row_' + Date.now() + '_' + Math.random();
-    var options = '<option value="">-- Select Product --</option>';
-    for (var i = 0; i < callInAllProducts.water.length; i++) {
-        options += '<option value="' + callInAllProducts.water[i].name + '">' + callInAllProducts.water[i].name + '</option>';
+        console.log('Loaded ' + (values.length - 1) + ' customers');
+    } catch (err) {
+        console.error('Error:', err);
+        tbody.innerHTML = '<tr><td colspan="10">Error loading customers: ' + err.message + '</div>';
     }
-    var rowHtml = `
-        <div class="product-row" id="${rowId}" style="display:flex; gap:10px; margin-bottom:10px;">
-            <select class="product-select" style="flex:2; padding:6px;">${options}</select>
-            <input type="number" class="product-qty" placeholder="Qty" value="1" style="width:80px;">
-            <input type="text" class="product-unit" placeholder="Unit" style="width:100px;">
-            <button onclick="removeProductRow('${rowId}')" class="btn-top" style="background:#dc3545; padding:4px 8px;">Remove</button>
-        </div>
-    `;
-    productListDiv.insertAdjacentHTML('beforeend', rowHtml);
 }
 
-function removeProductRow(rowId) {
-    var row = document.getElementById(rowId);
-    if (row) row.remove();
-}
-
-window.managerCallInOrder = async function() {
-    await loadCallInProducts();
-    var today = new Date();
-    var year = today.getFullYear();
-    var month = String(today.getMonth() + 1).padStart(2, '0');
-    var day = String(today.getDate()).padStart(2, '0');
-    document.getElementById('ci_date').value = year + '-' + month + '-' + day;
-    document.getElementById('ci_name').value = '';
-    document.getElementById('ci_phone').value = '';
-    document.getElementById('ci_notes').value = '';
-    document.getElementById('ci_productList').innerHTML = '';
-    addNewProductRow();
-    document.getElementById('callinModal').style.display = 'flex';
-};
-
-window.closeCallInModal = function() {
-    document.getElementById('callinModal').style.display = 'none';
-};
-
-window.saveCallInOrder = async function() {
-    var customerName = document.getElementById('ci_name').value.trim();
-    if (!customerName) { alert('Please enter customer name'); return; }
-    var products = [];
-    var rows = document.querySelectorAll('#ci_productList .product-row');
-    for (var i = 0; i < rows.length; i++) {
-        var select = rows[i].querySelector('.product-select');
-        var qty = rows[i].querySelector('.product-qty').value;
-        var unit = rows[i].querySelector('.product-unit').value;
-        if (select && select.value) {
-            products.push(select.value + ' x' + qty + (unit ? ' ' + unit : ''));
-        }
+async function loadWorkingProducts() {
+    var tbody = document.getElementById('workingProdBody');
+    var thead = document.getElementById('workingProdHead');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading products...</div>';
+    
+    if (!getWorkingToken()) {
+        tbody.innerHTML = '<tr><td colspan="10">Please click "Sign in with Google" in the header first.</div>';
+        return;
     }
-    if (products.length === 0) { alert('Please add at least one product'); return; }
-    var orderId = 'ORD-' + Date.now();
-    var orderData = {
-        orderId: orderId,
-        customer: customerName,
-        phone: document.getElementById('ci_phone').value,
-        date: document.getElementById('ci_date').value,
-        route: document.getElementById('ci_route').value,
-        products: products.join(', '),
-        notes: document.getElementById('ci_notes').value,
-        status: 'Pending',
-        createdAt: new Date().toISOString()
-    };
-    var existingOrders = localStorage.getItem('logiflow_orders');
-    var orders = existingOrders ? JSON.parse(existingOrders) : [];
-    orders.push(orderData);
-    localStorage.setItem('logiflow_orders', JSON.stringify(orders));
-    alert('Order saved!\nOrder ID: ' + orderId);
-    closeCallInModal();
-};
+    
+    try {
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+        var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + workingAccessToken } });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        var data = await response.json();
+        var values = data.values;
+        if (!values || values.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10">No product data found.</div>';
+            return;
+        }
+        var headers = values[0];
+        var headerHtml = '<tr>';
+        for (var i = 0; i < headers.length; i++) headerHtml += '<th>' + (headers[i] || '') + '</th>';
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+        tbody.innerHTML = '';
+        for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var rowHtml = '<tr>';
+            for (var j = 0; j < headers.length; j++) rowHtml += '<td>' + (row[j] || '') + '</td>';
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        }
+        console.log('Loaded ' + (values.length - 1) + ' products');
+        showToast('Products loaded from Google Sheets', false);
+    } catch (err) {
+        console.error('Error:', err);
+        tbody.innerHTML = '<tr><td colspan="10">Error loading products: ' + err.message + '</div>';
+    }
+}
 
 // ============================================================
 // INITIALIZATION
@@ -1046,6 +762,22 @@ function init() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' }).addTo(map);
     window.map = map;
     setTimeout(function() { if (window.map) window.map.invalidateSize(); }, 500);
+    
+    // Attach working manager button handlers
+    document.getElementById('workingManagerCloseBtn').onclick = closeWorkingManager;
+    document.getElementById('workingTabCust').onclick = showWorkingCust;
+    document.getElementById('workingTabProd').onclick = showWorkingProd;
+    document.getElementById('workingLoadProdBtn').onclick = loadWorkingProducts;
+    document.getElementById('floatingManagerBtn').onclick = openWorkingManager;
+    
+    // Override original manager button
+    var originalBtn = document.getElementById('btnManager');
+    if (originalBtn) {
+        originalBtn.onclick = function(e) {
+            e.preventDefault();
+            openWorkingManager();
+        };
+    }
 }
 
 init();
@@ -1057,603 +789,14 @@ init();
     function attachHandler() {
         var btn = document.getElementById('btnManager');
         if (!btn) { setTimeout(attachHandler, 200); return; }
-        btn.onclick = function() {
-            var modal = document.getElementById('mgrModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
-                if (typeof loadProductFile === 'function') loadProductFile();
-            }
+        btn.onclick = function(e) {
+            e.preventDefault();
+            openWorkingManager();
         };
     }
     attachHandler();
 })();
 </script>
 
-<!-- ========== ADDITIVE FIX: Fix Tab Buttons ========== -->
-<script>
-(function fixTabs() {
-    function attachTabs() {
-        var showCust = document.getElementById('btnShowCust');
-        var showProd = document.getElementById('btnShowProd');
-        var custView = document.getElementById('custView');
-        var prodView = document.getElementById('prodView');
-        if (showCust) {
-            showCust.onclick = function() {
-                if (custView) custView.style.display = 'block';
-                if (prodView) prodView.style.display = 'none';
-                showCust.classList.add('active');
-                if (showProd) showProd.classList.remove('active');
-                if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
-            };
-        }
-        if (showProd) {
-            showProd.onclick = function() {
-                if (custView) custView.style.display = 'none';
-                if (prodView) prodView.style.display = 'block';
-                showProd.classList.add('active');
-                if (showCust) showCust.classList.remove('active');
-                if (typeof loadProductFile === 'function') loadProductFile();
-            };
-        }
-    }
-    attachTabs();
-})();
-</script>
-
-<!-- Emergency Manager Button (bottom-left corner) -->
-<div style="position: fixed; bottom: 15px; left: 15px; z-index: 9999;">
-    <button id="emergencyManagerBtn" style="background: #004a99; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;">📋 Manager</button>
-</div>
-<script>
-document.getElementById('emergencyManagerBtn').onclick = function() {
-    var modal = document.getElementById('mgrModal');
-    if (modal) modal.style.display = 'flex';
-    if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
-};
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
-<!-- ========== ADDITIVE FIX: Force Manager Panel to Open ========== -->
-<script>
-(function forceManagerPanel() {
-    // Function to ensure manager button opens the modal
-    function fixManagerButton() {
-        var managerBtn = document.getElementById('btnManager');
-        if (!managerBtn) {
-            setTimeout(fixManagerButton, 200);
-            return;
-        }
-        
-        // Remove any existing handlers and add new one
-        var newBtn = managerBtn.cloneNode(true);
-        managerBtn.parentNode.replaceChild(newBtn, managerBtn);
-        
-        newBtn.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            console.log('Manager button clicked - opening panel');
-            
-            // Get the modal
-            var modal = document.getElementById('mgrModal');
-            if (modal) {
-                // Force display to flex
-                modal.style.display = 'flex';
-                modal.style.visibility = 'visible';
-                modal.style.opacity = '1';
-                
-                // Load data after modal is open
-                setTimeout(function() {
-                    if (typeof loadCustomersFromSheets === 'function') {
-                        loadCustomersFromSheets();
-                    }
-                    if (typeof loadProductFile === 'function') {
-                        loadProductFile();
-                    }
-                }, 100);
-            } else {
-                console.error('Manager modal not found');
-                alert('Manager modal not found. Please refresh the page.');
-            }
-        };
-        
-        console.log('Manager button fixed - will open modal');
-    }
-    
-    // Also fix the emergency button
-    function fixEmergencyButton() {
-        var emergencyBtn = document.getElementById('emergencyManagerBtn');
-        if (emergencyBtn) {
-            emergencyBtn.onclick = function() {
-                var modal = document.getElementById('mgrModal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    modal.style.visibility = 'visible';
-                    modal.style.opacity = '1';
-                    if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
-                    if (typeof loadProductFile === 'function') loadProductFile();
-                }
-            };
-        }
-    }
-    
-    // Run when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            fixManagerButton();
-            fixEmergencyButton();
-        });
-    } else {
-        fixManagerButton();
-        fixEmergencyButton();
-    }
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Ensure Modal Close Button Works ========== -->
-<script>
-(function fixModalClose() {
-    function fixCloseButton() {
-        var modal = document.getElementById('mgrModal');
-        if (!modal) {
-            setTimeout(fixCloseButton, 200);
-            return;
-        }
-        
-        // Find the exit button inside the modal
-        var exitBtn = modal.querySelector('.btn-top[style*="background:#dc3545"]');
-        if (exitBtn) {
-            exitBtn.onclick = function() {
-                modal.style.display = 'none';
-            };
-        }
-        
-        // Also close when clicking outside the modal content
-        modal.onclick = function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        };
-    }
-    
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fixCloseButton);
-    } else {
-        fixCloseButton();
-    }
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Add a Visible Manager Button in Corner ========== -->
-<div style="position: fixed; bottom: 15px; right: 15px; z-index: 9999; display: flex; gap: 8px;">
-    <button id="manualManagerBtn" style="background: #28a745; color: white; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-        📋 OPEN MANAGER
-    </button>
-</div>
-<script>
-(function addManualButton() {
-    var btn = document.getElementById('manualManagerBtn');
-    if (btn) {
-        btn.onclick = function() {
-            var modal = document.getElementById('mgrModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                modal.style.visibility = 'visible';
-                modal.style.opacity = '1';
-                if (typeof loadCustomersFromSheets === 'function') loadCustomersFromSheets();
-                if (typeof loadProductFile === 'function') loadProductFile();
-            } else {
-                alert('Modal not found. Please refresh the page.');
-            }
-        };
-    }
-})();
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
-    <!-- ========== ADDITIVE FIX: Direct Manager Button Handler ========== -->
-<script>
-(function directManagerFix() {
-    // Wait for the button to exist
-    var checkInterval = setInterval(function() {
-        var managerBtn = document.getElementById('btnManager');
-        if (managerBtn) {
-            clearInterval(checkInterval);
-            
-            // Clear all existing event listeners by replacing the button
-            var newBtn = managerBtn.cloneNode(true);
-            managerBtn.parentNode.replaceChild(newBtn, managerBtn);
-            
-            // Simple click handler - ONLY opens modal, NO data loading
-            newBtn.onclick = function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                var modal = document.getElementById('mgrModal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    console.log('Manager modal opened');
-                } else {
-                    console.error('Modal not found');
-                    alert('Manager modal not found');
-                }
-            };
-            
-            console.log('Manager button fixed - click to open modal');
-        }
-    }, 100);
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Simple Modal Opener (Backup Button) ========== -->
-<div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-    <button id="simpleManagerBtn" style="background: #004a99; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-        <i class="fas fa-cog"></i> Manager Panel
-    </button>
-</div>
-<script>
-(function simpleManagerFix() {
-    var simpleBtn = document.getElementById('simpleManagerBtn');
-    if (simpleBtn) {
-        simpleBtn.onclick = function() {
-            var modal = document.getElementById('mgrModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                console.log('Manager modal opened via backup button');
-            } else {
-                alert('Modal not found');
-            }
-        };
-    }
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Ensure Modal Close Works ========== -->
-<script>
-(function fixModalClose() {
-    var modal = document.getElementById('mgrModal');
-    if (modal) {
-        // Find the exit button
-        var exitBtn = modal.querySelector('.btn-top[style*="background:#dc3545"]');
-        if (exitBtn) {
-            exitBtn.onclick = function() {
-                modal.style.display = 'none';
-            };
-        }
-        // Click outside to close
-        modal.onclick = function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        };
-    }
-})();
-</script>
-
-<!-- ========== ADDITIVE FIX: Load Customers AFTER Modal Opens ========== -->
-<script>
-(function loadDataAfterModal() {
-    // Watch for modal to become visible, then load data
-    var observer = new MutationObserver(function(mutations) {
-        var modal = document.getElementById('mgrModal');
-        if (modal && modal.style.display === 'flex') {
-            // Modal is open, load data
-            if (typeof loadCustomersFromSheets === 'function') {
-                setTimeout(function() {
-                    loadCustomersFromSheets();
-                }, 100);
-            }
-            if (typeof loadProductFile === 'function') {
-                setTimeout(function() {
-                    loadProductFile();
-                }, 200);
-            }
-        }
-    });
-    
-    var modal = document.getElementById('mgrModal');
-    if (modal) {
-        observer.observe(modal, { attributes: true, attributeFilter: ['style'] });
-    }
-})();
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
-    <!-- ========== ADDITIVE FIX: Create New Working Manager Modal ========== -->
-<style>
-.new-manager-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.7);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-}
-.new-manager-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 1000px;
-    max-height: 85vh;
-    overflow-y: auto;
-}
-.new-manager-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
-.new-manager-header h2 {
-    margin: 0;
-    color: #004a99;
-}
-.new-manager-tabs {
-    display: flex;
-    gap: 5px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
-}
-.new-manager-tab {
-    padding: 8px 16px;
-    background: #eee;
-    border: none;
-    border-radius: 4px 4px 0 0;
-    cursor: pointer;
-}
-.new-manager-tab.active {
-    background: #007bff;
-    color: white;
-}
-.new-manager-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-.new-manager-table th, .new-manager-table td {
-    border: 1px solid #ddd;
-    padding: 6px;
-    text-align: left;
-}
-.new-manager-table th {
-    background: #f8f9fa;
-    position: sticky;
-    top: 0;
-}
-</style>
-
-<div id="newManagerModal" class="new-manager-modal">
-    <div class="new-manager-content">
-        <div class="new-manager-header">
-            <h2><i class="fas fa-cogs"></i> Manager Control Panel</h2>
-            <button id="newManagerCloseBtn" class="btn-top" style="background:#dc3545;">Close</button>
-        </div>
-        <div class="new-manager-tabs">
-            <button id="newShowCustBtn" class="new-manager-tab active">Customer Maintenance</button>
-            <button id="newShowProdBtn" class="new-manager-tab">Product Maintenance</button>
-        </div>
-        <div id="newCustView" style="display: block;">
-            <div style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
-                <table class="new-manager-table">
-                    <thead id="newCustTableHead"></thead>
-                    <tbody id="newCustTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-        <div id="newProdView" style="display: none;">
-            <div style="margin-bottom:10px;">
-                <button id="newLoadProductsBtn" class="btn-top" style="background:#6f4e37;">Load Products</button>
-            </div>
-            <div style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
-                <table class="new-manager-table">
-                    <thead id="newProdTableHead"></thead>
-                    <tbody id="newProdTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-(function createWorkingManagerModal() {
-    // Get references
-    var newModal = document.getElementById('newManagerModal');
-    var showCustBtn = document.getElementById('newShowCustBtn');
-    var showProdBtn = document.getElementById('newShowProdBtn');
-    var custView = document.getElementById('newCustView');
-    var prodView = document.getElementById('newProdView');
-    var closeBtn = document.getElementById('newManagerCloseBtn');
-    var loadProdBtn = document.getElementById('newLoadProductsBtn');
-    
-    // Function to open the new modal
-    function openNewManagerModal() {
-        if (newModal) {
-            newModal.style.display = 'flex';
-            // Load customers immediately
-            loadNewCustomers();
-        }
-    }
-    
-    // Function to close the new modal
-    function closeNewManagerModal() {
-        if (newModal) newModal.style.display = 'none';
-    }
-    
-    // Load customers for new modal
-    async function loadNewCustomers() {
-        var tbody = document.getElementById('newCustTableBody');
-        var thead = document.getElementById('newCustTableHead');
-        tbody.innerHTML = '<td><td colspan="10">Loading customers...</div>';
-        
-        if (!accessToken) {
-            tbody.innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
-            return;
-        }
-        
-        try {
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
-            var response = await fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + accessToken }
-            });
-            
-            if (!response.ok) throw new Error('Failed to load');
-            
-            var data = await response.json();
-            var values = data.values;
-            
-            if (!values || values.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10">No data found</div>';
-                return;
-            }
-            
-            var headers = values[0];
-            var headerHtml = '<tr>';
-            for (var h = 0; h < headers.length; h++) {
-                headerHtml += '<th>' + (headers[h] || '') + '</th>';
-            }
-            headerHtml += '</tr>';
-            thead.innerHTML = headerHtml;
-            
-            tbody.innerHTML = '';
-            for (var i = 1; i < values.length; i++) {
-                var row = values[i];
-                var rowHtml = '<tr>';
-                for (var j = 0; j < headers.length; j++) {
-                    rowHtml += '<td>' + (row[j] || '') + '</td>';
-                }
-                rowHtml += '</tr>';
-                tbody.innerHTML += rowHtml;
-            }
-            
-            console.log('Customers loaded into new modal');
-        } catch (err) {
-            console.error('Error:', err);
-            tbody.innerHTML = '<tr><td colspan="10">Error loading customers</div>';
-        }
-    }
-    
-    // Load products for new modal
-    async function loadNewProducts() {
-        var tbody = document.getElementById('newProdTableBody');
-        var thead = document.getElementById('newProdTableHead');
-        tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
-        
-        if (!accessToken) {
-            tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
-            return;
-        }
-        
-        try {
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
-            var response = await fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + accessToken }
-            });
-            
-            if (!response.ok) throw new Error('Failed to load');
-            
-            var data = await response.json();
-            var values = data.values;
-            
-            if (!values || values.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10">No data found</div>';
-                return;
-            }
-            
-            var headers = values[0];
-            var headerHtml = '<tr>';
-            for (var h = 0; h < headers.length; h++) {
-                headerHtml += '<th>' + (headers[h] || '') + '</th>';
-            }
-            headerHtml += '</tr>';
-            thead.innerHTML = headerHtml;
-            
-            tbody.innerHTML = '';
-            for (var i = 1; i < values.length; i++) {
-                var row = values[i];
-                var rowHtml = '<tr>';
-                for (var j = 0; j < headers.length; j++) {
-                    rowHtml += '<td>' + (row[j] || '') + '</td>';
-                }
-                rowHtml += '</tr>';
-                tbody.innerHTML += rowHtml;
-            }
-            
-            console.log('Products loaded into new modal');
-        } catch (err) {
-            console.error('Error:', err);
-            tbody.innerHTML = '<tr><td colspan="10">Error loading products</div>';
-        }
-    }
-    
-    // Tab switching
-    if (showCustBtn) {
-        showCustBtn.onclick = function() {
-            custView.style.display = 'block';
-            prodView.style.display = 'none';
-            showCustBtn.classList.add('active');
-            showProdBtn.classList.remove('active');
-            loadNewCustomers();
-        };
-    }
-    
-    if (showProdBtn) {
-        showProdBtn.onclick = function() {
-            custView.style.display = 'none';
-            prodView.style.display = 'block';
-            showProdBtn.classList.add('active');
-            showCustBtn.classList.remove('active');
-            loadNewProducts();
-        };
-    }
-    
-    if (loadProdBtn) {
-        loadProdBtn.onclick = function() {
-            loadNewProducts();
-        };
-    }
-    
-    if (closeBtn) {
-        closeBtn.onclick = closeNewManagerModal;
-    }
-    
-    // Override the original Manager button to open new modal
-    var originalBtn = document.getElementById('btnManager');
-    if (originalBtn) {
-        var newOriginalBtn = originalBtn.cloneNode(true);
-        originalBtn.parentNode.replaceChild(newOriginalBtn, originalBtn);
-        newOriginalBtn.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openNewManagerModal();
-        };
-    }
-    
-    // Also add a floating button
-    var floatBtn = document.createElement('button');
-    floatBtn.innerHTML = '📋 Manager';
-    floatBtn.style.position = 'fixed';
-    floatBtn.style.bottom = '15px';
-    floatBtn.style.right = '15px';
-    floatBtn.style.zIndex = '9999';
-    floatBtn.style.background = '#004a99';
-    floatBtn.style.color = 'white';
-    floatBtn.style.border = 'none';
-    floatBtn.style.padding = '10px 16px';
-    floatBtn.style.borderRadius = '5px';
-    floatBtn.style.cursor = 'pointer';
-    floatBtn.style.fontWeight = 'bold';
-    floatBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-    floatBtn.onclick = openNewManagerModal;
-    document.body.appendChild(floatBtn);
-    
-    console.log('New working manager modal created');
-})();
-</script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
