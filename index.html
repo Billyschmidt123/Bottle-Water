@@ -1,4 +1,4 @@
-<!-- ========== ADDITIVE FIX: Live View Functionality (Fixed) ========== -->
+<!-- ========== ADDITIVE FIX: Live View - Search All CSV Files ========== -->
 <style>
 .live-view-modal {
     max-width: 1200px !important;
@@ -19,7 +19,6 @@
     color: white;
     position: sticky;
     top: 0;
-    cursor: pointer;
 }
 .live-view-table tr:nth-child(even) {
     background: #f9f9f9;
@@ -40,24 +39,14 @@
     border-radius: 4px;
     font-size: 14px;
 }
-.refresh-btn {
-    background: #17a2b8;
-}
-.refresh-btn:hover {
-    background: #138496;
-}
-.auto-refresh-checkbox {
-    margin-left: 15px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
 .live-view-summary {
     background: #e9ecef;
-    padding: 8px 12px;
+    padding: 12px;
     border-radius: 4px;
     margin-bottom: 10px;
     font-size: 13px;
+    max-height: 300px;
+    overflow-y: auto;
 }
 .loading-spinner-small {
     display: inline-block;
@@ -70,6 +59,21 @@
     margin-right: 10px;
     vertical-align: middle;
 }
+.file-list-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+.file-list-item:hover {
+    background: #e7f3ff;
+}
+.file-list-item .file-name {
+    font-weight: bold;
+}
+.file-list-item .file-date {
+    font-size: 11px;
+    color: #666;
+}
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -78,56 +82,34 @@
 
 <script>
 (function fixLiveView() {
-    // Live View state
+    // Store modal reference
     var liveViewModal = null;
     var autoRefreshInterval = null;
     
-    // Helper to get global token from window or check periodically
-    function getAccessToken() {
-        // Try to get from window if exposed
-        if (typeof window.accessToken !== 'undefined' && window.accessToken) {
-            return window.accessToken;
-        }
-        // Try to get from the main scope via the token client
-        if (typeof accessToken !== 'undefined' && accessToken) {
-            return accessToken;
-        }
-        return null;
-    }
-    
-    function getDriveFolderId() {
-        // Try to get from window
-        if (typeof window.GOOGLE_DRIVE_FOLDER_ID !== 'undefined') {
-            return window.GOOGLE_DRIVE_FOLDER_ID;
-        }
-        // Use the hardcoded value from configuration
-        return '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
-    }
-    
-    function getRepoOwner() {
-        if (typeof window.REPO_OWNER !== 'undefined') return window.REPO_OWNER;
-        return 'Billyschmidt123';
-    }
-    
-    function getRepoName() {
-        if (typeof window.REPO_NAME !== 'undefined') return window.REPO_NAME;
-        return 'Bottle-Water';
-    }
+    // Get repository info
+    var REPO_OWNER = 'Billyschmidt123';
+    var REPO_NAME = 'Bottle-Water';
     
     // Override the managerLiveView function
     window.managerLiveView = function() {
+        console.log('Live View button clicked - opening modal');
         openLiveViewModal();
     };
     
-    // Create and open the Live View modal
+    // Also override the original function if it exists
+    if (typeof managerLiveView !== 'undefined' && managerLiveView !== window.managerLiveView) {
+        window.originalManagerLiveView = managerLiveView;
+    }
+    
     function openLiveViewModal() {
         // Remove existing modal if present
         if (liveViewModal) {
             liveViewModal.remove();
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
-            }
+            liveViewModal = null;
+        }
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
         }
         
         // Create modal
@@ -135,32 +117,33 @@
         liveViewModal.id = 'liveViewModal';
         liveViewModal.className = 'modal-overlay';
         liveViewModal.style.display = 'flex';
+        liveViewModal.style.zIndex = '10000';
         liveViewModal.innerHTML = `
             <div class="modal-content live-view-modal">
                 <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:15px;">
-                    <h2 style="margin:0;">Live View - Trip Logs</h2>
+                    <h2 style="margin:0;">Live View - Delivery Logs</h2>
                     <button onclick="closeLiveViewModal()" class="btn-top" style="background:#dc3545;">Close</button>
                 </div>
                 <hr>
                 <div class="live-view-controls">
-                    <input type="date" id="liveViewDatePicker" class="date-picker-input" value="${getTodayDate()}">
-                    <button id="liveViewSearchBtn" class="btn-top">Search Trip Logs</button>
-                    <button id="liveViewRefreshBtn" class="btn-top refresh-btn">Refresh</button>
-                    <label class="auto-refresh-checkbox">
-                        <input type="checkbox" id="autoRefreshCheckbox"> Auto-refresh (30 sec)
+                    <input type="date" id="liveViewDatePicker" class="date-picker-input">
+                    <button id="liveViewSearchBtn" class="btn-top" style="background:#007bff;">Search Logs</button>
+                    <button id="liveViewRefreshBtn" class="btn-top" style="background:#17a2b8;">Refresh</button>
+                    <label class="auto-refresh-checkbox" style="margin-left:15px;">
+                        <input type="checkbox" id="autoRefreshCheckbox"> Auto-refresh (30s)
                     </label>
-                    <span id="liveViewStatus" style="margin-left: auto; font-size:12px; color:#666;"></span>
+                    <span id="liveViewStatus" style="margin-left:auto; font-size:12px;"></span>
                 </div>
                 <div id="liveViewSummary" class="live-view-summary">
-                    📅 Select a date and click "Search Trip Logs" to view delivery records...
+                    <span class="loading-spinner-small"></span> Loading available log files...
                 </div>
-                <div style="overflow-x: auto; max-height: 60vh; overflow-y: auto;">
-                    <table id="liveViewTable" class="live-view-table">
+                <div id="liveViewContent" style="overflow-x: auto; max-height: 55vh; overflow-y: auto;">
+                    <table id="liveViewTable" class="live-view-table" style="width:100%;">
                         <thead id="liveViewTableHead">
-                            <tr><th>No data</th></tr>
+                            <tr><th>Loading...</th></tr>
                         </thead>
                         <tbody id="liveViewTableBody">
-                            <tr><td style="text-align:center;">Select a date to search</td></tr>
+                            <tr><td style="text-align:center;">Searching for delivery logs...</td></tr>
                         </tbody>
                     能有
                 </div>
@@ -169,30 +152,47 @@
         document.body.appendChild(liveViewModal);
         
         // Set up event listeners
-        document.getElementById('liveViewSearchBtn').onclick = function() {
-            searchTripLogs();
-        };
-        document.getElementById('liveViewRefreshBtn').onclick = function() {
-            searchTripLogs();
-        };
-        document.getElementById('autoRefreshCheckbox').onchange = function(e) {
-            if (e.target.checked) {
-                if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-                autoRefreshInterval = setInterval(function() {
-                    searchTripLogs(true);
-                }, 30000);
-                showLiveViewToast('Auto-refresh enabled (30 sec)', false);
-            } else {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
-                    showLiveViewToast('Auto-refresh disabled', false);
+        var searchBtn = document.getElementById('liveViewSearchBtn');
+        if (searchBtn) {
+            searchBtn.onclick = function() { searchAllLogFiles(); };
+        }
+        var refreshBtn = document.getElementById('liveViewRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() { searchAllLogFiles(); };
+        }
+        var autoCheckbox = document.getElementById('autoRefreshCheckbox');
+        if (autoCheckbox) {
+            autoCheckbox.onchange = function(e) {
+                if (e.target.checked) {
+                    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = setInterval(function() {
+                        searchAllLogFiles(true);
+                    }, 30000);
+                    showLiveViewStatus('Auto-refresh enabled (30 sec)', false);
+                } else {
+                    if (autoRefreshInterval) {
+                        clearInterval(autoRefreshInterval);
+                        autoRefreshInterval = null;
+                        showLiveViewStatus('Auto-refresh disabled', false);
+                    }
                 }
-            }
-        };
+            };
+        }
+        
+        // Set default date to today
+        var today = new Date();
+        var year = today.getFullYear();
+        var month = String(today.getMonth() + 1).padStart(2, '0');
+        var day = String(today.getDate()).padStart(2, '0');
+        var datePicker = document.getElementById('liveViewDatePicker');
+        if (datePicker) {
+            datePicker.value = year + '-' + month + '-' + day;
+        }
+        
+        // Load initial data
+        searchAllLogFiles();
     }
     
-    // Close Live View modal
     window.closeLiveViewModal = function() {
         if (liveViewModal) {
             liveViewModal.remove();
@@ -204,276 +204,216 @@
         }
     };
     
-    // Get today's date in YYYY-MM-DD format
-    function getTodayDate() {
-        var today = new Date();
-        var year = today.getFullYear();
-        var month = String(today.getMonth() + 1).padStart(2, '0');
-        var day = String(today.getDate()).padStart(2, '0');
-        return year + '-' + month + '-' + day;
-    }
-    
-    // Show toast message within Live View
-    function showLiveViewToast(message, isError) {
+    function showLiveViewStatus(message, isError) {
         var statusSpan = document.getElementById('liveViewStatus');
         if (statusSpan) {
             statusSpan.innerHTML = message;
             statusSpan.style.color = isError ? '#dc3545' : '#28a745';
             setTimeout(function() {
-                if (statusSpan) statusSpan.innerHTML = '';
-            }, 3000);
+                if (statusSpan && statusSpan.innerHTML === message) {
+                    statusSpan.innerHTML = '';
+                }
+            }, 4000);
         }
     }
     
-    // Search trip logs - First try Google Drive, then fallback to GitHub
-    async function searchTripLogs(isAutoRefresh) {
-        var datePicker = document.getElementById('liveViewDatePicker');
-        if (!datePicker) return;
-        
-        var selectedDate = datePicker.value;
-        if (!selectedDate) {
-            showLiveViewToast('Please select a date', true);
-            return;
-        }
-        
-        // Show loading indicator
+    async function searchAllLogFiles(isAutoRefresh) {
         var summaryDiv = document.getElementById('liveViewSummary');
+        var contentDiv = document.getElementById('liveViewContent');
         var tableBody = document.getElementById('liveViewTableBody');
+        
         if (summaryDiv) {
-            summaryDiv.innerHTML = '<span class="loading-spinner-small"></span> Searching for trip logs on ' + selectedDate + '...';
+            summaryDiv.innerHTML = '<span class="loading-spinner-small"></span> Searching GitHub for log files...';
         }
         if (tableBody) {
-            tableBody.innerHTML = '<tr><td style="text-align:center;"><span class="loading-spinner-small"></span> Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td style="text-align:center;"><span class="loading-spinner-small"></span> Searching...</td></tr>';
         }
         
-        var token = getAccessToken();
-        var driveFolderId = getDriveFolderId();
-        var repoOwner = getRepoOwner();
-        var repoName = getRepoName();
-        
-        // Format date for filename search (YYYY-MM-DD)
-        var dateStr = selectedDate;
-        
-        // Try GitHub first (more reliable, no CORS)
         try {
-            var githubUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/trip-reports`;
-            var githubResponse = await fetch(githubUrl);
+            // First, get all files from GitHub
+            var apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
+            var response = await fetch(apiUrl);
             
-            if (githubResponse.ok) {
-                var files = await githubResponse.json();
-                var matchingFiles = [];
+            if (!response.ok) {
+                throw new Error('GitHub API error: ' + response.status);
+            }
+            
+            var contents = await response.json();
+            var logFiles = [];
+            
+            // Look for trip-reports folder
+            var tripReportsFolder = null;
+            for (var i = 0; i < contents.length; i++) {
+                if (contents[i].name === 'trip-reports' && contents[i].type === 'dir') {
+                    tripReportsFolder = contents[i];
+                    break;
+                }
+            }
+            
+            if (tripReportsFolder) {
+                // Get files from trip-reports folder
+                var folderResponse = await fetch(tripReportsFolder.url);
+                var folderContents = await folderResponse.json();
                 
-                for (var i = 0; i < files.length; i++) {
-                    var file = files[i];
-                    if (file.name.endsWith('.csv') && file.name.indexOf(dateStr) !== -1) {
-                        matchingFiles.push({
-                            name: file.name,
-                            download_url: file.download_url,
-                            modified: new Date(file.commit?.committer?.date || Date.now()).toLocaleString()
+                for (var f = 0; f < folderContents.length; f++) {
+                    if (folderContents[f].name.endsWith('.csv')) {
+                        logFiles.push({
+                            name: folderContents[f].name,
+                            url: folderContents[f].download_url,
+                            size: folderContents[f].size,
+                            modified: new Date(folderContents[f].commit?.committer?.date || Date.now()).toLocaleString()
                         });
                     }
                 }
-                
-                if (matchingFiles.length === 0) {
-                    summaryDiv.innerHTML = `📭 No trip logs found for ${selectedDate} in GitHub.<br>Complete a delivery to create a log file.`;
-                    tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No trip logs found for this date</td></tr>';
-                    return;
+            }
+            
+            // Also check root directory for CSV files
+            for (var i = 0; i < contents.length; i++) {
+                if (contents[i].name.endsWith('.csv') && contents[i].name.toLowerCase().indexOf('trip') !== -1) {
+                    var alreadyExists = false;
+                    for (var f = 0; f < logFiles.length; f++) {
+                        if (logFiles[f].name === contents[i].name) {
+                            alreadyExists = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyExists) {
+                        logFiles.push({
+                            name: contents[i].name,
+                            url: contents[i].download_url,
+                            size: contents[i].size,
+                            modified: new Date(contents[i].commit?.committer?.date || Date.now()).toLocaleString()
+                        });
+                    }
                 }
-                
-                displayFileList(matchingFiles, summaryDiv);
-                
-                // Auto-load first file
-                if (!isAutoRefresh && matchingFiles.length > 0) {
-                    loadTripLogFromUrl(matchingFiles[0].download_url, matchingFiles[0].name);
+            }
+            
+            if (logFiles.length === 0) {
+                summaryDiv.innerHTML = '📭 No log files found in GitHub repository.<br><br>📝 Trip logs are created when you complete deliveries. Each delivery creates a CSV file in the trip-reports folder.<br><br>💡 To create test data, start a route and complete a delivery.';
+                if (tableBody) {
+                    tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No log files found. Complete a delivery to generate logs.</td></tr>';
                 }
                 return;
             }
-        } catch (githubErr) {
-            console.warn('GitHub fetch failed:', githubErr);
-        }
-        
-        // Fallback to Google Drive if GitHub fails and user is signed in
-        if (!token) {
-            summaryDiv.innerHTML = '⚠️ Please sign in with Google to view trip logs.<br>Click the "Sign in with Google" button in the header, then try again.';
-            tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Not signed in. Please sign in with Google.</td></tr>';
-            return;
-        }
-        
-        try {
-            var query = `name contains 'Trip-log' and name contains '${dateStr}' and trashed = false`;
-            var searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime,modifiedTime)&orderBy=modifiedTime desc`;
             
-            var searchResponse = await fetch(searchUrl, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
+            // Display file list
+            var fileListHtml = '<div style="margin-bottom:15px;">';
+            fileListHtml += '<strong>📁 Found ' + logFiles.length + ' log file(s):</strong><br><br>';
+            fileListHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:4px;">';
             
-            if (!searchResponse.ok) {
-                throw new Error('Google Drive API error: ' + searchResponse.status);
+            for (var i = 0; i < logFiles.length; i++) {
+                var file = logFiles[i];
+                var fileDate = '';
+                var dateMatch = file.name.match(/\d{4}-\d{2}-\d{2}/);
+                if (dateMatch) {
+                    fileDate = ' 📅 ' + dateMatch[0];
+                }
+                fileListHtml += `
+                    <div class="file-list-item" onclick="loadAndDisplayLogFile('${file.url.replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}')">
+                        <div class="file-name">📄 ${file.name}</div>
+                        <div class="file-date">📏 ${Math.round(file.size / 1024)} KB | Modified: ${file.modified}${fileDate}</div>
+                    </div>
+                `;
+            }
+            fileListHtml += '</div></div><div id="liveViewFileContent"></div>';
+            
+            summaryDiv.innerHTML = fileListHtml;
+            
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td style="text-align:center;">Click on any log file above to view its contents.</td></tr>';
             }
             
-            var searchResult = await searchResponse.json();
-            var files = searchResult.files || [];
-            
-            if (files.length === 0) {
-                summaryDiv.innerHTML = `📭 No trip logs found for ${selectedDate} in Google Drive.<br>Complete a delivery to create a log file.`;
-                tableBody.innerHTML = '<tr><td style="text-align:center; color:#999;">No trip logs found for this date</td></tr>';
-                return;
-            }
-            
-            var fileList = files.map(function(f) {
-                return {
-                    name: f.name,
-                    id: f.id,
-                    modified: f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : 'Unknown'
-                };
-            });
-            
-            displayFileList(fileList, summaryDiv);
-            
-            if (!isAutoRefresh && files.length > 0) {
-                loadTripLogFromDrive(files[0].id, files[0].name);
-            }
+            showLiveViewStatus('Loaded ' + logFiles.length + ' log files', false);
             
         } catch (err) {
             console.error('Search error:', err);
-            summaryDiv.innerHTML = '❌ Error searching: ' + err.message + '<br>Make sure you are signed in with Google.';
-            tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Error loading data: ' + err.message + '</td></tr>';
+            summaryDiv.innerHTML = '❌ Error loading files: ' + err.message + '<br><br>Make sure your GitHub repository is accessible.';
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td style="text-align:center; color:#dc3545;">Error: ' + err.message + '</td></tr>';
+            }
         }
     }
     
-    function displayFileList(files, summaryDiv) {
-        var fileListHtml = '<div style="margin-bottom:15px;">';
-        fileListHtml += '<strong>📁 Found ' + files.length + ' trip log(s):</strong>';
-        fileListHtml += '<table style="width:100%; border-collapse:collapse; margin-top:10px;">';
-        fileListHtml += '<tr style="background:#e9ecef;"><th style="padding:8px;">File Name</th><th style="padding:8px;">Modified</th><th style="padding:8px;">Action</th></tr>';
-        
-        for (var i = 0; i < files.length; i++) {
-            var file = files[i];
-            fileListHtml += `
-                <tr>
-                    <td style="padding:8px; border-bottom:1px solid #eee;">${file.name}</td>
-                    <td style="padding:8px; border-bottom:1px solid #eee;">${file.modified}</td>
-                    <td style="padding:8px; border-bottom:1px solid #eee;">
-                        <button class="btn-top" style="padding:4px 8px;" onclick="loadTripLogFromUrlManual('${file.download_url || file.url || ''}', '${file.name}', '${file.id || ''}')">View Log</button>
-                    </td>
-                </tr>
-            `;
-        }
-        fileListHtml += '</table></div><div id="tripLogContentDiv"></div>';
-        summaryDiv.innerHTML = fileListHtml;
-    }
-    
-    window.loadTripLogFromUrlManual = async function(url, fileName, fileId) {
-        if (url) {
-            loadTripLogFromUrl(url, fileName);
-        } else if (fileId) {
-            loadTripLogFromDrive(fileId, fileName);
-        } else {
-            showLiveViewToast('Cannot load file - no URL or ID', true);
-        }
-    };
-    
-    async function loadTripLogFromUrl(url, fileName) {
-        var contentDiv = document.getElementById('tripLogContentDiv');
+    window.loadAndDisplayLogFile = async function(fileUrl, fileName) {
+        var contentDiv = document.getElementById('liveViewFileContent');
         if (!contentDiv) return;
         
         contentDiv.innerHTML = '<div style="text-align:center; padding:20px;"><span class="loading-spinner-small"></span> Loading ' + fileName + '...</div>';
         
         try {
-            var response = await fetch(url + '?t=' + Date.now());
-            if (!response.ok) throw new Error('Failed to load');
-            
-            var csvText = await response.text();
-            displayTripLogData(csvText, fileName, contentDiv);
-            
-        } catch (err) {
-            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Error loading file: ' + err.message + '</div>';
-        }
-    }
-    
-    async function loadTripLogFromDrive(fileId, fileName) {
-        var contentDiv = document.getElementById('tripLogContentDiv');
-        if (!contentDiv) return;
-        
-        var token = getAccessToken();
-        if (!token) {
-            contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Please sign in with Google first</div>';
-            return;
-        }
-        
-        contentDiv.innerHTML = '<div style="text-align:center; padding:20px;"><span class="loading-spinner-small"></span> Loading ' + fileName + '...</div>';
-        
-        try {
-            var exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text%2Fplain`;
-            var response = await fetch(exportUrl, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            
+            var response = await fetch(fileUrl + '?t=' + Date.now());
             if (!response.ok) throw new Error('Failed to load file');
             
             var csvText = await response.text();
-            displayTripLogData(csvText, fileName, contentDiv);
+            var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
+            
+            if (lines.length === 0) {
+                contentDiv.innerHTML = '<div style="text-align:center; color:#999;">File is empty</div>';
+                return;
+            }
+            
+            var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+            var data = [];
+            for (var i = 1; i < lines.length; i++) {
+                var values = lines[i].split(',');
+                var row = {};
+                for (var j = 0; j < headers.length && j < values.length; j++) {
+                    row[headers[j]] = values[j].trim();
+                }
+                data.push(row);
+            }
+            
+            // Build table HTML
+            var tableHtml = '<div style="margin-top:15px; border-top:2px solid #004a99; padding-top:15px;">';
+            tableHtml += '<h4>' + fileName + '</h4>';
+            tableHtml += '<div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">';
+            tableHtml += '<table class="live-view-table" style="width:100%; font-size:11px;">';
+            
+            tableHtml += '<thead><tr>';
+            for (var h = 0; h < headers.length; h++) {
+                tableHtml += '<th style="background:#004a99; color:white; padding:8px;">' + headers[h] + '</th>';
+            }
+            tableHtml += '</thead><tbody>';
+            
+            for (var r = 0; r < data.length; r++) {
+                tableHtml += '<tr>';
+                for (var h = 0; h < headers.length; h++) {
+                    var cellValue = data[r][headers[h]] || '—';
+                    if (headers[h] === 'Status') {
+                        var statusColor = cellValue === 'Delivered' ? '#28a745' : (cellValue === 'Not Delivered' ? '#dc3545' : '#333');
+                        tableHtml += '<td style="padding:6px; border:1px solid #ddd; color:' + statusColor + '; font-weight:bold;">' + cellValue + '</table>';
+                    } else {
+                        tableHtml += '<td style="padding:6px; border:1px solid #ddd;">' + cellValue + '</td>';
+                    }
+                }
+                tableHtml += '</tr>';
+            }
+            
+            tableHtml += '</tbody></table></div>';
+            tableHtml += '<div style="margin-top:10px; padding:8px; background:#e9ecef; border-radius:4px;">';
+            tableHtml += '📊 Total records: <strong>' + data.length + '</strong> | ';
+            tableHtml += '📅 File: ' + fileName;
+            tableHtml += '</div>';
+            tableHtml += '<button class="btn-top" style="margin-top:10px; background:#6c757d;" onclick="document.getElementById(\'liveViewFileContent\').innerHTML = \'\'">Clear View</button>';
+            tableHtml += '</div>';
+            
+            contentDiv.innerHTML = tableHtml;
+            showLiveViewStatus('Loaded ' + fileName + ' - ' + data.length + ' records', false);
             
         } catch (err) {
+            console.error('Load error:', err);
             contentDiv.innerHTML = '<div style="text-align:center; color:#dc3545;">Error loading file: ' + err.message + '</div>';
         }
-    }
+    };
     
-    function displayTripLogData(csvText, fileName, contentDiv) {
-        var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
-        
-        if (lines.length === 0) {
-            contentDiv.innerHTML = '<div style="text-align:center; color:#999;">File is empty</div>';
-            return;
+    // Also try to find any existing managerLiveView button and attach
+    setTimeout(function() {
+        var liveViewBtn = document.getElementById('btnLiveView');
+        if (liveViewBtn) {
+            liveViewBtn.onclick = function() { openLiveViewModal(); };
         }
-        
-        var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-        var data = [];
-        for (var i = 1; i < lines.length; i++) {
-            var values = lines[i].split(',');
-            var row = {};
-            for (var j = 0; j < headers.length && j < values.length; j++) {
-                row[headers[j]] = values[j].trim();
-            }
-            data.push(row);
-        }
-        
-        var tableHtml = '<div style="margin-top:15px;"><h4>' + fileName + '</h4>';
-        tableHtml += '<div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">';
-        tableHtml += '<table class="live-view-table" style="font-size:11px;">';
-        
-        tableHtml += '<thead><tr>';
-        for (var h = 0; h < headers.length; h++) {
-            tableHtml += '<th>' + headers[h] + '</th>';
-        }
-        tableHtml += '</thead><tbody>';
-        
-        for (var r = 0; r < data.length; r++) {
-            tableHtml += '<tr>';
-            for (var h = 0; h < headers.length; h++) {
-                var cellValue = data[r][headers[h]] || '';
-                if (headers[h] === 'Status') {
-                    var statusStyle = cellValue === 'Delivered' ? 'style="color:#28a745; font-weight:bold;"' : (cellValue === 'Not Delivered' ? 'style="color:#dc3545; font-weight:bold;"' : '');
-                    tableHtml += '<td ' + (statusStyle || '') + '>' + cellValue + '</td>';
-                } else {
-                    tableHtml += '<td>' + cellValue + '</td>';
-                }
-            }
-            tableHtml += '</tr>';
-        }
-        
-        tableHtml += '</tbody></table></div>';
-        tableHtml += '<div style="margin-top:10px; font-size:11px; color:#666;">📊 Total records: ' + data.length + '</div>';
-        tableHtml += '<button class="btn-top" style="margin-top:10px; background:#6c757d;" onclick="document.getElementById(\'tripLogContentDiv\').innerHTML = \'\'">Clear View</button>';
-        tableHtml += '</div>';
-        
-        contentDiv.innerHTML = tableHtml;
-        showLiveViewToast('Loaded ' + fileName + ' - ' + data.length + ' records', false);
-    }
-    
-    console.log('Live View fix applied - searches GitHub trip-reports folder');
+        console.log('Live View fix applied - searching for CSV files in GitHub repository');
+    }, 1000);
 })();
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
