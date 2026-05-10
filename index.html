@@ -215,7 +215,7 @@
                         <th>Qty</th>
                         <th>Unit</th>
                         <th>Action</th>
-                    </tr>
+                     </>
                 </thead>
                 <tbody id="cartItemsBody"></tbody>
             </table>
@@ -665,8 +665,7 @@ async function savePDFToDrive(fileName, dataUrl) {
         var response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + accessToken },
-            body: formData
-        });
+            body: formData        });
         
         if (response.ok) {
             showToast('PDF saved to Google Drive: ' + fileName, false);
@@ -851,7 +850,7 @@ window.validateAndFinishStop = async function() {
     var productRows = '';
     for (var i = 0; i < deliveryCart.length; i++) {
         var item = deliveryCart[i];
-        productRows += '<td><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
+        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     var emptyRows = '';
@@ -913,9 +912,9 @@ window.validateAndFinishStop = async function() {
         '</div>' +
         '<td style="border:1px solid #000; text-align:right; font-weight:bold; padding:4px;">TOTAL</div>' +
         '<td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div>' +
-        '</tr>' +
+        '<tr>' +
         '</tbody>' +
-        '</table>' +
+        '</tr>' +
         
         '<div style="margin-top:15px; display:flex; justify-content:space-between;">' +
         '<div style="width:48%;">' +
@@ -1198,7 +1197,7 @@ async function loadCustomersFromSheets() {
         
     } catch (err) {
         console.error('Error loading customers:', err);
-        tbody.innerHTML = '<tr><td colspan="10">Error loading customers: ' + err.message + '</div>';
+        tbody.innerHTML = '<td><td colspan="10">Error loading customers: ' + err.message + '</div>';
         showToast('Error loading customers: ' + err.message, true);
     }
 }
@@ -1280,10 +1279,10 @@ init();
                 for (var i = 0; i < deliveryCart.length; i++) {
                     var item = deliveryCart[i];
                     productRows += '<tr>' +
-                        '<td style="border:1px solid #000; padding:5px; text-align:center;">' + item.qty + '</td>' +
-                        '<td style="border:1px solid #000; padding:5px;">' + item.name + '</td>' +
-                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:center;">' + item.qty + '</div>' +
+                        '<td style="border:1px solid #000; padding:5px;">' + item.name + '</div>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</div>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</div>' +
                         '</tr>';
                 }
                 
@@ -1291,10 +1290,10 @@ init();
                 var emptyRows = '';
                 for (var i = deliveryCart.length; i < 10; i++) {
                     emptyRows += '<tr>' +
-                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</div>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</div>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</div>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</div>' +
                         '</tr>';
                 }
                 
@@ -1389,7 +1388,7 @@ init();
                             '<tr class="payment-row">' +
                                 '<td colspan="2" class="payment-options">' +
                                     '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
-                                '</table>' +
+                                '</td>' +
                                 '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</div>' +
                                 '<td style="border: 1px solid #000;">&nbsp;</div>' +
                             '</tr>' +
@@ -2334,7 +2333,7 @@ init();
             var values = data.values || [];
             
             if (values.length < 2) {
-                document.getElementById('enhancedCustomerBody').innerHTML = '</tr><td colspan="10">No customer data found.</div>';
+                document.getElementById('enhancedCustomerBody').innerHTML = '<tr><td colspan="10">No customer data found.</div>';
                 document.getElementById('customerRecordCount').textContent = '0 records';
                 return;
             }
@@ -2365,7 +2364,7 @@ init();
         var tbody = document.getElementById('enhancedCustomerBody');
         
         // Build header with sort indicators
-        var headerHtml = '<tr>';
+        var headerHtml = '</tr>';
         headerHtml += '<th style="width:80px;">Action</th>';
         for (var i = 0; i < enhancedHeaders.length; i++) {
             var header = enhancedHeaders[i];
@@ -2672,7 +2671,7 @@ init();
             var values = data.values || [];
             
             if (values.length < 2) {
-                document.getElementById('enhancedProductBody').innerHTML = '<td><td colspan="10">No product data found.</div>';
+                document.getElementById('enhancedProductBody').innerHTML = '<tr><td colspan="10">No product data found.</div>';
                 return;
             }
             
@@ -2703,7 +2702,7 @@ init();
         var thead = document.getElementById('enhancedProductHead');
         var tbody = document.getElementById('enhancedProductBody');
         
-        var headerHtml = '<tr>';
+        var headerHtml = '</tr>';
         headerHtml += '<th style="width:80px;">Action</th>';
         for (var i = 0; i < enhancedProductHeaders.length; i++) {
             var header = enhancedProductHeaders[i];
@@ -2918,7 +2917,7 @@ init();
             } else {
                 var tbody = document.getElementById('custTableBody');
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
+                    tbody.innerHTML = '</table><td colspan="10">Please sign in with Google first.</div>';
                 }
             }
         }
@@ -3154,6 +3153,140 @@ init();
     console.log('Tables connected to Product Maintenance and Customer Maintenance buttons');
 })();
 </script>
-<!-- ========== END OF ADDITIVE FIX ========== -->
+
+<!-- ========== ADDITIVE FIX: Fix Offline Status - Wait for Sign-in to Complete ========== -->
+<script>
+(function fixOfflineStatusAndAuth() {
+    // Override the initializeGoogleSignIn function to ensure status updates properly
+    var originalInitialize = window.initializeGoogleSignIn;
+    if (originalInitialize) {
+        window.initializeGoogleSignIn = function() {
+            console.log('Custom sign-in handler - waiting for auth...');
+            
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                auto_select: true,
+                callback: function(response) {
+                    var payload = JSON.parse(atob(response.credential.split('.')[1]));
+                    userEmail = payload.email;
+                    console.log('User authenticated:', userEmail);
+                    
+                    var tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: GOOGLE_CLIENT_ID,
+                        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+                        callback: function(tokenResponse) {
+                            if (tokenResponse.access_token) {
+                                accessToken = tokenResponse.access_token;
+                                console.log('Access token obtained successfully');
+                                showToast('Connected: ' + userEmail, false);
+                                updateOnlineStatus(true);
+                                
+                                // Load products and customers only after token is obtained
+                                setTimeout(function() {
+                                    if (typeof loadProductFile === 'function') {
+                                        loadProductFile('Coffee.csv');
+                                    }
+                                    if (typeof loadCustomersFromSheets === 'function') {
+                                        loadCustomersFromSheets();
+                                    }
+                                    // Also load enhanced tables if they exist
+                                    if (typeof loadEnhancedCustomers === 'function') {
+                                        loadEnhancedCustomers();
+                                    }
+                                    if (typeof loadEnhancedProducts === 'function') {
+                                        loadEnhancedProducts();
+                                    }
+                                }, 500);
+                            } else {
+                                console.error('Failed to get access token');
+                                updateOnlineStatus(false);
+                            }
+                        }
+                    });
+                    tokenClient.requestAccessToken();
+                }
+            });
+            
+            google.accounts.id.prompt();
+        };
+    }
+    
+    // Ensure the online status updates when accessToken is set
+    var originalUpdateOnlineStatus = window.updateOnlineStatus;
+    if (originalUpdateOnlineStatus) {
+        window.updateOnlineStatus = function(connected) {
+            var statusSpan = document.getElementById('onlineStatus');
+            if (connected && accessToken && userEmail) {
+                statusSpan.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Online Storage Active';
+                statusSpan.className = 'online-status active';
+                console.log('Online status: ACTIVE');
+            } else {
+                statusSpan.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Offline';
+                statusSpan.className = 'online-status inactive';
+                console.log('Online status: OFFLINE (accessToken=' + !!accessToken + ', userEmail=' + !!userEmail + ')');
+            }
+        };
+    }
+    
+    // Also add a function to manually retry sign-in if needed
+    window.retryGoogleSignIn = function() {
+        console.log('Manually retrying Google Sign-In...');
+        if (typeof initializeGoogleSignIn === 'function') {
+            initializeGoogleSignIn();
+        } else if (typeof originalInitialize === 'function') {
+            originalInitialize();
+        }
+    };
+    
+    console.log('Offline status fix applied - waiting for sign-in to complete');
+})();
+</script>
+
+<!-- ========== ADDITIVE FIX: Ensure Customer and Product Tables Load After Login ========== -->
+<script>
+(function ensureTablesLoadAfterLogin() {
+    // Check every second to see if accessToken is available and tables are loaded
+    var checkInterval = setInterval(function() {
+        if (accessToken && userEmail) {
+            console.log('User is logged in, ensuring tables load...');
+            
+            // Check if customer table is populated
+            var custBody = document.getElementById('custTableBody');
+            if (custBody && custBody.innerHTML.indexOf('Please sign in') !== -1) {
+                console.log('Customer table showing sign-in message - reloading...');
+                if (typeof loadCustomersFromSheets === 'function') {
+                    loadCustomersFromSheets();
+                }
+                if (typeof loadEnhancedCustomers === 'function') {
+                    loadEnhancedCustomers();
+                }
+            }
+            
+            // Check if product table is populated
+            var prodBody = document.getElementById('prodTableBody');
+            if (prodBody && prodBody.innerHTML.indexOf('Please sign in') !== -1) {
+                console.log('Product table showing sign-in message - reloading...');
+                if (typeof loadProductFile === 'function') {
+                    loadProductFile('Coffee.csv');
+                }
+                if (typeof loadEnhancedProducts === 'function') {
+                    loadEnhancedProducts();
+                }
+            }
+            
+            // Once everything is loaded, we can stop checking
+            if (custBody && custBody.innerHTML.indexOf('Please sign in') === -1 &&
+                prodBody && prodBody.innerHTML.indexOf('Please sign in') === -1) {
+                console.log('All tables loaded successfully');
+                // Don't clear interval - keep checking just in case
+            }
+        }
+    }, 2000);
+    
+    console.log('Table loader after login active');
+})();
+</script>
+
+<!-- ========== END OF ADDITIVE FIXES ========== -->
 </body>
 </html>
