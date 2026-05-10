@@ -1,11 +1,62 @@
-<!-- ========== ADDITIVE FIX: Customer Schedule Management Modal ========== -->
+<!-- ========== ADDITIVE FIX: Customer Edit Modal with Loading Bar ========== -->
 <style>
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+.loading-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 300px;
+}
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #004a99;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.loading-progress {
+    width: 100%;
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+.loading-progress-bar {
+    height: 100%;
+    background: #28a745;
+    width: 0%;
+    transition: width 0.3s;
+}
+.loading-text {
+    font-size: 14px;
+    color: #333;
+    margin: 10px 0;
+}
 .customer-route-list {
-    max-height: 300px;
+    max-height: 250px;
     overflow-y: auto;
     border: 1px solid #ddd;
     border-radius: 4px;
-    margin-top: 10px;
+    margin: 10px 0;
 }
 .route-item {
     padding: 10px;
@@ -21,21 +72,17 @@
     font-weight: bold;
 }
 .route-status {
-    font-size: 12px;
-    padding: 2px 8px;
+    font-size: 11px;
+    padding: 2px 6px;
     border-radius: 10px;
 }
 .route-status.active {
     background: #d4edda;
     color: #155724;
 }
-.route-status.inactive {
-    background: #f8d7da;
-    color: #721c24;
-}
 .route-actions button {
     margin-left: 5px;
-    padding: 4px 8px;
+    padding: 3px 8px;
     font-size: 11px;
 }
 .add-route-section {
@@ -46,504 +93,535 @@
 </style>
 
 <script>
-(function fixCustomerManagement() {
-    // Wait for DOM to be ready
-    setTimeout(function() {
-        // Store all route files data
-        var allRouteFiles = [];
-        var allRouteData = {};
-        var currentEditingCustomer = null;
-        var currentEditingCustomerIndex = -1;
+(function fixCustomerEditAndLoading() {
+    // Global variables for customer management
+    var allRouteData = {};
+    var allRouteFilesList = [];
+    var currentEditCustomer = null;
+    var customerSaveCallback = null;
+    
+    // Show loading overlay
+    function showLoading(message, showProgress) {
+        var existing = document.getElementById('customLoadingOverlay');
+        if (existing) existing.remove();
         
-        // Load all route files
-        async function loadAllRouteFiles() {
-            try {
-                var response = await fetch('https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes');
-                var files = await response.json();
-                allRouteFiles = [];
-                allRouteData = {};
-                
-                for (var f = 0; f < files.length; f++) {
-                    if (files[f].name.endsWith('.csv')) {
-                        var routeName = files[f].name.replace('.csv', '');
-                        var fileUrl = files[f].download_url + '?t=' + Date.now();
-                        var csvResponse = await fetch(fileUrl);
-                        var csvText = await csvResponse.text();
-                        allRouteData[routeName] = {
-                            content: csvText,
-                            sha: files[f].sha,
-                            name: files[f].name,
-                            url: files[f].download_url
-                        };
-                        allRouteFiles.push(routeName);
-                    }
+        var overlay = document.createElement('div');
+        overlay.id = 'customLoadingOverlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">${message || 'Loading...'}</div>
+                ${showProgress ? '<div class="loading-progress"><div class="loading-progress-bar" id="loadingProgressBar"></div></div>' : ''}
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    
+    function updateLoadingProgress(percent) {
+        var bar = document.getElementById('loadingProgressBar');
+        if (bar) bar.style.width = percent + '%';
+    }
+    
+    function hideLoading() {
+        var overlay = document.getElementById('customLoadingOverlay');
+        if (overlay) overlay.remove();
+    }
+    
+    function showToastMessage(message, isError) {
+        var toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        if (isError) toast.classList.add('toast-error');
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+    }
+    
+    // Load all route files
+    async function loadAllRouteFiles() {
+        showLoading('Loading route files...', true);
+        updateLoadingProgress(10);
+        
+        try {
+            var response = await fetch('https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes');
+            var files = await response.json();
+            updateLoadingProgress(30);
+            
+            allRouteFilesList = [];
+            allRouteData = {};
+            
+            var totalFiles = files.filter(function(f) { return f.name.endsWith('.csv'); }).length;
+            var processed = 0;
+            
+            for (var f = 0; f < files.length; f++) {
+                if (files[f].name.endsWith('.csv')) {
+                    var routeName = files[f].name.replace('.csv', '');
+                    var csvResponse = await fetch(files[f].download_url + '?t=' + Date.now());
+                    var csvText = await csvResponse.text();
+                    allRouteData[routeName] = {
+                        content: csvText,
+                        sha: files[f].sha,
+                        name: files[f].name,
+                        url: files[f].download_url
+                    };
+                    allRouteFilesList.push(routeName);
+                    processed++;
+                    updateLoadingProgress(30 + (processed / totalFiles) * 60);
                 }
-                console.log('Loaded ' + allRouteFiles.length + ' route files');
+            }
+            
+            updateLoadingProgress(100);
+            setTimeout(hideLoading, 500);
+            showToastMessage('Loaded ' + allRouteFilesList.length + ' route files', false);
+            return true;
+        } catch(e) {
+            hideLoading();
+            showToastMessage('Error loading routes: ' + e.message, true);
+            return false;
+        }
+    }
+    
+    // Find routes containing a customer
+    function findCustomerInRoutes(customer) {
+        var routes = [];
+        var customerName = (customer.Company || customer.Name || '').toLowerCase();
+        var customerAddress = (customer.Address || '').toLowerCase();
+        
+        for (var routeName in allRouteData) {
+            var data = allRouteData[routeName];
+            var lines = data.content.split('\n');
+            if (lines.length < 2) continue;
+            
+            var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
+            var nameIdx = -1;
+            var addrIdx = -1;
+            for (var h = 0; h < headers.length; h++) {
+                if (headers[h] === 'company' || headers[h] === 'name') nameIdx = h;
+                if (headers[h] === 'address') addrIdx = h;
+            }
+            
+            for (var i = 1; i < lines.length; i++) {
+                var vals = lines[i].split(',');
+                var rowName = (nameIdx >= 0 && vals[nameIdx]) ? vals[nameIdx].trim().toLowerCase() : '';
+                var rowAddr = (addrIdx >= 0 && vals[addrIdx]) ? vals[addrIdx].trim().toLowerCase() : '';
+                
+                if (rowName === customerName && (customerAddress === '' || rowAddr === customerAddress || rowAddr.indexOf(customerAddress) !== -1)) {
+                    routes.push({
+                        name: routeName,
+                        lineIndex: i,
+                        line: lines[i],
+                        headers: headers,
+                        values: vals
+                    });
+                    break;
+                }
+            }
+        }
+        return routes;
+    }
+    
+    // Save route content back to GitHub
+    async function saveRouteToGitHub(routeName, newContent) {
+        var route = allRouteData[routeName];
+        if (!route) return false;
+        
+        try {
+            var fileUrl = 'https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes/' + route.name;
+            var fileResponse = await fetch(fileUrl);
+            var fileData = await fileResponse.json();
+            
+            var updateResponse = await fetch(fileUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'token ' + window.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'Update route: ' + routeName,
+                    content: btoa(unescape(encodeURIComponent(newContent))),
+                    sha: fileData.sha
+                })
+            });
+            
+            if (updateResponse.ok) {
+                route.content = newContent;
+                route.sha = (await updateResponse.json()).content.sha;
                 return true;
-            } catch(e) {
-                console.error('Error loading routes:', e);
-                return false;
             }
+            return false;
+        } catch(e) {
+            console.error('Save error:', e);
+            return false;
         }
+    }
+    
+    // Open customer edit modal with route management
+    window.openCustomerEditModalWithRoutes = async function(customer, index) {
+        currentEditCustomer = customer;
         
-        // Find which routes contain a customer
-        function findCustomerRoutes(customer) {
-            var routes = [];
-            for (var routeName in allRouteData) {
-                var data = allRouteData[routeName];
-                var lines = data.content.split('\n');
-                var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
-                
-                // Find company column
-                var companyIdx = -1;
-                var addressIdx = -1;
-                for (var h = 0; h < headers.length; h++) {
-                    if (headers[h].indexOf('company') !== -1 || headers[h] === 'name') companyIdx = h;
-                    if (headers[h].indexOf('address') !== -1) addressIdx = h;
-                }
-                
-                // Search for customer in this route
-                for (var i = 1; i < lines.length; i++) {
-                    var vals = lines[i].split(',');
-                    var rowCompany = (companyIdx >= 0 && vals[companyIdx]) ? vals[companyIdx].trim() : '';
-                    var rowAddress = (addressIdx >= 0 && vals[addressIdx]) ? vals[addressIdx].trim() : '';
-                    var custCompany = customer.Company || customer.Name || '';
-                    var custAddress = customer.Address || '';
-                    
-                    if (rowCompany === custCompany && (custAddress === '' || rowAddress === custAddress)) {
-                        routes.push({
-                            name: routeName,
-                            lineIndex: i,
-                            line: lines[i],
-                            active: true
-                        });
-                        break;
-                    }
-                }
-            }
-            return routes;
-        }
+        await loadAllRouteFiles();
+        var customerRoutes = findCustomerInRoutes(customer);
         
-        // Open customer edit modal with schedule management
-        window.openCustomerScheduleModal = async function(customer, index) {
-            currentEditingCustomer = customer;
-            currentEditingCustomerIndex = index;
-            
-            // Load fresh route data
-            await loadAllRouteFiles();
-            var customerRoutes = findCustomerRoutes(customer);
-            
-            // Create or get modal
-            var modal = document.getElementById('customerScheduleModal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'customerScheduleModal';
-                modal.className = 'modal-overlay';
-                modal.innerHTML = `
-                    <div class="modal-content" style="max-width: 700px;">
-                        <div style="display:flex; justify-content: space-between; align-items:center;">
-                            <h2 id="customerScheduleModalTitle" style="margin:0;">Edit Customer & Routes</h2>
-                            <button onclick="closeCustomerScheduleModal()" class="btn-top" style="background:#dc3545;">Cancel</button>
+        var modalHtml = `
+            <div id="customerEditRoutesModal" class="modal-overlay" style="display:flex;">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div style="display:flex; justify-content: space-between; align-items:center;">
+                        <h2 style="margin:0;">Edit Customer: ${customer.Company || customer.Name || 'Customer'}</h2>
+                        <button onclick="closeCustomerRoutesModal()" class="btn-top" style="background:#dc3545;">Close</button>
+                    </div>
+                    <hr>
+                    <div style="background:#f8f9fa; padding:10px; border-radius:4px; margin-bottom:15px;">
+                        <p><strong>Company:</strong> ${customer.Company || customer.Name || 'N/A'}</p>
+                        <p><strong>Address:</strong> ${customer.Address || 'N/A'}</p>
+                        <p><strong>Phone:</strong> ${customer.Phone || 'N/A'}</p>
+                        <p><strong>Email:</strong> ${customer.Email || 'N/A'}</p>
+                    </div>
+                    <h4>Assigned Routes</h4>
+                    <div id="customerRoutesList" class="customer-route-list">
+                        ${customerRoutes.length === 0 ? '<div style="padding:20px; text-align:center; color:#999;">Not assigned to any routes</div>' : ''}
+                    </div>
+                    <div class="add-route-section">
+                        <label>Add to Route: </label>
+                        <select id="addToRouteSelect" style="width:200px; padding:6px;"></select>
+                        <button id="addToRouteBtn" class="btn-top" style="background:#28a745;">Add to Route</button>
+                    </div>
+                    <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                        <button onclick="closeCustomerRoutesModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
+                        <button id="saveAllRouteChangesBtn" class="btn-top" style="background:#28a745;">Save All Changes</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if present
+        var existingModal = document.getElementById('customerEditRoutesModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Populate routes list
+        var routesListDiv = document.getElementById('customerRoutesList');
+        if (customerRoutes.length > 0) {
+            var listHtml = '';
+            for (var i = 0; i < customerRoutes.length; i++) {
+                var r = customerRoutes[i];
+                listHtml += `
+                    <div class="route-item" data-route="${r.name}" data-line="${r.lineIndex}">
+                        <div>
+                            <span class="route-name">${r.name}</span>
                         </div>
-                        <hr>
-                        <div id="customerInfoSection" style="margin-bottom:20px;"></div>
-                        <h4>Assigned Routes</h4>
-                        <div id="customerRouteList" class="customer-route-list"></div>
-                        <div class="add-route-section">
-                            <label>Add to Route:</label>
-                            <select id="addRouteSelect" style="width: 200px; padding: 6px; margin-left: 10px;"></select>
-                            <button id="addToRouteBtn" class="btn-top" style="background:#28a745; margin-left: 10px;">Add to Route</button>
-                        </div>
-                        <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                            <button onclick="closeCustomerScheduleModal()" class="btn-top" style="background:#6c757d;">Cancel</button>
-                            <button id="saveCustomerChangesBtn" class="btn-top" style="background:#28a745;">Save Changes</button>
+                        <div class="route-actions">
+                            <button class="btn-top" style="background:#ffc107; padding:3px 8px;" onclick="deactivateCustomerInRoute('${r.name}', ${r.lineIndex})">Deactivate</button>
+                            <button class="btn-top" style="background:#dc3545; padding:3px 8px;" onclick="removeCustomerFromRouteFile('${r.name}', ${r.lineIndex})">Remove</button>
                         </div>
                     </div>
                 `;
-                document.body.appendChild(modal);
             }
-            
-            // Populate customer info
-            var infoHtml = '<div style="background:#f8f9fa; padding:10px; border-radius:4px;">';
-            infoHtml += '<p><strong>Company:</strong> ' + (customer.Company || customer.Name || 'N/A') + '</p>';
-            infoHtml += '<p><strong>Address:</strong> ' + (customer.Address || 'N/A') + '</p>';
-            infoHtml += '<p><strong>Phone:</strong> ' + (customer.Phone || 'N/A') + '</p>';
-            infoHtml += '<p><strong>Email:</strong> ' + (customer.Email || 'N/A') + '</p>';
-            infoHtml += '</div>';
-            document.getElementById('customerInfoSection').innerHTML = infoHtml;
-            document.getElementById('customerScheduleModalTitle').innerHTML = 'Edit Customer: ' + (customer.Company || customer.Name || 'Customer');
-            
-            // Populate route list
-            var routeListDiv = document.getElementById('customerRouteList');
-            if (customerRoutes.length === 0) {
-                routeListDiv.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Not assigned to any routes</div>';
-            } else {
-                var listHtml = '';
-                for (var i = 0; i < customerRoutes.length; i++) {
-                    var r = customerRoutes[i];
-                    listHtml += `
-                        <div class="route-item" data-route="${r.name}" data-line="${r.lineIndex}">
-                            <div>
-                                <span class="route-name">${r.name}</span>
-                                <span class="route-status active">Active</span>
-                            </div>
-                            <div class="route-actions">
-                                <button class="btn-top" style="background:#ffc107; padding:4px 8px;" onclick="deactivateCustomerFromRoute('${r.name}', ${r.lineIndex})">Deactivate</button>
-                                <button class="btn-top" style="background:#dc3545; padding:4px 8px;" onclick="removeCustomerFromRoute('${r.name}', ${r.lineIndex})">Remove</button>
-                            </div>
-                        </div>
-                    `;
-                }
-                routeListDiv.innerHTML = listHtml;
-            }
-            
-            // Populate add route dropdown
-            var addSelect = document.getElementById('addRouteSelect');
-            addSelect.innerHTML = '<option value="">Select a route...</option>';
-            for (var i = 0; i < allRouteFiles.length; i++) {
-                var alreadyInRoute = false;
-                for (var j = 0; j < customerRoutes.length; j++) {
-                    if (customerRoutes[j].name === allRouteFiles[i]) {
-                        alreadyInRoute = true;
-                        break;
-                    }
-                }
-                if (!alreadyInRoute) {
-                    addSelect.innerHTML += '<option value="' + allRouteFiles[i] + '">' + allRouteFiles[i] + '</option>';
-                }
-            }
-            
-            document.getElementById('addToRouteBtn').onclick = function() {
-                var selectedRoute = addSelect.value;
-                if (selectedRoute) {
-                    addCustomerToRoute(selectedRoute, customer);
-                    addSelect.value = '';
-                    // Refresh modal
-                    openCustomerScheduleModal(customer, index);
-                }
-            };
-            
-            document.getElementById('saveCustomerChangesBtn').onclick = function() {
-                saveAllRouteChanges();
-                closeCustomerScheduleModal();
-                alert('Route changes saved! Please refresh the page to see updates.');
-            };
-            
-            modal.style.display = 'flex';
-        };
+            routesListDiv.innerHTML = listHtml;
+        }
         
-        // Add customer to a route
-        window.addCustomerToRoute = async function(routeName, customer) {
-            var route = allRouteData[routeName];
-            if (!route) return;
-            
-            // Parse existing CSV
-            var lines = route.content.split('\n');
-            var headers = lines[0].split(',');
-            
-            // Build new row
-            var newRow = [];
-            for (var h = 0; h < headers.length; h++) {
-                var header = headers[h].trim().toLowerCase();
-                if (header === 'company' || header === 'name') {
-                    newRow.push(customer.Company || customer.Name || '');
-                } else if (header === 'address') {
-                    newRow.push(customer.Address || '');
-                } else if (header === 'phone') {
-                    newRow.push(customer.Phone || '');
-                } else if (header === 'email') {
-                    newRow.push(customer.Email || '');
-                } else if (header === 'city') {
-                    newRow.push(customer.City || '');
-                } else if (header === 'postal code' || header === 'postalcode') {
-                    newRow.push(customer.PostalCode || '');
-                } else {
-                    newRow.push('');
+        // Populate add route dropdown
+        var addSelect = document.getElementById('addToRouteSelect');
+        addSelect.innerHTML = '<option value="">Select a route...</option>';
+        for (var i = 0; i < allRouteFilesList.length; i++) {
+            var alreadyIn = false;
+            for (var j = 0; j < customerRoutes.length; j++) {
+                if (customerRoutes[j].name === allRouteFilesList[i]) {
+                    alreadyIn = true;
+                    break;
                 }
             }
-            
-            lines.push(newRow.join(','));
-            route.content = lines.join('\n');
-            route.modified = true;
-            
-            showToast('Added to route: ' + routeName, false);
-        };
-        
-        // Remove customer from route (delete row)
-        window.removeCustomerFromRoute = function(routeName, lineIndex) {
-            if (confirm('Remove customer from ' + routeName + '? This cannot be undone.')) {
-                var route = allRouteData[routeName];
-                if (route) {
-                    var lines = route.content.split('\n');
-                    lines.splice(lineIndex, 1);
-                    route.content = lines.join('\n');
-                    route.modified = true;
-                    showToast('Removed from route: ' + routeName, false);
-                    // Refresh modal
-                    if (currentEditingCustomer) {
-                        openCustomerScheduleModal(currentEditingCustomer, currentEditingCustomerIndex);
-                    }
-                }
+            if (!alreadyIn) {
+                addSelect.innerHTML += '<option value="' + allRouteFilesList[i] + '">' + allRouteFilesList[i] + '</option>';
             }
-        };
+        }
         
-        // Deactivate customer (mark as inactive but keep in route)
-        window.deactivateCustomerFromRoute = function(routeName, lineIndex) {
-            var route = allRouteData[routeName];
-            if (route) {
-                var lines = route.content.split('\n');
-                var headers = lines[0].split(',');
-                
-                // Check if there's an Active column
-                var activeIdx = -1;
-                for (var h = 0; h < headers.length; h++) {
-                    if (headers[h].trim().toLowerCase() === 'active') {
-                        activeIdx = h;
-                        break;
-                    }
-                }
-                
-                var row = lines[lineIndex].split(',');
-                if (activeIdx >= 0) {
-                    row[activeIdx] = 'FALSE';
-                } else {
-                    // Add Active column if not exists
-                    headers.push('Active');
-                    for (var i = 1; i < lines.length; i++) {
-                        lines[i] = lines[i] + ',TRUE';
-                    }
-                    lines[0] = headers.join(',');
-                    activeIdx = headers.length - 1;
-                    row = lines[lineIndex].split(',');
-                    row[activeIdx] = 'FALSE';
-                }
-                
-                lines[lineIndex] = row.join(',');
-                route.content = lines.join('\n');
-                route.modified = true;
-                showToast('Deactivated in route: ' + routeName, false);
-                
+        // Add to route button
+        document.getElementById('addToRouteBtn').onclick = function() {
+            var selectedRoute = addSelect.value;
+            if (selectedRoute) {
+                addCustomerToRouteFile(selectedRoute, customer);
                 // Refresh modal
-                if (currentEditingCustomer) {
-                    openCustomerScheduleModal(currentEditingCustomer, currentEditingCustomerIndex);
-                }
+                openCustomerEditModalWithRoutes(customer, index);
             }
         };
         
-        // Save all modified routes to GitHub
-        window.saveAllRouteChanges = async function() {
-            var tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-                callback: async function(tokenResponse) {
-                    if (!tokenResponse.access_token) {
-                        showToast('Please sign in with Google to save', true);
-                        // Fallback to download
-                        downloadRoutesAsCSV();
-                        return;
-                    }
-                    
-                    var accessToken = tokenResponse.access_token;
-                    var savedCount = 0;
-                    
-                    for (var routeName in allRouteData) {
-                        var route = allRouteData[routeName];
-                        if (route.modified) {
-                            try {
-                                // Get file info from GitHub
-                                var fileUrl = 'https://api.github.com/repos/Billyschmidt123/Bottle-Water/contents/routes/' + route.name;
-                                var fileResponse = await fetch(fileUrl);
-                                var fileData = await fileResponse.json();
-                                
-                                // Update via GitHub API
-                                var updateResponse = await fetch(fileUrl, {
-                                    method: 'PUT',
-                                    headers: {
-                                        'Authorization': 'token ' + window.token,
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        message: 'Update route: ' + routeName,
-                                        content: btoa(unescape(encodeURIComponent(route.content))),
-                                        sha: fileData.sha
-                                    })
-                                });
-                                
-                                if (updateResponse.ok) {
-                                    savedCount++;
-                                    route.modified = false;
-                                }
-                            } catch(e) {
-                                console.error('Error saving', routeName, e);
-                            }
-                        }
-                    }
-                    
-                    if (savedCount > 0) {
-                        showToast('Saved ' + savedCount + ' routes to GitHub', false);
-                    } else {
-                        showToast('No changes to save or save failed', true);
-                    }
-                }
-            });
-            tokenClient.requestAccessToken();
-        };
-        
-        // Fallback: download CSV files
-        function downloadRoutesAsCSV() {
+        // Save all changes button
+        document.getElementById('saveAllRouteChangesBtn').onclick = async function() {
+            showLoading('Saving changes to GitHub...', false);
+            var savedCount = 0;
+            
             for (var routeName in allRouteData) {
                 var route = allRouteData[routeName];
                 if (route.modified) {
-                    var blob = new Blob([route.content], { type: 'text/csv' });
-                    var link = document.createElement('a');
-                    link.download = route.name;
-                    link.href = URL.createObjectURL(blob);
-                    link.click();
-                    URL.revokeObjectURL(link.href);
-                    route.modified = false;
-                }
-            }
-            alert('Route CSV files downloaded. Please upload them to GitHub manually.');
-        }
-        
-        window.closeCustomerScheduleModal = function() {
-            var modal = document.getElementById('customerScheduleModal');
-            if (modal) modal.style.display = 'none';
-            currentEditingCustomer = null;
-            currentEditingCustomerIndex = -1;
-        };
-        
-        // Override the Edit button in customer table
-        var originalRenderCustTable = window.renderCustTable;
-        if (originalRenderCustTable) {
-            window.renderCustTable = function() {
-                originalRenderCustTable();
-                // Replace Edit button handlers
-                var editButtons = document.querySelectorAll('#custTableBody .btn-top');
-                for (var i = 0; i < editButtons.length; i++) {
-                    var btn = editButtons[i];
-                    if (btn.textContent === 'Edit') {
-                        var oldOnclick = btn.onclick;
-                        btn.onclick = (function(idx) {
-                            return function() {
-                                var customer = globalCustomers ? globalCustomers[idx] : null;
-                                if (customer) {
-                                    openCustomerScheduleModal(customer, idx);
-                                } else {
-                                    alert('Customer data not available');
-                                }
-                            };
-                        })(i);
+                    var success = await saveRouteToGitHub(routeName, route.content);
+                    if (success) {
+                        savedCount++;
+                        route.modified = false;
                     }
                 }
-            };
-        }
-        
-        // Also handle customer data from routes
-        window.loadCustomerMaintenance = async function() {
-            var tbody = document.getElementById('custTableBody');
-            var thead = document.getElementById('custTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Loading customers...</div>';
+            }
             
-            try {
-                await loadAllRouteFiles();
-                var allCustomers = [];
-                var allHeaders = [];
-                
-                for (var routeName in allRouteData) {
-                    var data = allRouteData[routeName];
-                    var lines = data.content.split('\n');
-                    if (lines.length < 2) continue;
-                    
-                    var headers = lines[0].split(',').map(function(h) { return h.trim(); });
-                    if (allHeaders.length === 0) {
-                        allHeaders = headers;
-                        var headerHtml = '<th>Action</th><th>Routes</th>';
-                        for (var h = 0; h < allHeaders.length; h++) {
-                            headerHtml += '<th>' + allHeaders[h] + '</th>';
-                        }
-                        thead.innerHTML = headerHtml;
-                    }
-                    
-                    for (var i = 1; i < lines.length; i++) {
-                        var vals = lines[i].split(',');
-                        var rowObj = {};
-                        for (var j = 0; j < allHeaders.length; j++) {
-                            rowObj[allHeaders[j]] = (vals[j] || '').trim();
-                        }
-                        
-                        // Check if customer already exists (by company name)
-                        var companyName = rowObj.Company || rowObj.Name || '';
-                        var existingIdx = -1;
-                        for (var c = 0; c < allCustomers.length; c++) {
-                            if ((allCustomers[c].Company || allCustomers[c].Name) === companyName && companyName !== '') {
-                                existingIdx = c;
-                                break;
-                            }
-                        }
-                        
-                        if (existingIdx >= 0) {
-                            if (!allCustomers[existingIdx]._routes) allCustomers[existingIdx]._routes = [];
-                            if (allCustomers[existingIdx]._routes.indexOf(routeName) === -1) {
-                                allCustomers[existingIdx]._routes.push(routeName);
-                            }
-                        } else if (companyName !== '') {
-                            rowObj._routes = [routeName];
-                            allCustomers.push(rowObj);
-                        }
-                    }
+            hideLoading();
+            if (savedCount > 0) {
+                showToastMessage('Saved ' + savedCount + ' route updates to GitHub', false);
+                // Reload customer maintenance table
+                if (typeof loadCustomerMaintenance === 'function') {
+                    loadCustomerMaintenance();
                 }
-                
-                tbody.innerHTML = '';
-                for (var idx = 0; idx < allCustomers.length; idx++) {
-                    var cust = allCustomers[idx];
-                    var routesList = cust._routes ? cust._routes.join(', ') : 'None';
-                    var row = '</tr>';
-                    row += '<td><button class="btn-top" style="padding:4px;" onclick="openCustomerScheduleModal(globalCustomers[' + idx + '], ' + idx + ')">Edit</button></td>';
-                    row += '<td style="font-size:11px;">' + routesList + '</td>';
-                    for (var h = 0; h < allHeaders.length; h++) {
-                        row += '<td>' + (cust[allHeaders[h]] || '') + '</td>';
-                    }
-                    row += '</tr>';
-                    tbody.innerHTML += row;
-                }
-                
-                // Store globally for access
-                window.globalCustomers = allCustomers;
-                
-                if (allCustomers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10">No customer data found.</div>';
-                } else {
-                    showToast('Loaded ' + allCustomers.length + ' customers from routes', false);
-                }
-            } catch (e) {
-                console.error('Error loading customers:', e);
-                tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>';
+            } else {
+                showToastMessage('No changes to save', false);
             }
+            closeCustomerRoutesModal();
         };
+    };
+    
+    // Add customer to a route
+    window.addCustomerToRouteFile = function(routeName, customer) {
+        var route = allRouteData[routeName];
+        if (!route) return;
         
-        // Override Manager button to use new customer loader
-        var managerBtn = document.getElementById('btnManager');
-        if (managerBtn) {
-            var oldClick = managerBtn.onclick;
-            managerBtn.onclick = function() {
-                document.getElementById('mgrModal').style.display = 'flex';
-                window.loadCustomerMaintenance();
-            };
+        var lines = route.content.split('\n');
+        var headers = lines[0].split(',');
+        
+        // Build new row
+        var newRow = [];
+        for (var h = 0; h < headers.length; h++) {
+            var header = headers[h].trim().toLowerCase();
+            if (header === 'company' || header === 'name') {
+                newRow.push(customer.Company || customer.Name || '');
+            } else if (header === 'address') {
+                newRow.push(customer.Address || '');
+            } else if (header === 'phone') {
+                newRow.push(customer.Phone || '');
+            } else if (header === 'email') {
+                newRow.push(customer.Email || '');
+            } else if (header === 'active') {
+                newRow.push('TRUE');
+            } else {
+                newRow.push('');
+            }
         }
         
-        // Override Show Cust button
-        var showCustBtn = document.getElementById('btnShowCust');
-        if (showCustBtn) {
-            showCustBtn.onclick = function() {
-                document.getElementById('custView').style.display = 'block';
-                document.getElementById('prodView').style.display = 'none';
-                window.loadCustomerMaintenance();
-            };
+        lines.push(newRow.join(','));
+        route.content = lines.join('\n');
+        route.modified = true;
+        showToastMessage('Added to route: ' + routeName, false);
+    };
+    
+    // Remove customer from route
+    window.removeCustomerFromRouteFile = function(routeName, lineIndex) {
+        if (confirm('Remove customer from ' + routeName + '? This cannot be undone.')) {
+            var route = allRouteData[routeName];
+            if (route) {
+                var lines = route.content.split('\n');
+                lines.splice(lineIndex, 1);
+                route.content = lines.join('\n');
+                route.modified = true;
+                showToastMessage('Removed from route: ' + routeName, false);
+                
+                // Refresh modal
+                if (currentEditCustomer) {
+                    openCustomerEditModalWithRoutes(currentEditCustomer, 0);
+                }
+            }
         }
+    };
+    
+    // Deactivate customer in route
+    window.deactivateCustomerInRoute = function(routeName, lineIndex) {
+        var route = allRouteData[routeName];
+        if (route) {
+            var lines = route.content.split('\n');
+            var headers = lines[0].split(',');
+            
+            var activeIdx = -1;
+            for (var h = 0; h < headers.length; h++) {
+                if (headers[h].trim().toLowerCase() === 'active') {
+                    activeIdx = h;
+                    break;
+                }
+            }
+            
+            var values = lines[lineIndex].split(',');
+            if (activeIdx >= 0) {
+                values[activeIdx] = 'FALSE';
+            } else {
+                // Add Active column
+                headers.push('Active');
+                for (var i = 1; i < lines.length; i++) {
+                    lines[i] = lines[i] + ',TRUE';
+                }
+                lines[0] = headers.join(',');
+                activeIdx = headers.length - 1;
+                values = lines[lineIndex].split(',');
+                values[activeIdx] = 'FALSE';
+            }
+            
+            lines[lineIndex] = values.join(',');
+            route.content = lines.join('\n');
+            route.modified = true;
+            showToastMessage('Deactivated in route: ' + routeName, false);
+            
+            if (currentEditCustomer) {
+                openCustomerEditModalWithRoutes(currentEditCustomer, 0);
+            }
+        }
+    };
+    
+    window.closeCustomerRoutesModal = function() {
+        var modal = document.getElementById('customerEditRoutesModal');
+        if (modal) modal.remove();
+        currentEditCustomer = null;
+    };
+    
+    // Override the customer maintenance loader with loading bar
+    window.loadCustomerMaintenanceWithLoading = async function() {
+        var tbody = document.getElementById('custTableBody');
+        var thead = document.getElementById('custTableHead');
         
-        console.log('Customer schedule management fix applied');
-    }, 1000);
+        showLoading('Loading customers from routes...', true);
+        updateLoadingProgress(10);
+        
+        try {
+            await loadAllRouteFiles();
+            updateLoadingProgress(40);
+            
+            var allCustomers = [];
+            var allHeaders = [];
+            
+            var routeNames = Object.keys(allRouteData);
+            var processedRoutes = 0;
+            
+            for (var r = 0; r < routeNames.length; r++) {
+                var routeName = routeNames[r];
+                var data = allRouteData[routeName];
+                var lines = data.content.split('\n');
+                if (lines.length < 2) continue;
+                
+                var headers = lines[0].split(',').map(function(h) { return h.trim(); });
+                if (allHeaders.length === 0) {
+                    allHeaders = headers;
+                    var headerHtml = '<th>Action</th><th>Routes</th>';
+                    for (var h = 0; h < allHeaders.length; h++) {
+                        headerHtml += '<th>' + allHeaders[h] + '</th>';
+                    }
+                    thead.innerHTML = headerHtml;
+                }
+                
+                for (var i = 1; i < lines.length; i++) {
+                    var vals = lines[i].split(',');
+                    var rowObj = {};
+                    for (var j = 0; j < allHeaders.length; j++) {
+                        rowObj[allHeaders[j]] = (vals[j] || '').trim();
+                    }
+                    
+                    var companyName = rowObj.Company || rowObj.Name || '';
+                    var existingIdx = -1;
+                    for (var c = 0; c < allCustomers.length; c++) {
+                        if ((allCustomers[c].Company || allCustomers[c].Name) === companyName && companyName !== '') {
+                            existingIdx = c;
+                            break;
+                        }
+                    }
+                    
+                    if (existingIdx >= 0) {
+                        if (!allCustomers[existingIdx]._routes) allCustomers[existingIdx]._routes = [];
+                        if (allCustomers[existingIdx]._routes.indexOf(routeName) === -1) {
+                            allCustomers[existingIdx]._routes.push(routeName);
+                        }
+                    } else if (companyName !== '') {
+                        rowObj._routes = [routeName];
+                        allCustomers.push(rowObj);
+                    }
+                }
+                
+                processedRoutes++;
+                updateLoadingProgress(40 + (processedRoutes / routeNames.length) * 50);
+            }
+            
+            updateLoadingProgress(95);
+            
+            tbody.innerHTML = '';
+            for (var idx = 0; idx < allCustomers.length; idx++) {
+                var cust = allCustomers[idx];
+                var routesList = cust._routes ? cust._routes.join(', ') : 'None';
+                var row = '<tr>';
+                row += '<td><button class="btn-top" style="padding:4px;" onclick="openCustomerEditModalWithRoutes(globalCustomerList[' + idx + '], ' + idx + ')">Edit</button></td>';
+                row += '<td style="font-size:11px;">' + routesList + '</td>';
+                for (var h = 0; h < allHeaders.length; h++) {
+                    row += '<td>' + (cust[allHeaders[h]] || '') + '</td>';
+                }
+                row += '</tr>';
+                tbody.innerHTML += row;
+            }
+            
+            window.globalCustomerList = allCustomers;
+            
+            updateLoadingProgress(100);
+            setTimeout(hideLoading, 500);
+            
+            if (allCustomers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10">No customer data found.</div>';
+            } else {
+                showToastMessage('Loaded ' + allCustomers.length + ' customers', false);
+            }
+        } catch (e) {
+            hideLoading();
+            showToastMessage('Error loading customers: ' + e.message, true);
+            tbody.innerHTML = '<tr><td colspan="10">Error loading customer data.</div>';
+        }
+    };
+    
+    // Override Manager button
+    var managerBtn = document.getElementById('btnManager');
+    if (managerBtn) {
+        var oldClick = managerBtn.onclick;
+        managerBtn.onclick = function() {
+            document.getElementById('mgrModal').style.display = 'flex';
+            window.loadCustomerMaintenanceWithLoading();
+        };
+    }
+    
+    // Override Show Cust button
+    var showCustBtn = document.getElementById('btnShowCust');
+    if (showCustBtn) {
+        showCustBtn.onclick = function() {
+            document.getElementById('custView').style.display = 'block';
+            document.getElementById('prodView').style.display = 'none';
+            window.loadCustomerMaintenanceWithLoading();
+        };
+    }
+    
+    // Fix Product Maintenance save message
+    var originalSaveProductEdit = window.saveProductEdit;
+    if (originalSaveProductEdit) {
+        window.saveProductEdit = function() {
+            if (currentEditingProductIndex === -1) {
+                alert('No product selected');
+                return;
+            }
+            for (var i = 0; i < currentProdHeaders.length; i++) {
+                var header = currentProdHeaders[i];
+                if (header === 'Status') continue;
+                var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
+                if (input) currentProdList[currentEditingProductIndex][header] = input.value;
+            }
+            renderProdTable();
+            // Save to localStorage
+            var data = {
+                headers: currentProdHeaders,
+                products: currentProdList,
+                file: currentProductFile,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
+            closeProductEditModal();
+            showToastMessage('Product saved to browser storage (refresh to keep)', false);
+        };
+    }
+    
+    console.log('Customer edit and loading bar fix applied');
 })();
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
