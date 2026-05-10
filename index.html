@@ -1,48 +1,69 @@
-<!-- ========== ADDITIVE FIX: Save Products Directly to Google Drive CSV Files ========== -->
+<!-- ========== ADDITIVE FIX: Simple Product Persistence with LocalStorage + Google Drive Export ========== -->
 <script>
-(function fixGoogleDriveProductSave() {
-    // Wait for Google token and product data
+(function fixProductPersistence() {
+    // Wait for product data to be available
     var checkInterval = setInterval(function() {
-        if (typeof accessToken !== 'undefined' && accessToken && 
-            typeof currentProdList !== 'undefined' && 
-            typeof currentProdHeaders !== 'undefined') {
+        if (typeof currentProdList !== 'undefined' && typeof currentProdHeaders !== 'undefined' && typeof renderProdTable !== 'undefined') {
             clearInterval(checkInterval);
             
-            // Your Google Drive file IDs for CSV files
-            const GOOGLE_DRIVE_COFFEE_FILE_ID = '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs';
-            const GOOGLE_DRIVE_WATER_FILE_ID = '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX';
+            // ========== LOCAL STORAGE SAVE/LOAD (Auto-saves, always works) ==========
+            function saveProductsToLocalStorage() {
+                if (!currentProductFile) return;
+                var data = {
+                    headers: currentProdHeaders,
+                    products: currentProdList,
+                    file: currentProductFile,
+                    version: '1.0',
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
+                console.log('Auto-saved to localStorage:', currentProductFile);
+                return true;
+            }
             
-            // Function to save products to Google Drive CSV
-            window.saveProductsToGoogleDrive = async function(fileName, productList, headers) {
+            function loadProductsFromLocalStorage(fileName) {
+                var saved = localStorage.getItem('logiflow_products_' + fileName);
+                if (saved) {
+                    try {
+                        var data = JSON.parse(saved);
+                        if (data.products && data.products.length > 0 && data.headers) {
+                            currentProdHeaders = data.headers;
+                            currentProdList = data.products;
+                            currentProductFile = data.file;
+                            renderProdTable();
+                            showToast('Loaded from browser storage', false);
+                            return true;
+                        }
+                    } catch(e) {
+                        console.error('LocalStorage parse error:', e);
+                    }
+                }
+                return false;
+            }
+            
+            // ========== EXPORT TO GOOGLE DRIVE (Manual button) ==========
+            window.exportProductsToGoogleDrive = async function() {
                 if (!accessToken) {
                     showToast('Please sign in with Google first', true);
-                    return false;
+                    return;
+                }
+                if (!currentProductFile || !currentProdList) {
+                    showToast('No products loaded to export', true);
+                    return;
                 }
                 
+                showToast('Exporting to Google Drive...', false);
+                
                 try {
-                    // Determine which file ID to use
-                    var fileId = null;
-                    if (fileName === 'Coffee.csv') {
-                        fileId = GOOGLE_DRIVE_COFFEE_FILE_ID;
-                    } else if (fileName === 'Water.csv') {
-                        fileId = GOOGLE_DRIVE_WATER_FILE_ID;
-                    } else {
-                        showToast('Unknown product file', true);
-                        return false;
-                    }
-                    
                     // Build CSV content
-                    var visibleHeaders = headers.filter(function(h) { return h !== 'Status'; });
-                    var csvRows = [];
-                    csvRows.push(visibleHeaders.join(','));
+                    var visibleHeaders = currentProdHeaders.filter(function(h) { return h !== 'Status'; });
+                    var csvRows = [visibleHeaders.join(',')];
                     
-                    for (var p = 0; p < productList.length; p++) {
-                        var product = productList[p];
+                    for (var p = 0; p < currentProdList.length; p++) {
+                        var product = currentProdList[p];
                         var row = [];
                         for (var v = 0; v < visibleHeaders.length; v++) {
-                            var headerName = visibleHeaders[v];
-                            var val = product[headerName] || '';
-                            // Escape commas with quotes
+                            var val = product[visibleHeaders[v]] || '';
                             if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1) {
                                 val = '"' + val.replace(/"/g, '""') + '"';
                             }
@@ -52,25 +73,22 @@
                     }
                     
                     var csvContent = csvRows.join('\n');
+                    var fileName = currentProductFile;
+                    var fileId = null;
                     
-                    // First, get the current file metadata to check if it exists
-                    var getResponse = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + accessToken
-                        }
-                    });
-                    
-                    if (!getResponse.ok) {
-                        throw new Error('File not found or access denied');
+                    // Determine file ID based on product file
+                    if (fileName === 'Coffee.csv') {
+                        fileId = '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs';
+                    } else if (fileName === 'Water.csv') {
+                        fileId = '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX';
+                    } else {
+                        showToast('Unknown product file', true);
+                        return;
                     }
                     
-                    // Upload the new content using multipart update
+                    // Upload to Google Drive
                     var boundary = '-------' + Date.now();
-                    var metadata = {
-                        name: fileName,
-                        mimeType: 'text/csv'
-                    };
+                    var metadata = { name: fileName, mimeType: 'text/csv' };
                     
                     var multipart = '--' + boundary + '\r\n' +
                         'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
@@ -81,7 +99,7 @@
                         btoa(unescape(encodeURIComponent(csvContent))) + '\r\n' +
                         '--' + boundary + '--';
                     
-                    var updateResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=multipart', {
+                    var response = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=multipart', {
                         method: 'PATCH',
                         headers: {
                             'Authorization': 'Bearer ' + accessToken,
@@ -90,51 +108,53 @@
                         body: multipart
                     });
                     
-                    if (updateResponse.ok) {
-                        showToast('Products saved to Google Drive: ' + fileName, false);
-                        return true;
+                    if (response.ok) {
+                        showToast('Exported to Google Drive: ' + fileName, false);
+                        alert('SUCCESS!\nProducts exported to Google Drive\nFile: ' + fileName);
                     } else {
-                        var error = await updateResponse.json();
-                        console.error('Drive update error:', error);
-                        showToast('Failed to save to Google Drive: ' + (error.error ? error.error.message : 'Unknown error'), true);
-                        return false;
+                        var error = await response.json();
+                        showToast('Export failed: ' + (error.error?.message || 'Unknown'), true);
                     }
                 } catch (err) {
-                    console.error('Save to Drive error:', err);
-                    showToast('Error saving to Google Drive: ' + err.message, true);
-                    return false;
+                    console.error('Export error:', err);
+                    showToast('Export error: ' + err.message, true);
                 }
             };
             
-            // Function to load products from Google Drive CSV (with cache bypass)
-            window.loadProductsFromGoogleDrive = async function(fileName) {
+            // ========== IMPORT FROM GOOGLE DRIVE (Manual button) ==========
+            window.importProductsFromGoogleDrive = async function() {
                 if (!accessToken) {
-                    return false;
+                    showToast('Please sign in with Google first', true);
+                    return;
                 }
+                if (!currentProductFile) {
+                    showToast('Select a product file first (Coffee or Water)', true);
+                    return;
+                }
+                
+                showToast('Importing from Google Drive...', false);
                 
                 try {
                     var fileId = null;
-                    if (fileName === 'Coffee.csv') {
-                        fileId = GOOGLE_DRIVE_COFFEE_FILE_ID;
-                    } else if (fileName === 'Water.csv') {
-                        fileId = GOOGLE_DRIVE_WATER_FILE_ID;
+                    if (currentProductFile === 'Coffee.csv') {
+                        fileId = '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs';
+                    } else if (currentProductFile === 'Water.csv') {
+                        fileId = '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX';
                     } else {
-                        return false;
+                        showToast('Unknown product file', true);
+                        return;
                     }
                     
-                    // Export file as text
                     var exportUrl = 'https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=text%2Fplain';
                     var response = await fetch(exportUrl, {
                         method: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + accessToken
-                        }
+                        headers: { 'Authorization': 'Bearer ' + accessToken }
                     });
                     
                     if (response.ok) {
                         var csvText = await response.text();
                         var lines = csvText.split('\n').filter(function(l) { return l.trim(); });
-                        if (lines.length > 0) {
+                        if (lines.length > 1) {
                             var headers = lines[0].split(',').map(function(h) { return h.trim(); }).filter(function(h) { return h !== ''; });
                             if (headers.indexOf('Status') === -1) headers.push('Status');
                             
@@ -150,84 +170,118 @@
                                 }
                                 pObj.Status = pObj.Status || 'Active';
                                 var firstHeader = headers[0];
-                                if (pObj[firstHeader] && pObj[firstHeader].toLowerCase() !== 'not delivered' && pObj[firstHeader] !== '') {
+                                if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') {
                                     products.push(pObj);
                                 }
                             }
                             
-                            currentProdHeaders = headers;
-                            currentProdList = products;
-                            currentProductFile = fileName;
-                            renderProdTable();
-                            showToast('Products loaded from Google Drive', false);
-                            return true;
+                            if (products.length > 0) {
+                                currentProdHeaders = headers;
+                                currentProdList = products;
+                                renderProdTable();
+                                saveProductsToLocalStorage();
+                                showToast('Imported from Google Drive: ' + currentProductFile, false);
+                                alert('SUCCESS!\nProducts imported from Google Drive\n' + products.length + ' products loaded');
+                            } else {
+                                showToast('No valid products found in Google Drive file', true);
+                            }
+                        } else {
+                            showToast('Google Drive file is empty or invalid', true);
                         }
+                    } else {
+                        var error = await response.json();
+                        showToast('Import failed: File not found or access denied', true);
                     }
-                    return false;
                 } catch (err) {
-                    console.error('Load from Drive error:', err);
-                    return false;
+                    console.error('Import error:', err);
+                    showToast('Import error: ' + err.message, true);
                 }
             };
             
-            // Override saveProductEdit to save to Google Drive AND localStorage
+            // ========== EXPORT/IMPORT BUTTONS ==========
+            function addExportImportButtons() {
+                var prodViewDiv = document.getElementById('prodView');
+                if (!prodViewDiv) return;
+                
+                // Check if buttons already exist
+                if (document.getElementById('googleExportBtn')) return;
+                
+                var buttonDiv = document.createElement('div');
+                buttonDiv.style.marginBottom = '15px';
+                buttonDiv.style.display = 'flex';
+                buttonDiv.style.gap = '10px';
+                buttonDiv.style.justifyContent = 'center';
+                buttonDiv.innerHTML = `
+                    <button id="googleExportBtn" class="btn-top" style="background:#0d6efd;">Export to Google Drive</button>
+                    <button id="googleImportBtn" class="btn-top" style="background:#198754;">Import from Google Drive</button>
+                    <button id="clearLocalStorageBtn" class="btn-top" style="background:#dc3545;">Reset to GitHub</button>
+                `;
+                
+                var existingButtons = prodViewDiv.querySelector('.product-action-buttons');
+                if (existingButtons) {
+                    existingButtons.appendChild(buttonDiv);
+                } else {
+                    var firstChild = prodViewDiv.firstChild;
+                    var wrapper = document.createElement('div');
+                    wrapper.className = 'product-action-buttons';
+                    wrapper.appendChild(buttonDiv);
+                    prodViewDiv.insertBefore(wrapper, firstChild);
+                }
+                
+                document.getElementById('googleExportBtn').onclick = window.exportProductsToGoogleDrive;
+                document.getElementById('googleImportBtn').onclick = window.importProductsFromGoogleDrive;
+                document.getElementById('clearLocalStorageBtn').onclick = function() {
+                    if (confirm('Reset to GitHub version? This will discard all unsaved changes.')) {
+                        localStorage.removeItem('logiflow_products_' + currentProductFile);
+                        window.loadProductFile(currentProductFile);
+                        showToast('Reset to GitHub version', false);
+                    }
+                };
+            }
+            
+            // ========== OVERRIDE saveProductEdit to auto-save to localStorage ==========
             var originalSaveEdit = window.saveProductEdit;
             window.saveProductEdit = function() {
                 if (currentEditingProductIndex === -1) {
                     alert('No product selected');
                     return;
                 }
-                
-                // Update the product data
                 for (var i = 0; i < currentProdHeaders.length; i++) {
                     var header = currentProdHeaders[i];
                     if (header === 'Status') continue;
                     var input = document.getElementById('product_edit_' + header.replace(/ /g, '_'));
                     if (input) currentProdList[currentEditingProductIndex][header] = input.value;
                 }
-                
                 renderProdTable();
+                saveProductsToLocalStorage();
                 closeProductEditModal();
-                
-                // Save to Google Drive
-                window.saveProductsToGoogleDrive(currentProductFile, currentProdList, currentProdHeaders);
-                
-                // Also save to localStorage as backup
-                var backupData = {
-                    headers: currentProdHeaders,
-                    products: currentProdList,
-                    file: currentProductFile,
-                    timestamp: new Date().toISOString()
-                };
-                localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(backupData));
-                
-                showToast('Saving product changes to Google Drive...', false);
+                showToast('Product saved to browser storage', false);
             };
             
-            // Override toggleProductStatus to save to Google Drive
+            // ========== OVERRIDE toggleProductStatus to auto-save ==========
             var originalToggleStatus = window.toggleProductStatus;
             window.toggleProductStatus = function(idx) {
                 currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
                 renderProdTable();
-                window.saveProductsToGoogleDrive(currentProductFile, currentProdList, currentProdHeaders);
+                saveProductsToLocalStorage();
             };
             
-            // Override loadProductFile to try Google Drive first, then GitHub
+            // ========== OVERRIDE loadProductFile to check localStorage first ==========
             var originalLoadFile = window.loadProductFile;
             window.loadProductFile = async function(fileName) {
                 currentProductFile = fileName;
-                var tbody = document.getElementById('prodTableBody');
-                var theadRow = document.getElementById('prodTableHead');
-                tbody.innerHTML = '<tr><td colspan="10">Loading products from Google Drive...</div>';
                 
-                // Try Google Drive first
-                var driveLoaded = await window.loadProductsFromGoogleDrive(fileName);
-                if (driveLoaded) {
+                // Try localStorage first
+                if (loadProductsFromLocalStorage(fileName)) {
+                    addExportImportButtons();
                     return;
                 }
                 
-                // Fallback to GitHub
-                tbody.innerHTML = '<tr><td colspan="10">Loading products from GitHub...</div>';
+                // Fall back to GitHub
+                var tbody = document.getElementById('prodTableBody');
+                var theadRow = document.getElementById('prodTableHead');
+                tbody.innerHTML = '<tr><td colspan="10">Loading from GitHub...</div>';
+                
                 var text = await fetchFromGitHub('Products/' + fileName);
                 if (!text) {
                     tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
@@ -258,22 +312,28 @@
                         }
                         pObj.Status = pObj.Status || 'Active';
                         var firstHeader = currentProdHeaders[0];
-                        if (pObj[firstHeader] && pObj[firstHeader].toLowerCase() !== 'not delivered' && pObj[firstHeader] !== '') {
+                        if (pObj[firstHeader] && pObj[firstHeader] !== '' && pObj[firstHeader].toLowerCase() !== 'not delivered') {
                             currentProdList.push(pObj);
                         }
                     }
                     
                     renderProdTable();
-                    showToast('Products loaded from GitHub', false);
-                    
-                    // Also save the GitHub version to Google Drive as initial backup
-                    window.saveProductsToGoogleDrive(fileName, currentProdList, currentProdHeaders);
+                    saveProductsToLocalStorage();
+                    showToast('Loaded from GitHub', false);
+                    addExportImportButtons();
                 }
             };
             
-            console.log('Google Drive product save fix applied - products save directly to Google Drive CSV files');
+            // Add buttons when product view is shown
+            var originalShowProd = document.getElementById('btnShowProd').onclick;
+            document.getElementById('btnShowProd').onclick = function() {
+                if (originalShowProd) originalShowProd();
+                setTimeout(addExportImportButtons, 100);
+            };
+            
+            console.log('Product persistence fix applied - products auto-save to browser storage');
         }
-    }, 1000);
+    }, 500);
 })();
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
