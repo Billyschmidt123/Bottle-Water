@@ -54,7 +54,7 @@
     </div>
     <div style="display:flex; gap:10px; align-items:center;">
         <div id="googleSignInDiv"></div>
-        <span id="googleStatus" class="google-status disconnected">⚠️ Not connected</span>
+        <span id="googleStatus" class="google-status disconnected">⚠️ Sign in to save</span>
         <button id="btnManager" class="btn-top" style="background:#6c757d;">Manager</button>
         <button id="btnForceRefresh" class="btn-top" style="background:#17a2b8;"><i class="fas fa-sync"></i></button>
     </div>
@@ -259,7 +259,7 @@ function updateGoogleStatus() {
 }
 
 // ============================================================
-// GOOGLE SIGN-IN (with proper token handling)
+// GOOGLE SIGN-IN
 // ============================================================
 function initializeGoogleSignIn() {
     google.accounts.id.initialize({
@@ -269,14 +269,12 @@ function initializeGoogleSignIn() {
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
             userEmail = payload.email;
             
-            // Request access token for Drive & Sheets
             const tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
                 callback: (tokenResponse) => {
                     if (tokenResponse.access_token) {
                         accessToken = tokenResponse.access_token;
-                        console.log("Access token obtained");
                         showToast(`Signed in as ${userEmail} - Ready to save!`, false);
                         updateGoogleStatus();
                     } else {
@@ -293,6 +291,67 @@ function initializeGoogleSignIn() {
         document.getElementById('googleSignInDiv'),
         { theme: 'outline', size: 'medium', text: 'signin_with' }
     );
+}
+
+// ============================================================
+// SAVE PDF TO GOOGLE DRIVE (CORRECTED)
+// ============================================================
+async function savePDFToDrive(fileName, dataUrl) {
+    if (!accessToken) {
+        showToast("Please sign in with Google first", true);
+        return false;
+    }
+    
+    try {
+        // Extract base64 data from data URL
+        let base64Content = dataUrl;
+        if (dataUrl.includes(',')) {
+            base64Content = dataUrl.split(',')[1];
+        }
+        
+        // Convert base64 to blob
+        const binaryString = atob(base64Content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        
+        // Create form data for multipart upload
+        const formData = new FormData();
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/pdf',
+            parents: [GOOGLE_DRIVE_FOLDER_ID]
+        };
+        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        formData.append('file', blob, fileName);
+        
+        // Upload to Google Drive
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`✅ PDF saved: ${fileName}`, false);
+            console.log("Drive upload success:", result);
+            return true;
+        } else {
+            const error = await response.json();
+            console.error("Drive API error:", error);
+            showToast(`❌ Failed to save PDF: ${error.error?.message || "Unknown error"}`, true);
+            return false;
+        }
+    } catch (err) {
+        console.error("Drive save exception:", err);
+        showToast("❌ Error saving to Drive: " + err.message, true);
+        return false;
+    }
 }
 
 // ============================================================
@@ -332,112 +391,6 @@ async function appendToGoogleSheets(rowData) {
 }
 
 // ============================================================
-// SAVE PDF TO GOOGLE DRIVE
-// ============================================================
-async function savePDFToDrive(fileName, base64Data) {
-    if (!accessToken) {
-        showToast("Please sign in with Google first", true);
-        return false;
-    }
-    
-    try {
-        const base64Content = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-        
-        // Create file metadata
-        const metadata = {
-            name: fileName,
-            mimeType: 'application/pdf',
-            parents: [GOOGLE_DRIVE_FOLDER_ID]
-        };
-        
-        const metadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(metadata)
-        });
-        
-        if (!metadataResponse.ok) {
-            const error = await metadataResponse.json();
-            throw new Error(error.error?.message || "Metadata creation failed");
-        }
-        
-        const fileData = await metadataResponse.json();
-        const fileId = fileData.id;
-        
-        // Upload file content
-        const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/pdf'
-            },
-            body: base64Content
-        });
-        
-        if (uploadResponse.ok) {
-            showToast(`PDF saved to Google Drive: ${fileName}`, false);
-            return true;
-        } else {
-            throw new Error("Upload failed");
-        }
-    } catch (err) {
-        console.error("Drive save error:", err);
-        showToast(`Failed to save PDF: ${err.message}`, true);
-        return false;
-    }
-}
-
-// ============================================================
-// SAVE PRODUCTS TO GOOGLE SHEETS
-// ============================================================
-async function saveProductsToSheet() {
-    if (!accessToken) {
-        showToast("Please sign in with Google to save products", true);
-        return false;
-    }
-    
-    try {
-        const headers = currentProdHeaders.filter(h => h !== 'Status');
-        const values = [headers];
-        
-        for (const product of currentProdList) {
-            const row = headers.map(h => product[h] || '');
-            values.push(row);
-        }
-        
-        // Clear existing data
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:ZZZ:clear`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        // Write new data
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:ZZZ?valueInputOption=RAW`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ values })
-        });
-        
-        if (response.ok) {
-            showToast("Products saved to Google Sheets!", false);
-            return true;
-        } else {
-            throw new Error("Write failed");
-        }
-    } catch (err) {
-        console.error("Save products error:", err);
-        showToast("Failed to save products to Google Sheets", true);
-        return false;
-    }
-}
-
-// ============================================================
 // READ FROM GITHUB
 // ============================================================
 async function fetchFromGitHub(path) {
@@ -455,7 +408,7 @@ async function loadProductFile(fileName) {
     currentProductFile = fileName;
     const tbody = document.getElementById('prodTableBody');
     const theadRow = document.getElementById('prodTableHead');
-    tbody.innerHTML = '<table><td colspan="10">Loading products... </div>';
+    tbody.innerHTML = '<tr><td colspan="10">Loading products... </div>';
     
     try {
         const text = await fetchFromGitHub(`Products/${fileName}`);
@@ -497,8 +450,8 @@ function renderProdTable() {
             <td>
                 <button class="btn-top" style="padding:4px; margin:2px; background:#28a745;" onclick="openProductEditModal(${idx})">Edit</button>
                 <button class="btn-top" style="padding:4px; margin:2px; background:#ffc107;" onclick="toggleProductStatus(${idx})">${pObj.Status === "Active" ? "Deactivate" : "Activate"}</button>
-            </td>
-            ${currentProdHeaders.map(h => `<td>${pObj[h] || ''}</td>`).join('')}
+            </div>
+            ${currentProdHeaders.map(h => `<td>${pObj[h] || ''}</div>`).join('')}
         `;
         tbody.appendChild(tr);
     });
@@ -525,7 +478,6 @@ window.saveProductEdit = async function() {
     }
     
     renderProdTable();
-    await saveProductsToSheet();
     closeProductEditModal();
 };
 
@@ -625,10 +577,10 @@ function renderDeliveryCart() {
     }
     body.innerHTML = deliveryCart.map((item, idx) => `
         <tr>
-            <td>${item.name}</td>
-            <td>${item.qty}</td>
-            <td>${item.units}</td>
-            <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+            <td>${item.name} </div>
+            <td>${item.qty} </div>
+            <td>${item.units} </div>
+            <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button> </div>
         </tr>
     `).join('');
 }
@@ -647,7 +599,6 @@ window.markNotDelivered = async function() {
     const timestamp = new Date().toLocaleString();
     const rowData = [driverName, "N/A", timestamp, customerName, "N/A", "Not Delivered", reason];
     
-    // Save to Google Sheets
     const saved = await appendToGoogleSheets(rowData);
     if (saved) {
         alert(`Delivery marked as NOT DELIVERED\nReason: ${reason}\nLogged to Google Sheets.`);
@@ -678,49 +629,51 @@ window.validateAndFinishStop = async function() {
     const fileName = `${customerName.replace(/\s+/g, '_')}_Slip_${slipNum}.pdf`;
     const timestamp = new Date().toLocaleString();
     
-    // Row for Google Sheets log
     const logRow = [driverName, receiverName, timestamp, customerName, slipNum, "Delivered", "N/A"];
     
-    // Save to Google Sheets first
-    showToast("Saving delivery record to Google Sheets...", false);
+    showToast("Saving delivery record...", false);
     const sheetSaved = await appendToGoogleSheets(logRow);
     
     if (!sheetSaved) {
-        alert("Warning: Could not save to Google Sheets. Please check your Google sign-in.\nThe delivery will still complete but data may not be recorded.");
+        alert("Warning: Could not save to Google Sheets. Please check your Google sign-in.");
     }
     
-    // Generate and save PDF
+    // Generate simple PDF HTML
     showToast("Generating PDF...", false);
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.width = "790px";
-    pdfContainer.style.padding = "15px";
-    pdfContainer.style.fontFamily = "monospace";
-    pdfContainer.style.fontSize = "11px";
-    pdfContainer.innerHTML = `
-        <div style="text-align:center; margin-bottom:20px;">
-            <h1>CULLIGAN BOTTLED WATER</h1>
-            <h3>DELIVERY SLIP</h3>
-            <p>Slip #: ${slipNum} | Date: ${date}</p>
+    const pdfHTML = `
+        <div style="width: 100%; max-width: 800px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #004a99;">CULLIGAN BOTTLED WATER</h1>
+                <h2>DELIVERY SLIP</h2>
+                <p><strong>Slip #:</strong> ${slipNum} &nbsp;|&nbsp; <strong>Date:</strong> ${date}</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <p><strong>Customer:</strong> ${customerName}</p>
+                <p><strong>Address:</strong> ${address}</p>
+                <p><strong>PO #:</strong> ${po || 'N/A'}</p>
+                <p><strong>Received By:</strong> ${receiverName}</p>
+                ${instructions ? `<p><strong>Instructions:</strong> ${instructions}</p>` : ''}
+            </div>
+            <hr>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr style="background: #f0f0f0;"><th style="padding: 8px; border: 1px solid #ddd;">Item</th><th style="padding: 8px; border: 1px solid #ddd;">Qty</th><th style="padding: 8px; border: 1px solid #ddd;">Unit</th></tr>
+                ${deliveryCart.map(item => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td><td style="padding: 8px; border: 1px solid #ddd;">${item.qty}</td><td style="padding: 8px; border: 1px solid #ddd;">${item.units}</td></tr>`).join('')}
+            </table>
+            <hr>
+            <div style="margin-top: 20px;">
+                <p><strong>Signature:</strong></p>
+                <img src="${sigImage}" style="max-width: 300px; max-height: 100px; border: 1px solid #ccc;">
+            </div>
+            <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #666;">
+                Thank you for your business!
+            </div>
         </div>
-        <div><strong>Customer:</strong> ${customerName}</div>
-        <div><strong>Address:</strong> ${address}</div>
-        <div><strong>PO #:</strong> ${po || 'N/A'}</div>
-        <div><strong>Received By:</strong> ${receiverName}</div>
-        <hr>
-        <table style="width:100%; border-collapse:collapse;">
-            <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Unit</th></tr>
-            ${deliveryCart.map(item => `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.units}</td></tr>`).join('')}
-        </table>
-        <hr>
-        <div><strong>Signature:</strong></div>
-        <img src="${sigImage}" style="max-height:100px;">
-        <div style="margin-top:20px; font-size:9px;">Thank you for your business!</div>
     `;
     
     const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } };
     
     try {
-        const pdfBlob = await html2pdf().set(opt).from(pdfContainer).output('blob');
+        const pdfBlob = await html2pdf().set(opt).from(pdfHTML).output('blob');
         const reader = new FileReader();
         reader.readAsDataURL(pdfBlob);
         reader.onloadend = async function() {
@@ -728,19 +681,17 @@ window.validateAndFinishStop = async function() {
             const driveSaved = await savePDFToDrive(fileName, reader.result);
             
             if (driveSaved && sheetSaved) {
-                alert(`SUCCESS!\nDelivery completed and saved to Google Drive & Sheets.\nSlip #: ${slipNum}`);
+                alert(`✅ SUCCESS!\nDelivery completed and saved to Google Drive & Sheets.\nSlip #: ${slipNum}`);
             } else if (driveSaved) {
-                alert(`SUCCESS!\nPDF saved to Google Drive: ${fileName}\n(Sheet log failed - check permissions)`);
+                alert(`✅ PDF saved to Google Drive: ${fileName}\n⚠️ Sheet log failed - check permissions.`);
             } else if (sheetSaved) {
-                alert(`Delivery recorded to Google Sheets.\nPDF could not be saved to Drive. Check your Google sign-in.`);
-                // Download locally as fallback
+                alert(`⚠️ Delivery recorded to Google Sheets.\n❌ PDF could not be saved to Drive.\nPDF downloaded to your computer.`);
                 const link = document.createElement('a');
                 link.download = fileName;
                 link.href = reader.result;
                 link.click();
             } else {
-                alert(`Delivery completed but NOT saved to cloud.\nPlease sign in with Google to enable cloud save.`);
-                // Download locally as fallback
+                alert(`⚠️ Delivery completed but NOT saved to cloud.\nPDF downloaded to your computer.\nPlease sign in with Google to enable cloud save.`);
                 const link = document.createElement('a');
                 link.download = fileName;
                 link.href = reader.result;
@@ -809,46 +760,6 @@ async function loadGitHubRoutes() {
     }
 }
 
-function populateRouteDropdown() {
-    const dropdown = document.getElementById('routeDropdown');
-    dropdown.innerHTML = '<option value="">Select Route...</option>';
-    Object.keys(routeDataMap).forEach(fileName => {
-        const opt = document.createElement('option');
-        opt.value = fileName;
-        opt.textContent = fileName.replace('.csv', '');
-        dropdown.appendChild(opt);
-    });
-}
-
-async function loadCustomersFromRoutes() {
-    try {
-        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/routes`);
-        const files = await response.json();
-        globalCustomers = [];
-        routeDataMap = {};
-        
-        for (const f of files) {
-            if (!f.name.endsWith('.csv')) continue;
-            const text = await fetch(f.download_url).then(r => r.text());
-            routeDataMap[f.name] = text;
-            const lines = text.split('\n').filter(l => l.trim());
-            if (lines.length < 2) continue;
-            
-            const headers = lines[0].split(',').map(h => h.trim());
-            if (!csvHeaders.length) csvHeaders = headers;
-            
-            lines.slice(1).forEach(line => {
-                const vals = line.split(',');
-                const rowObj = {};
-                headers.forEach((h, i) => rowObj[h] = (vals[i] || "").trim());
-                globalCustomers.push(rowObj);
-            });
-        }
-    } catch (e) {
-        console.error("Error loading customers:", e);
-    }
-}
-
 document.getElementById('routeDropdown').onchange = async function() {
     const fileName = this.value;
     if (!fileName) return;
@@ -902,7 +813,6 @@ document.getElementById('routeDropdown').onchange = async function() {
             document.getElementById('navPhoneBar').textContent = `Phone: ${phone}`;
             document.getElementById('stopModalTitle').textContent = `Delivery: ${displayName}`;
             
-            // Populate modal fields
             document.getElementById('metaAddress').textContent = addr;
             document.getElementById('metaPhone').textContent = phone;
             document.getElementById('metaEmail').textContent = rowData.Email || '--';
@@ -922,10 +832,8 @@ document.getElementById('routeDropdown').onchange = async function() {
             canvas.style.background = '#eee';
             document.getElementById('btnActivateSig').style.background = '#007bff';
             document.getElementById('btnActivateSig').textContent = 'CLICK TO SIGN';
-            
             document.getElementById('receivedBy').value = '';
             
-            // Load products into dropdowns
             async function loadDropdown(fileName, targetId) {
                 const text = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/Products/${fileName}`).then(r => r.text());
                 const lines = text.split('\n').filter(l => l.trim());
@@ -962,11 +870,9 @@ async function init() {
     
     initializeGoogleSignIn();
     await loadGitHubRoutes();
-    await loadCustomersFromRoutes();
     
     document.getElementById('btnManager').onclick = () => {
         document.getElementById('mgrModal').style.display = 'flex';
-        loadCustomersFromRoutes();
     };
     document.getElementById('btnShowCust').onclick = () => {
         document.getElementById('custView').style.display = 'block';
@@ -979,7 +885,6 @@ async function init() {
     };
     document.getElementById('btnForceRefresh').onclick = () => {
         loadGitHubRoutes();
-        loadCustomersFromRoutes();
     };
 }
 
