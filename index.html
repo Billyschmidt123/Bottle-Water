@@ -1357,5 +1357,303 @@ document.getElementById('emergencyManagerBtn').onclick = function() {
 })();
 </script>
 <!-- ========== END OF ADDITIVE FIX ========== -->
+    <!-- ========== ADDITIVE FIX: Create New Working Manager Modal ========== -->
+<style>
+.new-manager-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+.new-manager-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+.new-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+.new-manager-header h2 {
+    margin: 0;
+    color: #004a99;
+}
+.new-manager-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+.new-manager-tab {
+    padding: 8px 16px;
+    background: #eee;
+    border: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+}
+.new-manager-tab.active {
+    background: #007bff;
+    color: white;
+}
+.new-manager-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.new-manager-table th, .new-manager-table td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    text-align: left;
+}
+.new-manager-table th {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+}
+</style>
+
+<div id="newManagerModal" class="new-manager-modal">
+    <div class="new-manager-content">
+        <div class="new-manager-header">
+            <h2><i class="fas fa-cogs"></i> Manager Control Panel</h2>
+            <button id="newManagerCloseBtn" class="btn-top" style="background:#dc3545;">Close</button>
+        </div>
+        <div class="new-manager-tabs">
+            <button id="newShowCustBtn" class="new-manager-tab active">Customer Maintenance</button>
+            <button id="newShowProdBtn" class="new-manager-tab">Product Maintenance</button>
+        </div>
+        <div id="newCustView" style="display: block;">
+            <div style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
+                <table class="new-manager-table">
+                    <thead id="newCustTableHead"></thead>
+                    <tbody id="newCustTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div id="newProdView" style="display: none;">
+            <div style="margin-bottom:10px;">
+                <button id="newLoadProductsBtn" class="btn-top" style="background:#6f4e37;">Load Products</button>
+            </div>
+            <div style="overflow-x: auto; max-height: 50vh; overflow-y: auto;">
+                <table class="new-manager-table">
+                    <thead id="newProdTableHead"></thead>
+                    <tbody id="newProdTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function createWorkingManagerModal() {
+    // Get references
+    var newModal = document.getElementById('newManagerModal');
+    var showCustBtn = document.getElementById('newShowCustBtn');
+    var showProdBtn = document.getElementById('newShowProdBtn');
+    var custView = document.getElementById('newCustView');
+    var prodView = document.getElementById('newProdView');
+    var closeBtn = document.getElementById('newManagerCloseBtn');
+    var loadProdBtn = document.getElementById('newLoadProductsBtn');
+    
+    // Function to open the new modal
+    function openNewManagerModal() {
+        if (newModal) {
+            newModal.style.display = 'flex';
+            // Load customers immediately
+            loadNewCustomers();
+        }
+    }
+    
+    // Function to close the new modal
+    function closeNewManagerModal() {
+        if (newModal) newModal.style.display = 'none';
+    }
+    
+    // Load customers for new modal
+    async function loadNewCustomers() {
+        var tbody = document.getElementById('newCustTableBody');
+        var thead = document.getElementById('newCustTableHead');
+        tbody.innerHTML = '<td><td colspan="10">Loading customers...</div>';
+        
+        if (!accessToken) {
+            tbody.innerHTML = '<td><td colspan="10">Please sign in with Google first.</div>';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load');
+            
+            var data = await response.json();
+            var values = data.values;
+            
+            if (!values || values.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10">No data found</div>';
+                return;
+            }
+            
+            var headers = values[0];
+            var headerHtml = '<tr>';
+            for (var h = 0; h < headers.length; h++) {
+                headerHtml += '<th>' + (headers[h] || '') + '</th>';
+            }
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+            
+            tbody.innerHTML = '';
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var rowHtml = '<tr>';
+                for (var j = 0; j < headers.length; j++) {
+                    rowHtml += '<td>' + (row[j] || '') + '</td>';
+                }
+                rowHtml += '</tr>';
+                tbody.innerHTML += rowHtml;
+            }
+            
+            console.log('Customers loaded into new modal');
+        } catch (err) {
+            console.error('Error:', err);
+            tbody.innerHTML = '<tr><td colspan="10">Error loading customers</div>';
+        }
+    }
+    
+    // Load products for new modal
+    async function loadNewProducts() {
+        var tbody = document.getElementById('newProdTableBody');
+        var thead = document.getElementById('newProdTableHead');
+        tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
+        
+        if (!accessToken) {
+            tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first.</div>';
+            return;
+        }
+        
+        try {
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Products!A1:Z`;
+            var response = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+            
+            if (!response.ok) throw new Error('Failed to load');
+            
+            var data = await response.json();
+            var values = data.values;
+            
+            if (!values || values.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10">No data found</div>';
+                return;
+            }
+            
+            var headers = values[0];
+            var headerHtml = '<tr>';
+            for (var h = 0; h < headers.length; h++) {
+                headerHtml += '<th>' + (headers[h] || '') + '</th>';
+            }
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+            
+            tbody.innerHTML = '';
+            for (var i = 1; i < values.length; i++) {
+                var row = values[i];
+                var rowHtml = '<tr>';
+                for (var j = 0; j < headers.length; j++) {
+                    rowHtml += '<td>' + (row[j] || '') + '</td>';
+                }
+                rowHtml += '</tr>';
+                tbody.innerHTML += rowHtml;
+            }
+            
+            console.log('Products loaded into new modal');
+        } catch (err) {
+            console.error('Error:', err);
+            tbody.innerHTML = '<tr><td colspan="10">Error loading products</div>';
+        }
+    }
+    
+    // Tab switching
+    if (showCustBtn) {
+        showCustBtn.onclick = function() {
+            custView.style.display = 'block';
+            prodView.style.display = 'none';
+            showCustBtn.classList.add('active');
+            showProdBtn.classList.remove('active');
+            loadNewCustomers();
+        };
+    }
+    
+    if (showProdBtn) {
+        showProdBtn.onclick = function() {
+            custView.style.display = 'none';
+            prodView.style.display = 'block';
+            showProdBtn.classList.add('active');
+            showCustBtn.classList.remove('active');
+            loadNewProducts();
+        };
+    }
+    
+    if (loadProdBtn) {
+        loadProdBtn.onclick = function() {
+            loadNewProducts();
+        };
+    }
+    
+    if (closeBtn) {
+        closeBtn.onclick = closeNewManagerModal;
+    }
+    
+    // Override the original Manager button to open new modal
+    var originalBtn = document.getElementById('btnManager');
+    if (originalBtn) {
+        var newOriginalBtn = originalBtn.cloneNode(true);
+        originalBtn.parentNode.replaceChild(newOriginalBtn, originalBtn);
+        newOriginalBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openNewManagerModal();
+        };
+    }
+    
+    // Also add a floating button
+    var floatBtn = document.createElement('button');
+    floatBtn.innerHTML = '📋 Manager';
+    floatBtn.style.position = 'fixed';
+    floatBtn.style.bottom = '15px';
+    floatBtn.style.right = '15px';
+    floatBtn.style.zIndex = '9999';
+    floatBtn.style.background = '#004a99';
+    floatBtn.style.color = 'white';
+    floatBtn.style.border = 'none';
+    floatBtn.style.padding = '10px 16px';
+    floatBtn.style.borderRadius = '5px';
+    floatBtn.style.cursor = 'pointer';
+    floatBtn.style.fontWeight = 'bold';
+    floatBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    floatBtn.onclick = openNewManagerModal;
+    document.body.appendChild(floatBtn);
+    
+    console.log('New working manager modal created');
+})();
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
