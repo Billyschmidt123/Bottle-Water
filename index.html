@@ -240,7 +240,7 @@
 <script src="https://accounts.google.com/gsi/client"></script>
 <script>
 // ============================================================
-// CONFIGURATION - YOUR FILE IDs ARE ALREADY INSERTED
+// CONFIGURATION
 // ============================================================
 const REPO_OWNER = 'Billyschmidt123';
 const REPO_NAME = 'Bottle-Water';
@@ -248,11 +248,6 @@ const GITHUB_RAW = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REP
 const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
 const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
 const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
-
-// YOUR GOOGLE DRIVE FILE IDs FOR PRODUCTS
-const GOOGLE_DRIVE_COFFEE_FILE_ID = '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs';
-const GOOGLE_DRIVE_WATER_FILE_ID = '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX';
-const GOOGLE_DRIVE_DOWNLOAD = 'https://drive.google.com/uc?export=download&id=';
 
 // Global variables
 var accessToken = null;
@@ -322,7 +317,7 @@ function initializeGoogleSignIn() {
 }
 
 // ============================================================
-// LOAD PRODUCTS FROM GOOGLE DRIVE (PRIMARY) or GITHUB (FALLBACK)
+// LOAD PRODUCTS FROM GITHUB (No CORS issues)
 // ============================================================
 async function fetchFromGitHub(path) {
     try {
@@ -339,30 +334,10 @@ async function loadProductFile(fileName) {
     currentProductFile = fileName;
     var tbody = document.getElementById('prodTableBody');
     var theadRow = document.getElementById('prodTableHead');
-    tbody.innerHTML = '<table><td colspan="10">Loading products from Google Drive...</div>';
+    tbody.innerHTML = '<tr><td colspan="10">Loading products...</div>';
     
     try {
-        var text = null;
-        
-        // Try Google Drive first
-        if (fileName === 'Coffee.csv') {
-            var driveUrl = GOOGLE_DRIVE_DOWNLOAD + GOOGLE_DRIVE_COFFEE_FILE_ID;
-            var driveResp = await fetch(driveUrl);
-            if (driveResp.ok) text = await driveResp.text();
-        } else if (fileName === 'Water.csv') {
-            var driveUrl = GOOGLE_DRIVE_DOWNLOAD + GOOGLE_DRIVE_WATER_FILE_ID;
-            var driveResp = await fetch(driveUrl);
-            if (driveResp.ok) text = await driveResp.text();
-        }
-        
-        // Fallback to GitHub if Google Drive fails
-        if (!text) {
-            text = await fetchFromGitHub('Products/' + fileName);
-            if (text) showToast('Loaded from GitHub (fallback)', false);
-        } else {
-            showToast('Loaded from Google Drive', false);
-        }
-        
+        var text = await fetchFromGitHub('Products/' + fileName);
         if (!text) throw new Error('File not found');
         
         var lines = text.split('\n').filter(function(l) { return l.trim(); });
@@ -387,18 +362,19 @@ async function loadProductFile(fileName) {
                     }
                 }
                 pObj.Status = pObj.Status || 'Active';
-                // Skip empty or "NOT DELIVERED" products if needed
+                // Skip empty or "NOT DELIVERED" products
                 var firstHeader = currentProdHeaders[0];
-                if (pObj[firstHeader] && pObj[firstHeader].toLowerCase() !== 'not delivered') {
+                if (pObj[firstHeader] && pObj[firstHeader].toLowerCase() !== 'not delivered' && pObj[firstHeader] !== '') {
                     currentProdList.push(pObj);
                 }
             }
             
             renderProdTable();
+            showToast('Products loaded from GitHub', false);
         }
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="10">Unable to load products.</div>';
-        showToast('Error loading products', true);
+        showToast('Error loading products from GitHub', true);
     }
 }
 
@@ -421,7 +397,6 @@ function renderProdTable() {
 window.toggleProductStatus = function(idx) {
     currentProdList[idx].Status = (currentProdList[idx].Status === 'Active') ? 'Deactivated' : 'Active';
     renderProdTable();
-    saveProductsToLocalStorage();
 };
 
 window.openProductEditModal = function(idx) {
@@ -444,16 +419,6 @@ window.closeProductEditModal = function() {
     currentEditingProductIndex = -1;
 };
 
-function saveProductsToLocalStorage() {
-    var data = {
-        headers: currentProdHeaders,
-        products: currentProdList,
-        file: currentProductFile,
-        timestamp: new Date().toISOString()
-    };
-    localStorage.setItem('logiflow_products_' + currentProductFile, JSON.stringify(data));
-}
-
 window.saveProductEdit = function() {
     if (currentEditingProductIndex === -1) {
         alert('No product selected');
@@ -466,9 +431,8 @@ window.saveProductEdit = function() {
         if (input) currentProdList[currentEditingProductIndex][header] = input.value;
     }
     renderProdTable();
-    saveProductsToLocalStorage();
     closeProductEditModal();
-    showToast('Product saved to browser storage', false);
+    showToast('Product updated', false);
 };
 
 window.toggleProductStatusFromModal = function() {
@@ -605,7 +569,7 @@ window.addProductToCart = function(dropdownId, qtyId, unitId) {
     var qty = parseInt(document.getElementById(qtyId).value);
     var units = document.getElementById(unitId).value;
     var itemName = dropdown.value;
-    if (!itemName) return;
+    if (!itemName || itemName === '') return;
     
     var existing = null;
     for (var i = 0; i < deliveryCart.length; i++) {
@@ -634,7 +598,7 @@ window.removeFromCart = function(idx) {
 function renderDeliveryCart() {
     var body = document.getElementById('cartItemsBody');
     if (deliveryCart.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" style="color:#999;">No items added.</div>';
+        body.innerHTML = '</tr><td colspan="4" style="color:#999; text-align:center;">No items added.</div>';
         return;
     }
     var html = '';
@@ -698,18 +662,18 @@ window.validateAndFinishStop = async function() {
     var productRows = '';
     for (var i = 0; i < deliveryCart.length; i++) {
         var item = deliveryCart[i];
-        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</td></tr>';
+        productRows += '<tr><td style="border:1px solid #000; padding:4px;">' + item.name + '</td><td style="border:1px solid #000; text-align:center; padding:4px;">' + item.qty + '</td><td style="border:1px solid #000; padding:4px;">' + item.units + '</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     // Add empty rows to reach 10 rows total
     var emptyRows = '';
     for (var i = deliveryCart.length; i < 10; i++) {
-        emptyRows += '<tr><td style="border:1px solid #000; padding:4px;">&nbsp;</td><td style="border:1px solid #000; text-align:center; padding:4px;">&nbsp;</td><td style="border:1px solid #000; padding:4px;">&nbsp;</td><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</td></tr>';
+        emptyRows += '<tr><td style="border:1px solid #000; padding:4px;">&nbsp;</div><td style="border:1px solid #000; text-align:center; padding:4px;">&nbsp;</div><td style="border:1px solid #000; padding:4px;">&nbsp;</div><td style="border:1px solid #000; text-align:right; padding:4px;">&nbsp;</div></tr>';
     }
     
     var dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
-    // Delivery Slip HTML
+    // Delivery Slip HTML - Culligan template
     var pdfHTML = '<div style="width:100%; max-width:800px; margin:0 auto; padding:15px; font-family:\'Courier New\', Courier, monospace; font-size:11px;">' +
         '<div style="display:flex; justify-content:space-between; margin-bottom:20px;">' +
         '<div style="width:50%;">' +
@@ -734,7 +698,6 @@ window.validateAndFinishStop = async function() {
         '<div style="border-bottom:1px solid #000; padding:2px 0;">&nbsp;</div>' +
         '</div>' +
         '<div style="width:38%; text-align:right;">' +
-        '<div style="border-bottom:1px solid #000; margin-bottom:5px;"><span style="float:left;">P.O. NO.</span> <strong>' + (document.getElementById('editMetaPO').value || '') + '</strong><div style="clear:both;"></div></div>' +
         '<div style="color:red; border:2px solid red; padding:5px; text-align:center;">' +
         '<div style="font-size:14px; font-weight:bold;">DELIVERY SLIP</div>' +
         '<div style="font-size:16px; font-weight:bold;">' + slipNum + '</div>' +
@@ -938,7 +901,6 @@ document.getElementById('routeDropdown').onchange = async function() {
                 document.getElementById('metaEmail').textContent = rowData.Email || '--';
                 document.getElementById('metaSpecOrder').textContent = rowData['Special Order'] || '--';
                 document.getElementById('metaSpecInst').textContent = rowData['Special Instructions'] || '--';
-                document.getElementById('editMetaPO').value = rowData['Purchase order'] || '';
                 
                 deliveryCart = [];
                 renderDeliveryCart();
@@ -955,23 +917,9 @@ document.getElementById('routeDropdown').onchange = async function() {
                 document.getElementById('receivedBy').value = '';
                 
                 async function loadDropdown(fName, targetId) {
-                    var txt = null;
-                    if (fName === 'Water.csv') {
-                        var driveUrl = GOOGLE_DRIVE_DOWNLOAD + GOOGLE_DRIVE_WATER_FILE_ID;
-                        var driveResp = await fetch(driveUrl);
-                        if (driveResp.ok) txt = await driveResp.text();
-                    } else if (fName === 'Coffee.csv') {
-                        var driveUrl = GOOGLE_DRIVE_DOWNLOAD + GOOGLE_DRIVE_COFFEE_FILE_ID;
-                        var driveResp = await fetch(driveUrl);
-                        if (driveResp.ok) txt = await driveResp.text();
-                    }
-                    
-                    if (!txt) {
-                        var githubResp = await fetch(GITHUB_RAW + 'Products/' + fName);
-                        if (githubResp.ok) txt = await githubResp.text();
-                    }
-                    
-                    if (txt) {
+                    var githubResp = await fetch(GITHUB_RAW + 'Products/' + fName);
+                    if (githubResp.ok) {
+                        var txt = await githubResp.text();
                         var productLines = txt.split('\n').filter(function(l) { return l.trim(); });
                         if (productLines.length > 1) {
                             var productHeaders = productLines[0].split(',');
@@ -984,7 +932,7 @@ document.getElementById('routeDropdown').onchange = async function() {
                             for (var l = 1; l < productLines.length; l++) {
                                 var productVals = productLines[l].split(',');
                                 var productName = productVals[descIdx] || productVals[0];
-                                if (productName && productName.toLowerCase() !== 'not delivered') {
+                                if (productName && productName.toLowerCase() !== 'not delivered' && productName !== '') {
                                     var opt = document.createElement('option');
                                     opt.value = productName;
                                     opt.textContent = productName;
