@@ -781,6 +781,449 @@ init();
     <button onclick="if(window.map){window.map.invalidateSize();}else{location.reload();}">🔄 Refresh Map</button>
     <button onclick="if(window.map){window.map.setView([55.17,-118.79],12);window.map.invalidateSize();}">📍 Reset View</button>
 </div>
+<!-- ========== ADDITIVE FIX: Call in Order Modal Styles ========== -->
+<style>
+.modal-window {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+.modal-header h2 { margin: 0; color: #004a99; }
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #999;
+}
+.modal-close:hover { color: #dc3545; }
+.modal-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+.modal-section label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+}
+.modal-section input, .modal-section textarea, .modal-section select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+.modal-section textarea { min-height: 60px; }
+.product-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.product-row select { flex: 2; margin-bottom: 0; }
+.product-row input { width: 80px; margin-bottom: 0; }
+.product-row button { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.add-product-btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    margin-top: 20px;
+}
+.btn-secondary { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-primary { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-primary:hover { background: #218838; }
+.btn-secondary:hover { background: #5a6268; }
+</style>
 
+<!-- ========== ADDITIVE FIX: Call in Order Modal HTML ========== -->
+<div id="callinModal" class="modal-overlay" style="display:none;">
+  <div class="modal-window">
+
+    <div class="modal-header">
+      <h2><i class="fas fa-phone-alt"></i> Call‑In Order</h2>
+      <button class="modal-close" onclick="closeCallInModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- CUSTOMER INFO -->
+      <div class="modal-section">
+        <label><i class="fas fa-user"></i> Customer Name</label>
+        <input id="ci_name" type="text" placeholder="Enter customer name">
+        
+        <label><i class="fas fa-phone"></i> Phone Number</label>
+        <input id="ci_phone" type="text" placeholder="Enter phone number">
+
+        <label><i class="fas fa-calendar"></i> Delivery Date</label>
+        <input id="ci_date" type="date" value="">
+        
+        <label><i class="fas fa-route"></i> Assign to Route</label>
+        <select id="ci_route">
+          <option value="">-- Select Route --</option>
+        </select>
+      </div>
+
+      <!-- PRODUCT LIST -->
+      <div class="modal-section">
+        <h3><i class="fas fa-boxes"></i> Products</h3>
+        <div id="ci_productList"></div>
+        <button class="add-product-btn" onclick="addNewProductRow()"><i class="fas fa-plus"></i> Add Product</button>
+      </div>
+
+      <!-- NOTES -->
+      <div class="modal-section">
+        <label><i class="fas fa-sticky-note"></i> Special Instructions / Notes</label>
+        <textarea id="ci_notes" placeholder="Any special instructions for delivery..."></textarea>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeCallInModal()"><i class="fas fa-times"></i> Cancel</button>
+      <button class="btn-primary" onclick="saveCallInOrder()"><i class="fas fa-save"></i> Save Order</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========== ADDITIVE FIX: Call in Order JavaScript ========== -->
+<script>
+// Call in Order - Global variables
+var callInProductList = [];
+var callInAllProducts = { water: [], coffee: [] };
+
+// Load products for dropdowns
+async function loadCallInProducts() {
+    try {
+        // Load Water products
+        var waterResp = await fetch(GITHUB_RAW + 'Products/Water.csv?t=' + Date.now());
+        if (waterResp.ok) {
+            var waterText = await waterResp.text();
+            var waterLines = waterText.split('\n').filter(l => l.trim());
+            if (waterLines.length > 1) {
+                var waterHeaders = waterLines[0].split(',');
+                var nameIdx = waterHeaders.findIndex(h => h.toLowerCase().includes('product') || h.toLowerCase().includes('item'));
+                if (nameIdx === -1) nameIdx = 0;
+                for (var i = 1; i < waterLines.length; i++) {
+                    var vals = waterLines[i].split(',');
+                    var productName = vals[nameIdx] ? vals[nameIdx].trim() : '';
+                    if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
+                        callInAllProducts.water.push({ name: productName, type: 'water' });
+                    }
+                }
+            }
+        }
+        
+        // Load Coffee products
+        var coffeeResp = await fetch(GITHUB_RAW + 'Products/Coffee.csv?t=' + Date.now());
+        if (coffeeResp.ok) {
+            var coffeeText = await coffeeResp.text();
+            var coffeeLines = coffeeText.split('\n').filter(l => l.trim());
+            if (coffeeLines.length > 1) {
+                var coffeeHeaders = coffeeLines[0].split(',');
+                var nameIdx = coffeeHeaders.findIndex(h => h.toLowerCase().includes('product') || h.toLowerCase().includes('item'));
+                if (nameIdx === -1) nameIdx = 0;
+                for (var i = 1; i < coffeeLines.length; i++) {
+                    var vals = coffeeLines[i].split(',');
+                    var productName = vals[nameIdx] ? vals[nameIdx].trim() : '';
+                    if (productName && productName !== '' && productName.toLowerCase() !== 'not delivered') {
+                        callInAllProducts.coffee.push({ name: productName, type: 'coffee' });
+                    }
+                }
+            }
+        }
+        
+        // Load routes for dropdown
+        var routesResp = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/routes');
+        if (routesResp.ok) {
+            var routesFiles = await routesResp.json();
+            var routeSelect = document.getElementById('ci_route');
+            for (var i = 0; i < routesFiles.length; i++) {
+                if (routesFiles[i].name.endsWith('.csv')) {
+                    var opt = document.createElement('option');
+                    opt.value = routesFiles[i].name.replace('.csv', '');
+                    opt.textContent = routesFiles[i].name.replace('.csv', '');
+                    routeSelect.appendChild(opt);
+                }
+            }
+        }
+        
+        console.log('Call in products loaded:', callInAllProducts);
+    } catch(e) {
+        console.error('Error loading products for call in:', e);
+    }
+}
+
+// Add a new product row to the order
+function addNewProductRow() {
+    var productListDiv = document.getElementById('ci_productList');
+    var rowId = 'product_row_' + Date.now() + '_' + Math.random();
+    
+    var waterOptions = '<option value="">-- Select Product --</option><optgroup label="Water Products">';
+    for (var i = 0; i < callInAllProducts.water.length; i++) {
+        waterOptions += '<option value="water|' + callInAllProducts.water[i].name + '">' + callInAllProducts.water[i].name + '</option>';
+    }
+    waterOptions += '</optgroup><optgroup label="Coffee Products">';
+    for (var i = 0; i < callInAllProducts.coffee.length; i++) {
+        waterOptions += '<option value="coffee|' + callInAllProducts.coffee[i].name + '">' + callInAllProducts.coffee[i].name + '</option>';
+    }
+    waterOptions += '</optgroup>';
+    
+    var rowHtml = `
+        <div class="product-row" id="${rowId}">
+            <select class="product-select" style="flex:2;" onchange="updateProductRow(this)">
+                ${waterOptions}
+            </select>
+            <input type="number" class="product-qty" placeholder="Qty" value="1" style="width:80px;">
+            <input type="text" class="product-unit" placeholder="Unit" style="width:100px;">
+            <button onclick="removeProductRow('${rowId}')"><i class="fas fa-trash"></i></button>
+        </div>
+    `;
+    productListDiv.insertAdjacentHTML('beforeend', rowHtml);
+    callInProductList.push({ id: rowId, product: '', qty: 1, unit: '' });
+}
+
+function updateProductRow(selectElement) {
+    var rowDiv = selectElement.closest('.product-row');
+    var rowId = rowDiv.id;
+    var selectedValue = selectElement.value;
+    var parts = selectedValue.split('|');
+    var productName = parts[1] || '';
+    
+    var qtyInput = rowDiv.querySelector('.product-qty');
+    var unitInput = rowDiv.querySelector('.product-unit');
+    
+    for (var i = 0; i < callInProductList.length; i++) {
+        if (callInProductList[i].id === rowId) {
+            callInProductList[i].product = productName;
+            callInProductList[i].qty = parseInt(qtyInput.value) || 1;
+            callInProductList[i].unit = unitInput.value;
+            break;
+        }
+    }
+}
+
+function removeProductRow(rowId) {
+    var row = document.getElementById(rowId);
+    if (row) row.remove();
+    for (var i = 0; i < callInProductList.length; i++) {
+        if (callInProductList[i].id === rowId) {
+            callInProductList.splice(i, 1);
+            break;
+        }
+    }
+}
+
+function updateAllProductRows() {
+    var rows = document.querySelectorAll('#ci_productList .product-row');
+    callInProductList = [];
+    rows.forEach(function(row) {
+        var select = row.querySelector('.product-select');
+        var qtyInput = row.querySelector('.product-qty');
+        var unitInput = row.querySelector('.product-unit');
+        var selectedValue = select ? select.value : '';
+        var parts = selectedValue.split('|');
+        callInProductList.push({
+            id: row.id,
+            product: parts[1] || '',
+            qty: qtyInput ? parseInt(qtyInput.value) || 1 : 1,
+            unit: unitInput ? unitInput.value : ''
+        });
+    });
+}
+
+// Open Call in Order modal
+window.managerCallInOrder = async function() {
+    // Load products if not already loaded
+    if (callInAllProducts.water.length === 0 && callInAllProducts.coffee.length === 0) {
+        await loadCallInProducts();
+    }
+    
+    // Set default date to today
+    var today = new Date();
+    var year = today.getFullYear();
+    var month = String(today.getMonth() + 1).padStart(2, '0');
+    var day = String(today.getDate()).padStart(2, '0');
+    document.getElementById('ci_date').value = year + '-' + month + '-' + day;
+    
+    // Clear previous entries
+    document.getElementById('ci_name').value = '';
+    document.getElementById('ci_phone').value = '';
+    document.getElementById('ci_notes').value = '';
+    document.getElementById('ci_productList').innerHTML = '';
+    callInProductList = [];
+    
+    // Add one empty product row
+    addNewProductRow();
+    
+    // Show modal
+    document.getElementById('callinModal').style.display = 'flex';
+};
+
+// Close Call in Order modal
+window.closeCallInModal = function() {
+    document.getElementById('callinModal').style.display = 'none';
+};
+
+// Save Call in Order
+window.saveCallInOrder = async function() {
+    updateAllProductRows();
+    
+    var customerName = document.getElementById('ci_name').value.trim();
+    var phone = document.getElementById('ci_phone').value.trim();
+    var deliveryDate = document.getElementById('ci_date').value;
+    var assignedRoute = document.getElementById('ci_route').value;
+    var notes = document.getElementById('ci_notes').value;
+    
+    if (!customerName) {
+        alert('Please enter a customer name.');
+        return;
+    }
+    
+    if (callInProductList.length === 0 || callInProductList.every(p => !p.product)) {
+        alert('Please add at least one product to the order.');
+        return;
+    }
+    
+    // Filter out empty products
+    var validProducts = callInProductList.filter(p => p.product && p.product !== '');
+    
+    if (validProducts.length === 0) {
+        alert('Please add at least one product to the order.');
+        return;
+    }
+    
+    // Create order object
+    var order = {
+        orderId: 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        customerName: customerName,
+        phone: phone,
+        deliveryDate: deliveryDate,
+        assignedRoute: assignedRoute || 'Unassigned',
+        notes: notes,
+        products: validProducts.map(p => ({ name: p.product, qty: p.qty, unit: p.unit || 'ea' })),
+        status: 'Pending',
+        createdAt: new Date().toISOString(),
+        createdBy: userEmail || 'Unknown'
+    };
+    
+    // Save to localStorage
+    var existingOrders = localStorage.getItem('logiflow_callin_orders');
+    var orders = existingOrders ? JSON.parse(existingOrders) : [];
+    orders.push(order);
+    localStorage.setItem('logiflow_callin_orders', JSON.stringify(orders));
+    
+    // Also append to a Google Sheet if signed in
+    if (accessToken) {
+        try {
+            var sheetRow = [
+                order.orderId,
+                order.customerName,
+                order.phone,
+                order.deliveryDate,
+                order.assignedRoute,
+                order.products.map(p => p.name + ' x' + p.qty).join('; '),
+                order.notes,
+                order.status,
+                order.createdAt,
+                order.createdBy
+            ];
+            await appendToCallInSheet(sheetRow);
+            showToast('Order saved to Google Sheets!', false);
+        } catch(e) {
+            console.warn('Could not save to Google Sheets:', e);
+        }
+    }
+    
+    // Display order summary
+    var productList = validProducts.map(p => '- ' + p.name + ' x' + p.qty + ' (' + (p.unit || 'ea') + ')').join('\n');
+    alert('✅ Order Saved!\n\n' +
+          'Order ID: ' + order.orderId + '\n' +
+          'Customer: ' + customerName + '\n' +
+          'Phone: ' + phone + '\n' +
+          'Delivery Date: ' + deliveryDate + '\n' +
+          'Route: ' + (assignedRoute || 'Unassigned') + '\n\n' +
+          'Products:\n' + productList + '\n\n' +
+          'Notes: ' + (notes || 'None') + '\n\n' +
+          'The order has been saved. You can view it in the Orders section.');
+    
+    closeCallInModal();
+};
+
+// Append to Call In Orders sheet
+async function appendToCallInSheet(rowData) {
+    if (!accessToken) return false;
+    try {
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + GOOGLE_SHEET_ID + '/values/CallInOrders!A:J:append?valueInputOption=USER_ENTERED';
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [rowData] })
+        });
+        return response.ok;
+    } catch(e) { return false; }
+}
+
+// Add a button to view orders (optional)
+function addOrdersViewButton() {
+    var managerDiv = document.querySelector('#mgrModal .modal-content');
+    if (managerDiv) {
+        var ordersBtn = document.createElement('button');
+        ordersBtn.id = 'btnViewOrders';
+        ordersBtn.className = 'mgmt-nav-btn';
+        ordersBtn.innerHTML = 'View Orders';
+        ordersBtn.onclick = function() { viewCallInOrders(); };
+        var buttonContainer = document.querySelector('#mgrModal .modal-content div:first-child');
+        if (buttonContainer) buttonContainer.appendChild(ordersBtn);
+    }
+}
+
+// View saved orders
+window.viewCallInOrders = function() {
+    var existingOrders = localStorage.getItem('logiflow_callin_orders');
+    var orders = existingOrders ? JSON.parse(existingOrders) : [];
+    
+    if (orders.length === 0) {
+        alert('No orders found.');
+        return;
+    }
+    
+    var orderList = orders.map(function(o, idx) {
+        return (idx + 1) + '. ' + o.orderId + ' - ' + o.customerName + ' - ' + o.deliveryDate + ' - ' + o.status;
+    }).join('\n');
+    
+    alert('📋 Saved Orders:\n\n' + orderList + '\n\n(Check browser console for details)');
+    console.log('All orders:', orders);
+};
+
+// Override the original managerCallInOrder if it exists
+if (typeof window.originalManagerCallInOrder === 'undefined') {
+    window.originalManagerCallInOrder = window.managerCallInOrder;
+}
+window.managerCallInOrder = window.managerCallInOrder || function() { window.managerCallInOrder(); };
+
+console.log('Call in Order feature fully loaded');
+</script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
