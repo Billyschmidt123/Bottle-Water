@@ -1093,18 +1093,15 @@ function init() {
 
 init();
 </script>
-    <!-- ========== ADDITIVE FIX: Corrected PDF Layout that Fits on One Page ========== -->
+<!-- ========== ADDITIVE FIX: PDF Size 8.5 x 11 inches - Fits on One Page ========== -->
 <script>
-(function fixPDFLayout() {
-    // Wait for the original function to be defined
+(function fixPDFSize() {
     var checkInterval = setInterval(function() {
         if (typeof window.validateAndFinishStop === 'function') {
             clearInterval(checkInterval);
             
-            // Store the original function
             var originalValidateAndFinishStop = window.validateAndFinishStop;
             
-            // Override with fixed PDF layout
             window.validateAndFinishStop = async function() {
                 var receiverName = document.getElementById('receivedBy').value.trim();
                 if (!receiverName) {
@@ -1132,98 +1129,157 @@ init();
                     alert('Warning: Could not save to Google Sheets. Please check your Google sign-in.');
                 }
                 
-                // Build product rows for PDF - COMPACT VERSION
+                var dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                // Build product rows
                 var productRows = '';
                 for (var i = 0; i < deliveryCart.length; i++) {
                     var item = deliveryCart[i];
                     productRows += '<tr>' +
-                        '<td style="border:1px solid #000; padding:3px; text-align:center; font-size:9px;">' + item.qty + '</td>' +
-                        '<td style="border:1px solid #000; padding:3px; font-size:9px;">' + item.name + '</td>' +
-                        '<td style="border:1px solid #000; padding:3px; font-size:9px;">' + item.units + '</td>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:center;">' + item.qty + '</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">' + item.name + '</td>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px; text-align:right;">&nbsp;</td>' +
                         '</tr>';
                 }
                 
-                // Add empty rows to fill space
+                // Empty rows
                 var emptyRows = '';
-                for (var i = deliveryCart.length; i < 8; i++) {
+                for (var i = deliveryCart.length; i < 10; i++) {
                     emptyRows += '<tr>' +
-                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
-                        '<td style="border:1px solid #000; padding:3px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
+                        '<td style="border:1px solid #000; padding:5px;">&nbsp;</td>' +
                         '</tr>';
                 }
                 
-                var dateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                
-                // COMPACT PDF HTML - FITS ON ONE PAGE
-                var pdfHTML = '<div style="width:100%; max-width:620px; margin:0 auto; padding:10px; font-family:\'Courier New\', Courier, monospace; font-size:10px;">' +
+                // PDF HTML - Exactly matches your design, sized for 8.5x11 letter paper
+                var pdfHTML = '<!DOCTYPE html>' +
+                '<html>' +
+                '<head>' +
+                '<meta charset="UTF-8">' +
+                '<style>' +
+                'body { font-family: "Courier New", Courier, monospace; margin: 0; padding: 0; background: white; }' +
+                '.slip-container { width: 7.5in; margin: 0.25in auto; padding: 0.1in; background: white; }' +
+                '.header-row { display: flex; justify-content: space-between; margin-bottom: 15px; }' +
+                '.company-box { width: 55%; }' +
+                '.company-name { font-size: 22px; font-weight: bold; border-bottom: 1px solid #000; }' +
+                '.company-sub { font-size: 10px; letter-spacing: 2px; }' +
+                '.company-address { font-size: 8px; margin-top: 8px; line-height: 1.3; }' +
+                '.delivery-box { width: 40%; text-align: right; }' +
+                '.date-line { border-bottom: 1px solid #000; margin-bottom: 8px; font-size: 10px; }' +
+                '.date-line span { float: left; }' +
+                '.clear { clear: both; }' +
+                '.slip-red-box { border: 2px solid red; padding: 5px; text-align: center; margin-top: 5px; }' +
+                '.slip-title { font-size: 14px; font-weight: bold; }' +
+                '.slip-number { font-size: 18px; font-weight: bold; }' +
+                '.slip-note { font-size: 7px; }' +
+                '.instructions-box { border: 1px solid #000; min-height: 50px; padding: 5px; margin-top: 10px; position: relative; }' +
+                '.instructions-label { font-size: 8px; position: absolute; top: -5px; left: 8px; background: white; padding: 0 4px; }' +
+                '.sold-to { margin: 12px 0 5px 0; }' +
+                '.sold-to-line { border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 5px; }' +
+                '.address-line { border-bottom: 1px solid #000; padding: 3px 0; }' +
+                '.product-table { width: 100%; border-collapse: collapse; margin: 10px 0; border: 2px solid #000; }' +
+                '.product-table th, .product-table td { border: 1px solid #000; padding: 5px; }' +
+                '.product-table th { text-align: center; font-size: 10px; }' +
+                '.payment-row { border-top: 2px solid #000; }' +
+                '.signature-row { display: flex; justify-content: space-between; margin-top: 15px; }' +
+                '.signature-box { width: 48%; }' +
+                '.signature-line { border-bottom: 1px solid #000; margin-top: 35px; }' +
+                '.signature-image { max-height: 50px; max-width: 200px; margin-top: -15px; }' +
+                '.signature-label { font-size: 7px; text-align: center; margin-top: 2px; }' +
+                '.terms { font-size: 6px; text-align: center; margin-top: 12px; }' +
+                '.payment-options { font-size: 7px; display: flex; gap: 12px; padding: 5px; }' +
+                '</style>' +
+                '</head>' +
+                '<body>' +
+                '<div class="slip-container">' +
                     
-                    // Header section
-                    '<div style="display:flex; justify-content:space-between; margin-bottom:8px;">' +
-                        '<div style="width:55%;">' +
-                            '<div style="font-size:18px; font-weight:bold;">Culligan Water</div>' +
-                            '<div style="font-size:8px;">BOTTLE WATER</div>' +
-                            '<div style="margin-top:5px; font-size:7px;">598316 ALBERTA LTD.<br>12001-99 AVENUE<br>GRANDE PRAIRIE AB T8W 0J7</div>' +
+                    // Header Row
+                    '<div class="header-row">' +
+                        '<div class="company-box">' +
+                            '<div class="company-name">Culligan Water</div>' +
+                            '<div class="company-sub">BOTTLE WATER</div>' +
+                            '<div class="company-address">598316 ALBERTA LTD.<br>12001-99 AVENUE<br>GRANDE PRAIRIE AB T8W 0J7<br>PHONE: (780) 532-6384 Fax: (780) 539-3861</div>' +
                         '</div>' +
-                        '<div style="width:40%; text-align:right;">' +
-                            '<div style="border-bottom:1px solid #000; margin-bottom:3px; font-size:8px;"><span style="float:left;">DATE</span> <strong>' + dateFormatted + '</strong><div style="clear:both;"></div></div>' +
-                            '<div style="border:1px solid red; padding:3px; text-align:center;">' +
-                                '<div style="font-size:11px; font-weight:bold;">DELIVERY SLIP</div>' +
-                                '<div style="font-size:13px; font-weight:bold;">' + slipNum + '</div>' +
-                                '<div style="font-size:6px;">NOT YOUR INVOICE</div>' +
+                        '<div class="delivery-box">' +
+                            '<div class="date-line"><span>DATE</span> <strong>' + dateFormatted + '</strong><div class="clear"></div></div>' +
+                            '<div class="instructions-box">' +
+                                '<div class="instructions-label">SPECIAL INSTRUCTIONS</div>' +
+                                '<div style="margin-top: 8px; font-size: 9px;">' + (instructions || '') + '</div>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
                     
-                    // Sold To section
-                    '<div style="margin-bottom:8px;">' +
-                        '<div><strong>SOLD TO:</strong> ' + customerName + '</div>' +
-                        '<div><strong>ADDRESS:</strong> ' + address + '</div>' +
+                    // Sold To and Delivery Slip Box
+                    '<div style="display: flex; justify-content: space-between; margin: 10px 0;">' +
+                        '<div style="width: 55%;">' +
+                            '<div class="sold-to-line"><span style="font-size: 9px;">SOLD TO</span> <strong style="font-size: 12px;">' + customerName + '</strong></div>' +
+                            '<div class="address-line">' + address + '</div>' +
+                            '<div class="address-line">&nbsp;</div>' +
+                            '<div class="address-line">&nbsp;</div>' +
+                        '</div>' +
+                        '<div style="width: 38%;">' +
+                            '<div class="slip-red-box">' +
+                                '<div class="slip-title">DELIVERY SLIP</div>' +
+                                '<div class="slip-number">' + slipNum + '</div>' +
+                                '<div class="slip-note">THIS IS NOT YOUR INVOICE<br>INVOICE TO FOLLOW</div>' +
+                            '</div>' +
+                        '</div>' +
                     '</div>' +
                     
-                    // Special Instructions (if any)
-                    (instructions ? '<div style="margin-bottom:8px; padding:3px; background:#f9f9f9;"><strong>INSTRUCTIONS:</strong> ' + instructions + '</div>' : '') +
-                    
-                    // Products table - COMPACT
-                    '<table style="width:100%; border-collapse:collapse; margin:6px 0;">' +
+                    // Product Table
+                    '<table class="product-table">' +
                         '<thead>' +
-                            '<tr style="background:#eee;">' +
-                                '<th style="border:1px solid #000; padding:3px; width:15%; text-align:center;">QTY</th>' +
-                                '<th style="border:1px solid #000; padding:3px; width:65%; text-align:left;">DESCRIPTION</th>' +
-                                '<th style="border:1px solid #000; padding:3px; width:20%; text-align:left;">UNIT</th>' +
+                            '<tr>' +
+                                '<th style="width: 12%;">QTY.</th>' +
+                                '<th style="width: 58%;">DESCRIPTION</th>' +
+                                '<th style="width: 15%;">EACH</th>' +
+                                '<th style="width: 15%;">TOTAL</th>' +
                             '</tr>' +
                         '</thead>' +
                         '<tbody>' +
                             productRows +
                             emptyRows +
+                            '<tr class="payment-row">' +
+                                '<td colspan="2" class="payment-options">' +
+                                    '<span>CASH [ ]</span> <span>CHQ [ ]</span> <span>VISA [ ]</span> <span>M/C [ ]</span> <span>INTERAC [ ]</span>' +
+                                '</td>' +
+                                '<td style="border: 1px solid #000; text-align: center; font-weight: bold;">TOTAL</td>' +
+                                '<td style="border: 1px solid #000;">&nbsp;</td>' +
+                            '</tr>' +
                         '</tbody>' +
                     '</table>' +
                     
-                    // Footer with signature and received by
-                    '<div style="display:flex; justify-content:space-between; margin-top:8px;">' +
-                        '<div style="width:45%;">' +
-                            '<div style="border-bottom:1px solid #000; margin-top:15px;"></div>' +
-                            '<img src="' + sigImage + '" style="max-height:40px; max-width:180px; margin-top:-12px;">' +
-                            '<div style="font-size:7px; text-align:center;">SIGNATURE</div>' +
+                    // Signature Row
+                    '<div class="signature-row">' +
+                        '<div class="signature-box">' +
+                            '<div class="signature-line"></div>' +
+                            '<img src="' + sigImage + '" class="signature-image">' +
+                            '<div class="signature-label">CUSTOMER SIGNATURE</div>' +
                         '</div>' +
-                        '<div style="width:45%;">' +
-                            '<div style="border-bottom:1px solid #000; text-align:center; font-weight:bold; padding-bottom:2px;">' + receiverName + '</div>' +
-                            '<div style="font-size:7px; text-align:center;">RECEIVED BY</div>' +
+                        '<div class="signature-box">' +
+                            '<div class="signature-line" style="text-align: center; font-weight: bold; padding-bottom: 2px;">' + receiverName + '</div>' +
+                            '<div class="signature-label">RECEIVED BY (PRINT NAME)</div>' +
                         '</div>' +
                     '</div>' +
                     
                     // Terms
-                    '<div style="margin-top:10px; font-size:6px; text-align:center;">' +
-                        'G.S.T. #8991131088 RT | NET 30 DAYS | 2% MONTHLY INTEREST' +
+                    '<div class="terms">' +
+                        'G.S.T. #8991131088 RT | TERMS OF PAYMENT: CASH OR ON APPROVED CREDIT.<br>' +
+                        'NET 30 DAYS. 2% PER MONTH INTEREST CHARGES ON ALL OVERDUE ACCOUNTS.' +
                     '</div>' +
-                '</div>';
+                '</div>' +
+                '</body>' +
+                '</html>';
                 
-                // PDF options - Letter size with smaller margins
+                // PDF options - EXACT 8.5 x 11 inches (Letter)
                 var opt = { 
-                    margin: [0.4, 0.4, 0.4, 0.4],  // top, right, bottom, left in inches
+                    margin: [0.3, 0.3, 0.3, 0.3],  // top, right, bottom, left in inches
                     filename: fileName, 
                     image: { type: 'jpeg', quality: 0.98 }, 
-                    html2canvas: { scale: 1.5, letterRendering: true }, 
+                    html2canvas: { scale: 2, letterRendering: true, useCORS: true },
                     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
                 };
                 
@@ -1259,11 +1315,12 @@ init();
                 }
             };
             
-            console.log('PDF layout fix applied - compact version fits on one page');
+            console.log('PDF size fix applied - 8.5x11 letter format');
         }
     }, 500);
 })();
 </script>
+<!-- ========== END OF ADDITIVE FIX ========== -->
 <!-- ========== END OF ADDITIVE FIX ========== -->
 </body>
 </html>
