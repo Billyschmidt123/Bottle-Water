@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System</title>
+    <title>LogiFlow Delivery System - Live Data</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -11,7 +11,7 @@
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
         header { background: #004a99; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .main-container { display: none; flex: 1; overflow: hidden; }
         #map { flex: 1; height: 100%; }
         .side-panel { width: 380px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
         .panel-header { padding: 15px; border-bottom: 1px solid #eee; }
@@ -22,6 +22,8 @@
         .btn-danger:hover { background: #c82333; }
         .btn-success { background: #28a745; }
         .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
         .mgmt-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
@@ -29,7 +31,7 @@
         .mgmt-table th { background: #f0f0f0; position: sticky; top: 0; }
         .mgmt-nav-btn { padding: 10px 20px; border: none; background: #eee; cursor: pointer; border-radius: 4px 4px 0 0; margin-right: 5px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
-        .driver-nav-bar { background: #e9ecef; padding: 10px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #dee2e6; flex-wrap: wrap; }
+        .driver-nav-bar { background: #e9ecef; padding: 10px 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #dee2e6; flex-wrap: wrap; display: none; }
         .info-bar { background: #fff; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; flex-grow: 1; }
         .btn-nav { padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: white; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 8px; z-index: 2000; animation: fadeOut 3s ease-in-out forwards; }
@@ -44,7 +46,7 @@
         .search-bar { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
         .search-bar input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .badge { background: #28a745; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-        .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; }
+        .working-bottom-btn { position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; display: none; }
         .working-bottom-btn:hover { background: #218838; }
         .edit-modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; margin: 15px 0; max-height: 55vh; overflow-y: auto; padding: 5px; }
         .edit-field-group { display: flex; flex-direction: column; }
@@ -53,8 +55,8 @@
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
         .modal-buttons-left { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
         
-        /* PIN Login Modal */
-        .pin-overlay {
+        /* Login Modal */
+        .login-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -66,26 +68,33 @@
             align-items: center;
             z-index: 20000;
         }
-        .pin-container {
+        .login-container {
             background: white;
             padding: 40px;
             border-radius: 16px;
             text-align: center;
-            width: 360px;
+            width: 420px;
             max-width: 90%;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        .pin-container h1 { color: #004a99; margin-bottom: 10px; font-size: 28px; }
-        .pin-subtitle { color: #666; margin-bottom: 25px; font-size: 14px; }
-        .pin-input { font-size: 36px; text-align: center; letter-spacing: 8px; padding: 12px; width: 100%; margin-bottom: 20px; border: 2px solid #ccc; border-radius: 8px; font-family: monospace; }
-        .pin-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
-        .pin-num-btn { padding: 15px; font-size: 20px; background: #f0f0f0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .pin-num-btn:hover { background: #ddd; }
-        .pin-clear { background: #ffc107; }
-        .pin-enter { background: #28a745; color: white; }
+        .login-logo { font-size: 60px; color: #004a99; margin-bottom: 15px; }
+        .login-container h1 { color: #004a99; margin-bottom: 8px; font-size: 28px; }
+        .login-subtitle { color: #666; margin-bottom: 25px; font-size: 14px; }
+        .pin-input-group { margin-bottom: 20px; text-align: left; }
+        .pin-input-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+        .pin-input { font-size: 32px; text-align: center; letter-spacing: 8px; padding: 12px; width: 100%; border: 2px solid #ccc; border-radius: 8px; font-family: monospace; }
+        .login-btn { background: #28a745; color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
+        .login-btn:hover { background: #218838; }
+        .sheet-input-group { margin-top: 20px; text-align: left; border-top: 1px solid #eee; padding-top: 20px; }
+        .sheet-input-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; font-size: 13px; }
+        .sheet-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; font-family: monospace; }
+        .help-text { font-size: 11px; color: #999; margin-top: 5px; }
         .route-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; background: #fff; margin: 2px 0; border-radius: 4px; transition: background 0.2s; }
         .route-item:hover { background: #e8f0fe; }
-        .sheet-id-input { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status-active { color: green; font-weight: bold; }
+        .status-inactive { color: red; text-decoration: line-through; }
     </style>
 </head>
 <body>
@@ -94,9 +103,9 @@
     <div><h1 style="margin:0; font-size:1.5rem;">LogiFlow Delivery</h1></div>
     <div style="display:flex; gap:10px; align-items:center;">
         <div id="userInfoDisplay" style="display:none;" class="user-info"></div>
-        <span id="onlineStatus" class="badge" style="background:#28a745;"><i class="fas fa-check-circle"></i> Online</span>
-        <button id="btnManager" class="btn-top">Manager</button>
-        <button id="btnForceRefresh" class="btn-top"><i class="fas fa-sync"></i></button>
+        <span id="onlineStatus" class="badge" style="background:#dc3545;"><i class="fas fa-cloud-download-alt"></i> Not Connected</span>
+        <button id="btnManager" class="btn-top" style="display:none;">Manager</button>
+        <button id="btnForceRefresh" class="btn-top" style="display:none;"><i class="fas fa-sync"></i></button>
     </div>
 </header>
 
@@ -117,7 +126,7 @@
             <h3 style="margin:0 0 10px 0;">Select a Route</h3>
             <select id="routeDropdown" class="btn-top" style="background:#0056b3; width:100%;"></select>
         </div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Select a route</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Login to load routes</p></div>
     </div>
 </div>
 
@@ -139,7 +148,7 @@
             <button id="btnViewSlips" class="mgmt-nav-btn">View Slips</button>
             <button id="btnViewPastLogs" class="mgmt-nav-btn">Past Logs</button>
             <button id="btnUserMgmt" class="mgmt-nav-btn">User Management</button>
-            <button id="btnRefreshData" class="mgmt-nav-btn" style="background:#17a2b8;">⟳ Refresh Data</button>
+            <button id="btnRefreshData" class="mgmt-nav-btn" style="background:#17a2b8;">⟳ Refresh Live Data</button>
         </div>
         <div id="custView"><div class="search-bar"><input type="text" id="custSearch" placeholder="Search customers..." onkeyup="filterCustomers()"><span id="custCount" class="badge"></span></div><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody>}</div>
         <div id="prodView" style="display:none;"><div class="search-bar"><input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterProducts()"><span id="prodCount" class="badge"></span></div><div style="margin-bottom:10px;"><button id="btnLoadCoffee" class="btn-top">☕ Coffee Products</button><button id="btnLoadWater" class="btn-top">💧 Water Products</button></div><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody>}</div>
@@ -184,16 +193,14 @@
 
 <script>
 // ============================================================
-// CONFIGURATION
+// CONFIGURATION - LIVE GOOGLE SHEETS
 // ============================================================
-// Google Sheet ID - You can change this to your sheet ID
-// Your sheet needs these tabs: Customers, Coffees, Waters, Routes, and route tabs
+// Default Google Sheet ID - Your sheet from config
 const DEFAULT_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
 
-// Store the current sheet ID
 var currentSheetId = localStorage.getItem('logiflow_sheet_id') || DEFAULT_SHEET_ID;
-var isLoggedIn = true;
-var currentUser = "Driver";
+var isLiveMode = false;
+var currentUser = "";
 
 // Global variables
 var currentProdList = [];
@@ -212,70 +219,90 @@ var currentEditingProductIndex = -1;
 var allRoutes = [];
 
 // ============================================================
-// PIN LOGIN SYSTEM
+// LOGIN MODAL - PIN + LIVE DATA BUTTON
 // ============================================================
-function showPinLogin() {
+function showLoginModal() {
     var modal = document.createElement('div');
-    modal.id = 'pinModal';
-    modal.className = 'pin-overlay';
+    modal.id = 'loginModal';
+    modal.className = 'login-overlay';
     modal.innerHTML = `
-        <div class="pin-container">
-            <div style="font-size:50px; margin-bottom:15px;">🚚</div>
+        <div class="login-container">
+            <div class="login-logo"><i class="fas fa-truck"></i></div>
             <h1>LogiFlow Delivery</h1>
-            <div class="pin-subtitle">Enter PIN to access system</div>
-            <input type="password" id="pinInput" class="pin-input" maxlength="4" placeholder="****" autofocus>
-            <div class="pin-buttons">
-                <button class="pin-num-btn" data-num="1">1</button><button class="pin-num-btn" data-num="2">2</button><button class="pin-num-btn" data-num="3">3</button>
-                <button class="pin-num-btn" data-num="4">4</button><button class="pin-num-btn" data-num="5">5</button><button class="pin-num-btn" data-num="6">6</button>
-                <button class="pin-num-btn" data-num="7">7</button><button class="pin-num-btn" data-num="8">8</button><button class="pin-num-btn" data-num="9">9</button>
-                <button class="pin-num-btn" data-num="0">0</button><button class="pin-num-btn pin-clear" id="pinClear">Clear</button><button class="pin-num-btn pin-enter" id="pinEnter">Enter</button>
+            <div class="login-subtitle">Enter your PIN to access the system</div>
+            
+            <div class="pin-input-group">
+                <label><i class="fas fa-lock"></i> Security PIN</label>
+                <input type="password" id="loginPin" class="pin-input" maxlength="4" placeholder="****" autofocus>
             </div>
-            <div style="margin-top:20px; font-size:12px; color:#999;">
+            
+            <button id="liveLoginBtn" class="login-btn" style="background:#28a745;">
+                <i class="fas fa-cloud-upload-alt"></i> LOGIN & LOAD LIVE DATA
+            </button>
+            
+            <div class="sheet-input-group">
+                <label><i class="fas fa-table"></i> Google Sheet ID (Optional)</label>
+                <input type="text" id="sheetIdInput" class="sheet-input" placeholder="Enter your Google Sheet ID" value="${currentSheetId}">
+                <div class="help-text">Your sheet needs tabs: Customers, Coffees, Waters, Routes, and route tabs</div>
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 11px; color: #999;">
                 <i class="fas fa-info-circle"></i> Default PIN: <strong>1234</strong>
-            </div>
-            <div style="margin-top:15px;">
-                <button id="changeSheetBtn" style="background:none; border:none; color:#004a99; cursor:pointer; font-size:12px;">
-                    <i class="fas fa-database"></i> Change Google Sheet ID
-                </button>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
     
-    var pinInput = document.getElementById('pinInput');
-    var clearBtn = document.getElementById('pinClear');
-    var enterBtn = document.getElementById('pinEnter');
+    var pinInput = document.getElementById('loginPin');
+    var sheetInput = document.getElementById('sheetIdInput');
+    var liveBtn = document.getElementById('liveLoginBtn');
     
-    document.querySelectorAll('.pin-num-btn[data-num]').forEach(btn => {
-        btn.onclick = () => { if(pinInput.value.length < 4) pinInput.value += btn.dataset.num; };
-    });
-    
-    clearBtn.onclick = () => pinInput.value = '';
-    enterBtn.onclick = () => {
-        if (pinInput.value === '1234') {
-            modal.remove();
-            completeLogin();
-        } else {
-            alert('Invalid PIN. Try 1234');
-            pinInput.value = '';
-        }
-    };
-    
-    document.getElementById('changeSheetBtn').onclick = () => {
-        var newId = prompt('Enter your Google Sheet ID:', currentSheetId);
-        if (newId && newId.trim()) {
-            currentSheetId = newId.trim();
+    // Update sheet ID when changed
+    sheetInput.onchange = function() {
+        if (sheetInput.value.trim()) {
+            currentSheetId = sheetInput.value.trim();
             localStorage.setItem('logiflow_sheet_id', currentSheetId);
-            showToast('Sheet ID updated. Refresh data to load from new sheet.', false);
         }
     };
+    
+    liveBtn.onclick = function() {
+        var pin = pinInput.value;
+        if (pin === '1234') {
+            if (sheetInput.value.trim()) {
+                currentSheetId = sheetInput.value.trim();
+                localStorage.setItem('logiflow_sheet_id', currentSheetId);
+            }
+            modal.remove();
+            startLiveMode();
+        } else {
+            alert('Invalid PIN. Please enter 1234');
+            pinInput.value = '';
+            pinInput.focus();
+        }
+    };
+    
+    pinInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') liveBtn.click();
+    });
     
     pinInput.focus();
 }
 
-function completeLogin() {
-    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+function startLiveMode() {
+    isLiveMode = true;
+    currentUser = "Live User";
+    
+    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-cloud-upload-alt"></i> LIVE - Connected';
     document.getElementById('onlineStatus').style.background = '#28a745';
+    document.getElementById('btnManager').style.display = 'inline-block';
+    document.getElementById('btnForceRefresh').style.display = 'inline-block';
+    document.getElementById('driverNavBar').style.display = 'flex';
+    document.getElementById('mainContainer').style.display = 'flex';
+    document.getElementById('workingBottomBtn').style.display = 'flex';
+    
+    var userInfoDiv = document.getElementById('userInfoDisplay');
+    userInfoDiv.style.display = 'flex';
+    userInfoDiv.innerHTML = `<i class="fas fa-cloud" style="font-size:20px;"></i><span>Live Mode</span><button class="logout-btn" onclick="logout()">Logout</button>`;
     
     // Initialize map
     map = L.map('map').setView([55.17, -118.79], 12);
@@ -283,26 +310,37 @@ function completeLogin() {
         attribution: '© OpenStreetMap'
     }).addTo(map);
     
-    // Load data from Google Sheet using CSV export (works without OAuth)
-    loadAllData();
+    // Load live data from Google Sheets
+    loadAllLiveData();
+}
+
+function logout() {
+    location.reload();
+}
+
+function showToast(msg, isErr) {
+    var toast = document.createElement('div');
+    toast.className = 'toast-notification' + (isErr ? ' toast-error' : '');
+    toast.innerHTML = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
 }
 
 // ============================================================
-// LOAD DATA FROM GOOGLE SHEET USING CSV EXPORT (NO OAUTH NEEDED!)
+// LOAD LIVE DATA FROM GOOGLE SHEETS (CSV Export - No OAuth)
 // ============================================================
-function loadAllData() {
-    showToast('Loading data from Google Sheet...', false);
-    loadCustomersFromSheet();
-    loadProductsFromSheet('Coffees');
-    loadRoutesFromSheet();
+async function loadAllLiveData() {
+    showToast('Loading live data from Google Sheet...', false);
+    await loadCustomersFromSheet();
+    await loadProductsFromSheet('Coffees');
+    await loadRoutesFromSheet();
 }
 
 async function loadCustomersFromSheet() {
     var tbody = document.getElementById('custTableBody');
-    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner" style="display:inline-block; width:20px; height:20px; border:3px solid #f3f3f3; border-top:3px solid #3498db; border-radius:50%; animation: spin 1s linear infinite;"></div> Loading customers...</div>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers from Google Sheet...</div>';
     
     try {
-        // Use CSV export format - works without authentication if sheet is published
         var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=Customers`;
         var response = await fetch(url);
         if (!response.ok) throw new Error('Sheet not accessible');
@@ -310,11 +348,10 @@ async function loadCustomersFromSheet() {
         
         var lines = csvText.split('\n').filter(l => l.trim());
         if (lines.length < 2) {
-            tbody.innerHTML = '<tr><td colspan="10">No customer data found. Create a "Customers" tab in your sheet.</div>';
+            tbody.innerHTML = '<tr><td colspan="10">⚠️ No customer data found. Create a "Customers" tab in your Google Sheet.</div>';
             return;
         }
         
-        // Parse CSV
         customerHeaders = parseCSVLine(lines[0]);
         customers = [];
         for (var i = 1; i < lines.length; i++) {
@@ -327,19 +364,19 @@ async function loadCustomersFromSheet() {
         }
         
         renderCustomerTable();
-        showToast(`Loaded ${customers.length} customers`, false);
+        showToast(`✅ Loaded ${customers.length} customers from Google Sheet`, false);
         
     } catch(err) {
         console.error('Error loading customers:', err);
-        tbody.innerHTML = `<tr><td colspan="10">❌ Error loading customers. Make sure your Google Sheet is published or the ID is correct.</div>`;
-        loadDemoCustomers();
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error loading customers. Make sure your Google Sheet is published.</div>`;
+        showToast('Error loading customers. Check Sheet ID and permissions.', true);
     }
 }
 
 async function loadProductsFromSheet(sheetName) {
     currentProductFile = sheetName;
     var tbody = document.getElementById('prodTableBody');
-    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading products...</div>';
+    tbody.innerHTML = `<td><td colspan="10"><div class="loading-spinner"></div> Loading ${sheetName} from Google Sheet...</div>`;
     
     try {
         var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=${sheetName}`;
@@ -349,7 +386,7 @@ async function loadProductsFromSheet(sheetName) {
         
         var lines = csvText.split('\n').filter(l => l.trim());
         if (lines.length < 2) {
-            tbody.innerHTML = `<tr><td colspan="10">No data in "${sheetName}" tab</div>`;
+            tbody.innerHTML = `<tr><td colspan="10">⚠️ No data in "${sheetName}" tab</div>`;
             return;
         }
         
@@ -366,11 +403,11 @@ async function loadProductsFromSheet(sheetName) {
         }
         
         renderProductTable();
-        showToast(`Loaded ${currentProdList.length} products from ${sheetName}`, false);
+        showToast(`✅ Loaded ${currentProdList.length} products from ${sheetName}`, false);
         
     } catch(err) {
-        tbody.innerHTML = `<table><td colspan="10">❌ Error loading products. Check sheet "${sheetName}"</div>`;
-        loadDemoProducts();
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error loading ${sheetName}</div>`;
+        showToast(`Error loading ${sheetName}`, true);
     }
 }
 
@@ -394,7 +431,7 @@ async function loadRoutesFromSheet() {
         var routeNameIdx = headers.findIndex(h => h.toLowerCase().includes('name')) || 0;
         
         allRoutes = [];
-        dropdown.innerHTML = '<option value="">-- Select Route --</option>';
+        dropdown.innerHTML = '<option value="">-- Select a Route --</option>';
         
         for (var i = 1; i < lines.length; i++) {
             var vals = parseCSVLine(lines[i]);
@@ -405,11 +442,11 @@ async function loadRoutesFromSheet() {
             opt.textContent = routeName;
             dropdown.appendChild(opt);
         }
-        showToast(`Loaded ${allRoutes.length} routes`, false);
+        showToast(`✅ Loaded ${allRoutes.length} routes from Google Sheet`, false);
         
     } catch(err) {
         dropdown.innerHTML = '<option value="">Error loading routes</option>';
-        loadDemoRoutes();
+        showToast('Error loading routes. Create a "Routes" tab in your sheet.', true);
     }
 }
 
@@ -428,7 +465,7 @@ document.getElementById('routeDropdown').onchange = async function() {
         
         var lines = csvText.split('\n').filter(l => l.trim());
         if (lines.length < 2) {
-            stopDiv.innerHTML = '<p>No stops found</p>';
+            stopDiv.innerHTML = '<p>No stops found in this route</p>';
             return;
         }
         
@@ -459,7 +496,7 @@ document.getElementById('routeDropdown').onchange = async function() {
             div.onclick = (function(idx, s) { return function() { selectStop(idx, s); }; })(i-1, stop);
             stopDiv.appendChild(div);
         }
-        showToast(`Loaded ${currentRouteStops.length} stops`, false);
+        showToast(`✅ Loaded ${currentRouteStops.length} stops for ${routeName}`, false);
         
     } catch(err) {
         stopDiv.innerHTML = '<p>Error loading stops</p>';
@@ -489,56 +526,20 @@ function parseCSVLine(line) {
 function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { return m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'; }); }
 
 // ============================================================
-// DEMO DATA (FALLBACK)
-// ============================================================
-function loadDemoCustomers() {
-    customers = [
-        { Name: "ABC Corporation", Address: "123 Main St", Phone: "555-0101", Email: "contact@abccorp.com" },
-        { Name: "XYZ Industries", Address: "456 Oak Ave", Phone: "555-0102", Email: "info@xyz.com" },
-        { Name: "Smith Trading", Address: "789 Pine Rd", Phone: "555-0103", Email: "smith@trading.com" }
-    ];
-    customerHeaders = ["Name", "Address", "Phone", "Email"];
-    renderCustomerTable();
-    showToast('Using demo customer data', false);
-}
-
-function loadDemoProducts() {
-    currentProdList = [
-        { Product: "Spring Water - 500ml", Price: "$1.50", Status: "Active" },
-        { Product: "Coffee - Medium Roast", Price: "$12.99", Status: "Active" },
-        { Product: "Water Cooler", Price: "$89.99", Status: "Active" }
-    ];
-    currentProdHeaders = ["Product", "Price", "Status"];
-    renderProductTable();
-}
-
-function loadDemoRoutes() {
-    allRoutes = ['Demo Route A', 'Demo Route B'];
-    var dropdown = document.getElementById('routeDropdown');
-    dropdown.innerHTML = '<option value="">-- Select Route --</option>';
-    allRoutes.forEach((route, i) => {
-        var opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = route + ' (Demo)';
-        dropdown.appendChild(opt);
-    });
-}
-
-// ============================================================
 // RENDER FUNCTIONS
 // ============================================================
 function renderCustomerTable() {
     var thead = document.getElementById('custTableHead');
     var tbody = document.getElementById('custTableBody');
-    var headerHtml = '<th>Action</th>';
+    var headerHtml = '<th style="width:80px;">Action</th>';
     customerHeaders.forEach(h => headerHtml += '<th>' + escapeHtml(h) + '</th>');
     thead.innerHTML = headerHtml;
     tbody.innerHTML = '';
     customers.forEach((cust, idx) => {
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + idx + ')">Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button></td>';
         customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</td>');
-        row += '</td>';
+        row += '</tr>';
         tbody.innerHTML += row;
     });
     document.getElementById('custCount').innerHTML = customers.length + ' records';
@@ -556,7 +557,7 @@ function filterCustomers() {
     tbody.innerHTML = '';
     filtered.forEach((cust, idx) => {
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + customers.indexOf(cust) + ')">Edit</button></td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + customers.indexOf(cust) + ')">✏️ Edit</button></td>';
         customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -567,9 +568,11 @@ function renderProductTable() {
     var tbody = document.getElementById('prodTableBody');
     tbody.innerHTML = '';
     currentProdList.forEach((p, idx) => {
-        var row = '<td>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + idx + ')">Edit</button></td>';
-        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
+        var statusClass = p.Status === 'Active' ? 'status-active' : 'status-inactive';
+        var statusText = p.Status === 'Active' ? '✅ Active' : '⭕ Inactive';
+        var row = '<tr>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + idx + ')">✏️ Edit</button></td>';
+        row += '<td class="' + statusClass + '">' + statusText + '</div>';
         currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -583,9 +586,11 @@ function filterProducts() {
     var tbody = document.getElementById('prodTableBody');
     tbody.innerHTML = '';
     filtered.forEach((p, idx) => {
+        var statusClass = p.Status === 'Active' ? 'status-active' : 'status-inactive';
+        var statusText = p.Status === 'Active' ? '✅ Active' : '⭕ Inactive';
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">Edit</button></td>';
-        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">✏️ Edit</button></td>';
+        row += '<td class="' + statusClass + '">' + statusText + '</div>';
         currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
@@ -617,7 +622,7 @@ function saveCustomerEdit() {
     });
     renderCustomerTable();
     closeCustomerEditModal();
-    showToast('Customer saved locally', false);
+    showToast('Customer updated locally', false);
 }
 
 function openProductEditModalNew(idx) {
@@ -646,7 +651,7 @@ function saveProductEditNew() {
     });
     renderProductTable();
     closeProductEditModalNew();
-    showToast('Product saved locally', false);
+    showToast('Product updated locally', false);
 }
 
 function toggleProductStatusNew() {
@@ -779,7 +784,7 @@ document.getElementById('btnShowCust').onclick = function() { document.getElemen
 document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; renderProductTable(); };
 document.getElementById('btnLoadCoffee').onclick = function() { loadProductsFromSheet('Coffees'); };
 document.getElementById('btnLoadWater').onclick = function() { loadProductsFromSheet('Waters'); };
-document.getElementById('btnRefreshData').onclick = function() { loadAllData(); };
+document.getElementById('btnRefreshData').onclick = function() { loadAllLiveData(); };
 document.getElementById('btnEndOfDay').onclick = function() { alert('End of Day Report'); };
 document.getElementById('btnLiveView').onclick = function() { alert('Live View - Map shows current location'); };
 document.getElementById('btnCallInOrder').onclick = function() { alert('Call in Order'); };
@@ -787,30 +792,29 @@ document.getElementById('btnBackup').onclick = function() { alert('Backup saved'
 document.getElementById('btnViewSlips').onclick = function() { alert('Delivery slips'); };
 document.getElementById('btnViewPastLogs').onclick = function() { alert('Past logs'); };
 document.getElementById('btnUserMgmt').onclick = function() { alert('User Management'); };
-document.getElementById('btnForceRefresh').onclick = function() { loadAllData(); };
+document.getElementById('btnForceRefresh').onclick = function() { loadAllLiveData(); };
 
-// Bottom button
+// ============================================================
+// BOTTOM BUTTON
+// ============================================================
 var bottomBtn = document.createElement('button');
+bottomBtn.id = 'workingBottomBtn';
 bottomBtn.className = 'working-bottom-btn';
 bottomBtn.innerHTML = '<i class="fas fa-cog"></i> MANAGER PANEL';
 bottomBtn.onclick = () => document.getElementById('mgrModal').style.display = 'flex';
 document.body.appendChild(bottomBtn);
 
-// Event listeners
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
 document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
 document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
 document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
 
-function showToast(msg, isErr) {
-    var toast = document.createElement('div');
-    toast.className = 'toast-notification' + (isErr ? ' toast-error' : '');
-    toast.innerHTML = msg;
-    document.body.appendChild(toast);
-    setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
-}
-
-// Start with PIN login
-showPinLogin();
+// ============================================================
+// START
+// ============================================================
+showLoginModal();
 </script>
 </body>
 </html>
