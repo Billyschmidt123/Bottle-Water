@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiFlow Delivery System | Google Drive Powered</title>
+    <title>LogiFlow Delivery System | Google Drive</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <!-- Google API Client Library -->
-    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; }
@@ -31,9 +29,15 @@
         .cart-box { border: 1px solid #cbd5e1; background: #fafcff; padding: 12px; border-radius: 16px; margin-top: 16px; }
         .route-stop-item { padding: 12px; border-bottom: 1px solid #edf2f7; cursor: pointer; transition: 0.1s; border-radius: 12px; margin-bottom: 4px; }
         .route-stop-item:hover { background: #e6f4ff; transform: translateX(4px); }
-        #loginModal .modal-content { max-width: 420px; text-align: center; }
-        .status-badge { background: #2c7da0; color: white; border-radius: 30px; padding: 4px 12px; font-size: 0.7rem; }
-        @media (max-width: 700px) { .side-panel { width: 280px; } .driver-nav-bar { gap: 6px; } }
+        #loginModal .modal-content { max-width: 450px; text-align: center; }
+        .status-badge { background: #2c7da0; color: white; border-radius: 30px; padding: 4px 12px; font-size: 0.7rem; display: inline-block; }
+        .user-info { display: flex; align-items: center; gap: 12px; background: #ffffff20; padding: 5px 12px; border-radius: 40px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: white; }
+        .google-btn { background: white; color: #555; border: none; padding: 10px 24px; border-radius: 40px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; font-size: 1rem; transition: 0.2s; }
+        .google-btn:hover { background: #f1f3f4; transform: scale(1.02); }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a4b8a; border-radius: 50%; animation: spin 1s linear infinite; margin-left: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (max-width: 700px) { .side-panel { width: 280px; } }
     </style>
 </head>
 <body>
@@ -43,16 +47,21 @@
         <h1 style="margin:0; font-size:1.4rem;">🚚 LogiFlow Drive</h1>
         <select id="routeDropdown" class="btn-top" style="background:#0f5b9c;"></select>
     </div>
-    <div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div id="userDisplay" style="display:none;" class="user-info">
+            <img id="userAvatar" class="user-avatar" src="">
+            <span id="userName"></span>
+        </div>
         <button id="btnManager" class="btn-top" style="background:#495057;">📋 Manager</button>
         <button id="btnForceRefresh" class="btn-top" style="background:#0d9488;"><i class="fas fa-sync-alt"></i> Sync</button>
+        <button id="btnLogout" class="btn-top" style="background:#6c757d; display:none;">🚪 Logout</button>
     </div>
 </header>
 
 <div class="driver-nav-bar">
     <button id="btnStartRoute" class="btn-nav" style="background: #2b6e3c;">▶ START ROUTE</button>
     <button id="btnFinishRoute" class="btn-nav" style="background: #b91c1c;">⏹ FINISH</button>
-    <button class="btn-nav" style="background: #b45309;" onclick="alert('Directions: Use map markers')"><i class="fas fa-directions"></i> DIRECTIONS</button>
+    <button class="btn-nav" style="background: #b45309;" onclick="alert('Use map markers for directions')"><i class="fas fa-directions"></i> DIRECTIONS</button>
     <div style="display: flex; gap: 5px;">
         <button class="btn-nav" style="background: #2563eb;" onclick="navigateStop(-1)"><i class="fas fa-chevron-left"></i></button>
         <button class="btn-nav" style="background: #2563eb;" onclick="navigateStop(1)"><i class="fas fa-chevron-right"></i></button>
@@ -72,6 +81,26 @@
     </div>
 </div>
 
+<!-- LOGIN MODAL - This appears first -->
+<div id="loginModal" class="modal-overlay" style="display:flex;">
+    <div class="modal-content">
+        <div style="text-align:center;">
+            <h2>🚚 LogiFlow Delivery System</h2>
+            <p style="color:#666;">Connect to Google Drive to access your routes, customers, and products</p>
+            <div style="background:#f8f9fa; border-radius:12px; padding:20px; margin:20px 0;">
+                <i class="fas fa-cloud-upload-alt" style="font-size:48px; color:#0a4b8a;"></i>
+                <p style="margin-top:10px;">This app needs access to:<br>
+                <strong>📁 Your Drive > LogiFlow folder</strong><br>
+                (Routes CSV files, Products data)</p>
+            </div>
+            <button id="googleSignInBtn" class="google-btn">
+                <img src="https://www.google.com/favicon.ico" style="width:20px;"> Sign in with Google
+            </button>
+            <p style="font-size:12px; color:#999; margin-top:20px;">Your data stays private in your Google Drive</p>
+        </div>
+    </div>
+</div>
+
 <!-- Manager Modal -->
 <div id="mgrModal" class="modal-overlay">
     <div class="modal-content">
@@ -81,7 +110,7 @@
             <button class="btn-top" onclick="renderCustTable()">👥 Customer Maintenance</button>
             <button class="btn-top" style="background:#4b5563;" onclick="managerProductMaint()">☕ Product Maintenance</button>
             <button class="btn-top" onclick="managerCallInOrder()">📞 Call-in Order</button>
-            <button class="btn-top" style="background:#4b5563;" onclick="alert('End of day summary (PDF) – coming soon')">📅 End of Day</button>
+            <button class="btn-top" style="background:#4b5563;" onclick="alert('End of day summary - Coming soon')">📅 End of Day</button>
         </div>
         <div style="background:#f8fafc; padding:12px; border-radius:16px;">
             <label>Filter Route: </label>
@@ -95,26 +124,26 @@
     </div>
 </div>
 
-<!-- EDIT CUSTOMER MODAL (Integrated Cart) -->
+<!-- EDIT CUSTOMER MODAL -->
 <div id="editModal" class="modal-overlay">
     <div class="modal-content" style="max-width:1000px;">
         <div style="display:flex; justify-content:space-between;"><h3>✏️ Edit Customer / Order</h3><button class="btn-top" style="background:#b91c1c;" onclick="closeModal('editModal')">Close</button></div>
         <div class="form-grid" id="editFieldsContainer"></div>
         <hr><h4>💧 Water Selection</h4>
         <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr auto;">
-            <select id="edit_WaterProduct" data-type="water"></select><select id="edit_WaterUnits"><option>Bottles</option><option>Cases</option></select><input type="number" id="edit_WaterQty" value="1" min="0" style="width:80px;"><button class="btn-top" onclick="addItemToEditCart('water')">➕ Add</button>
+            <select id="edit_WaterProduct"></select><select id="edit_WaterUnits"><option>Bottles</option><option>Cases</option></select><input type="number" id="edit_WaterQty" value="1" min="0" style="width:80px;"><button class="btn-top" onclick="addItemToEditCart('water')">➕ Add</button>
         </div>
         <h4>☕ Coffee Selection</h4>
         <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr auto;">
-            <select id="edit_CoffeeProduct" data-type="coffee"></select><select id="edit_CoffeeUnits"><option>Boxes</option><option>Cases</option></select><input type="number" id="edit_CoffeeQty" value="1" min="0"><button class="btn-top" onclick="addItemToEditCart('coffee')">➕ Add</button>
+            <select id="edit_CoffeeProduct"></select><select id="edit_CoffeeUnits"><option>Boxes</option><option>Cases</option></select><input type="number" id="edit_CoffeeQty" value="1" min="0"><button class="btn-top" onclick="addItemToEditCart('coffee')">➕ Add</button>
         </div>
         <div class="cart-box"><strong>🛒 Cart:</strong> <div id="editCartItemsDisplay">Empty</div></div>
-        <div class="form-group"><label>📝 Order Notes</label><input type="text" id="edit_OrderNotes" style="width:100%;"></div>
+        <div><label>📝 Order Notes</label><input type="text" id="edit_OrderNotes" style="width:100%;"></div>
         <div style="margin-top:20px; text-align:right;"><button class="btn-top" style="background:#2563eb;" id="saveRecordBtn">💾 Save Changes</button></div>
     </div>
 </div>
 
-<!-- New Customer Modal (simple) -->
+<!-- New Customer Modal -->
 <div id="newCustModal" class="modal-overlay">
     <div class="modal-content" style="max-width:800px;"><h3>🆕 New Customer</h3><div id="newCustFields"></div><div style="margin-top:20px; text-align:right;"><button class="btn-top" onclick="closeModal('newCustModal')">Cancel</button><button class="btn-top" style="background:#15803d;" id="saveNewCustBtn">Create</button></div></div>
 </div>
@@ -124,171 +153,252 @@
     <div class="modal-content"><h3>📞 Call-in Order</h3><div id="callInFormGrid"></div><div class="cart-box"><strong>Cart:</strong> <div id="callinCartDisplay"></div></div><div style="margin-top:20px;"><button class="btn-top" onclick="closeModal('callInModal')">Cancel</button><button class="btn-top" style="background:#2b6e3c;" id="saveCallInBtn">Save Order</button></div></div>
 </div>
 
-<!-- Login Modal for Google Drive -->
-<div id="loginModal" class="modal-overlay" style="display:flex;">
-    <div class="modal-content">
-        <h2>🔐 LogiFlow Access</h2>
-        <p>Grant access to Google Drive to load routes, customers & products.</p>
-        <button id="googleSignInBtn" class="btn-top" style="background:#0f5b9c; font-size:1.1rem;">🔑 Sign in with Google</button>
-        <hr><small>Data stored in your Drive folders. Your files remain private.</small>
-    </div>
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <script>
-    // ---------- global state ----------
-    let globalCustomers = [];       // each: { __route, ... csvHeaders }
+    // ============ CONFIGURATION ============
+    const CONFIG = {
+        GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
+        API_KEY: '', // Not needed for OAuth flow
+        SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
+        ROUTES_FOLDER_ID: '1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr',
+        WATER_PRODUCTS_FILE_ID: '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX',
+        COFFEE_PRODUCTS_FILE_ID: '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs'
+    };
+
+    // ============ GLOBAL STATE ============
+    let tokenClient = null;
+    let accessToken = null;
+    let currentUser = null;
+    let globalCustomers = [];
     let csvHeaders = [];
     let availableRoutes = [];
     let productMap = { water: [], coffee: [] };
     let currentEditIndex = null;
     let editCartItems = [];
     let callInCart = [];
-    let isGapiLoaded = false;
-    let tokenClient = null;
-    let accessToken = null;
     let currentRouteStops = [];
-    
-    // ---------- Google Drive Config (from provided snippet) ----------
-    const CONFIG = {
-        GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-        MAIN_FOLDER_ID: '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk',
-        ROUTES_FOLDER_ID: '1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr',
-        WATER_PRODUCTS_FILE_ID: '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX',
-        COFFEE_PRODUCTS_FILE_ID: '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs',
-        getFileDownloadUrl: (id) => `https://drive.google.com/uc?export=download&id=${id}`
-    };
+    let map, routeMarkers = [], currentStopIndex = 0;
 
-    // ---------- Google Auth & Drive API helpers ----------
-    function initGapi() {
-        gapi.load('client', async () => {
-            await gapi.client.init({
-                apiKey: '',
-                clientId: CONFIG.GOOGLE_CLIENT_ID,
-                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file'
-            });
-            isGapiLoaded = true;
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CONFIG.GOOGLE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
-                callback: (resp) => {
-                    if (resp.error) { console.error(resp); alert('Auth failed'); return; }
-                    accessToken = resp.access_token;
-                    document.getElementById('loginModal').style.display = 'none';
-                    loadAllDataFromDrive();
+    // ============ GOOGLE AUTHENTICATION ============
+    function initializeGapi() {
+        console.log("Initializing Google API...");
+        
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CONFIG.GOOGLE_CLIENT_ID,
+            scope: CONFIG.SCOPES,
+            callback: async (tokenResponse) => {
+                if (tokenResponse.error) {
+                    console.error("Auth error:", tokenResponse);
+                    alert("Authentication failed: " + tokenResponse.error);
+                    return;
                 }
-            });
+                accessToken = tokenResponse.access_token;
+                console.log("Got access token");
+                
+                // Get user info from Google
+                await fetchUserInfo();
+                
+                // Close login modal and load data
+                document.getElementById('loginModal').style.display = 'none';
+                document.getElementById('btnLogout').style.display = 'inline-block';
+                document.getElementById('userDisplay').style.display = 'flex';
+                
+                await loadAllDataFromDrive();
+            }
         });
     }
 
-    document.getElementById('googleSignInBtn').onclick = () => { if(tokenClient) tokenClient.requestAccessToken(); else alert("Loading APIs..."); };
+    async function fetchUserInfo() {
+        try {
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            currentUser = await res.json();
+            document.getElementById('userName').innerText = currentUser.name || currentUser.email;
+            if (currentUser.picture) {
+                document.getElementById('userAvatar').src = currentUser.picture;
+            }
+        } catch(e) { console.error("Failed to get user info", e); }
+    }
 
+    function signOut() {
+        if (tokenClient) {
+            // Revoke token
+            fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' })
+                .catch(e => console.log("Revoke error", e));
+        }
+        accessToken = null;
+        currentUser = null;
+        document.getElementById('loginModal').style.display = 'flex';
+        document.getElementById('btnLogout').style.display = 'none';
+        document.getElementById('userDisplay').style.display = 'none';
+        globalCustomers = [];
+        availableRoutes = [];
+        csvHeaders = [];
+        document.getElementById('routeDropdown').innerHTML = '<option value="">-- Select Route --</option>';
+    }
+
+    // ============ GOOGLE DRIVE API HELPERS ============
     async function loadTextFromDrive(fileId) {
-        if (!accessToken) return '';
+        if (!accessToken) throw new Error("Not authenticated");
         const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-        if (!res.ok) throw new Error(`Failed to fetch ${fileId}`);
-        return await res.text();
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch file ${fileId}: ${response.status}`);
+        return await response.text();
     }
 
     async function listCSVFilesInFolder(folderId) {
         if (!accessToken) return [];
-        let q = `'${folderId}' in parents and mimeType='text/csv' and trashed=false`;
-        let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-        let data = await res.json();
-        return data.files || [];
+        let allFiles = [];
+        let pageToken = null;
+        
+        do {
+            let url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='text/csv'+and+trashed=false&fields=files(id,name,webViewLink)&pageSize=100`;
+            if (pageToken) url += `&pageToken=${pageToken}`;
+            
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            const data = await response.json();
+            if (data.files) allFiles.push(...data.files);
+            pageToken = data.nextPageToken;
+        } while (pageToken);
+        
+        return allFiles;
     }
 
+    // ============ LOAD ALL DATA FROM DRIVE ============
     async function loadAllDataFromDrive() {
+        const syncBtn = document.getElementById('btnForceRefresh');
+        const originalText = syncBtn.innerHTML;
+        syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        
         try {
-            // 1. load product files
+            // 1. Load products
+            console.log("Loading products...");
             const waterText = await loadTextFromDrive(CONFIG.WATER_PRODUCTS_FILE_ID);
             const coffeeText = await loadTextFromDrive(CONFIG.COFFEE_PRODUCTS_FILE_ID);
-            productMap.water = waterText.split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(',')[1]?.trim()).filter(Boolean);
-            productMap.coffee = coffeeText.split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(',')[1]?.trim()).filter(Boolean);
             
-            // 2. list all route csv files from ROUTES_FOLDER_ID
+            productMap.water = waterText.split('\n').slice(1).filter(l => l.trim()).map(l => l.split(',')[1]?.trim()).filter(Boolean);
+            productMap.coffee = coffeeText.split('\n').slice(1).filter(l => l.trim()).map(l => l.split(',')[1]?.trim()).filter(Boolean);
+            console.log(`Loaded ${productMap.water.length} water products, ${productMap.coffee.length} coffee products`);
+            
+            // 2. List route CSV files
+            console.log("Listing route files...");
             const routeFiles = await listCSVFilesInFolder(CONFIG.ROUTES_FOLDER_ID);
             availableRoutes = routeFiles.map(f => f.name);
-            const routeDropdown = document.getElementById('routeDropdown');
-            routeDropdown.innerHTML = '<option value="">-- Select Route --</option>' + availableRoutes.map(r => `<option value="${r}">${r}</option>`).join('');
-            const filterSelect = document.getElementById('tableRouteFilter');
-            filterSelect.innerHTML = '<option value="All">All Routes</option>' + availableRoutes.map(r => `<option value="${r}">${r}</option>`).join('');
             
-            // 3. load all CSV content & build customers
+            // Update dropdowns
+            const routeDropdown = document.getElementById('routeDropdown');
+            routeDropdown.innerHTML = '<option value="">-- Select Route --</option>' + 
+                availableRoutes.map(r => `<option value="${r}">${r.replace('.csv', '')}</option>`).join('');
+            
+            const filterSelect = document.getElementById('tableRouteFilter');
+            filterSelect.innerHTML = '<option value="All">All Routes</option>' + 
+                availableRoutes.map(r => `<option value="${r}">${r.replace('.csv', '')}</option>`).join('');
+            
+            // 3. Load all customer data
+            console.log("Loading customer data...");
             globalCustomers = [];
             csvHeaders = [];
+            
             for (let file of routeFiles) {
                 const csvText = await loadTextFromDrive(file.id);
-                const lines = csvText.split(/\r?\n/).filter(l=>l.trim());
+                const lines = csvText.split(/\r?\n/).filter(l => l.trim());
                 if (lines.length === 0) continue;
-                const headers = lines[0].split(',').map(h=>h.trim());
+                
+                const headers = lines[0].split(',').map(h => h.trim());
                 if (csvHeaders.length === 0) csvHeaders = [...headers];
-                for (let i=1; i<lines.length; i++) {
-                    const vals = lines[i].split(',').map(v=>v.trim());
-                    let rowObj = { __route: file.name };
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const vals = lines[i].split(',').map(v => v.trim());
+                    let rowObj = { __route: file.name.replace('.csv', '') };
                     headers.forEach((h, idx) => { rowObj[h] = vals[idx] || ''; });
                     globalCustomers.push(rowObj);
                 }
             }
-            if(csvHeaders.length) rebuildTableHeader();
+            
+            console.log(`Loaded ${globalCustomers.length} customers from ${availableRoutes.length} routes`);
+            
+            // Rebuild UI
+            rebuildTableHeader();
             renderCustTable();
-            alert(`✅ Loaded ${globalCustomers.length} customers from ${availableRoutes.length} routes`);
             populateProductSelects();
-        } catch(err) { console.error(err); alert("Error loading from Drive: "+err.message); }
+            
+            alert(`✅ Successfully loaded!\n📊 ${globalCustomers.length} customers\n🗺️ ${availableRoutes.length} routes\n💧 ${productMap.water.length} water products\n☕ ${productMap.coffee.length} coffee products`);
+            
+        } catch (error) {
+            console.error("Error loading data:", error);
+            alert("Error loading from Google Drive: " + error.message + "\n\nMake sure you've shared the folder with this app and the files exist.");
+        } finally {
+            syncBtn.innerHTML = originalText;
+        }
     }
 
+    // ============ UI HELPERS ============
     function rebuildTableHeader() {
         const thead = document.getElementById('custTableHead');
-        if(!thead) return;
-        thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+        if (!thead) return;
+        thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+    }
+
+    function populateProductSelects() {
+        const waterOptions = '<option value="">Select water</option>' + productMap.water.map(p => `<option>${p}</option>`).join('');
+        const coffeeOptions = '<option value="">Select coffee</option>' + productMap.coffee.map(p => `<option>${p}</option>`).join('');
+        
+        document.querySelectorAll('#edit_WaterProduct, #callinWaterProduct').forEach(sel => {
+            if (sel) sel.innerHTML = waterOptions;
+        });
+        document.querySelectorAll('#edit_CoffeeProduct, #callinCoffeeProduct').forEach(sel => {
+            if (sel) sel.innerHTML = coffeeOptions;
+        });
     }
 
     window.renderCustTable = function() {
         const filter = document.getElementById('tableRouteFilter')?.value || 'All';
         let filtered = filter === 'All' ? globalCustomers : globalCustomers.filter(c => c.__route === filter);
         const tbody = document.getElementById('custTableBody');
+        if (!tbody) return;
         tbody.innerHTML = '';
+        
         filtered.slice(0, 200).forEach((cust, idx) => {
             const globalIdx = globalCustomers.indexOf(cust);
             let row = `<tr><td><button class="btn-top" style="padding:2px 8px;" onclick="openEditCustomer(${globalIdx})">✏️ Edit</button></td>`;
             csvHeaders.forEach(h => row += `<td>${cust[h] || ''}</td>`);
             tbody.innerHTML += row + `</tr>`;
         });
-        document.getElementById('tableStatus').innerText = `📋 ${filtered.length} records`;
+        const statusSpan = document.getElementById('tableStatus');
+        if (statusSpan) statusSpan.innerText = `📋 ${filtered.length} records`;
     };
 
     window.openEditCustomer = function(idx) {
         const cust = globalCustomers[idx];
-        if(!cust) return;
+        if (!cust) return;
         currentEditIndex = idx;
         editCartItems = [];
         document.getElementById('editCartItemsDisplay').innerHTML = 'Empty';
+        
         const container = document.getElementById('editFieldsContainer');
         container.innerHTML = '';
         csvHeaders.forEach(header => {
             let value = cust[header] || '';
-            container.innerHTML += `<div class="form-group"><label>${header}</label><input type="text" id="edit_${header.replace(/\s/g,'_')}" value="${escapeHtml(value)}"></div>`;
+            container.innerHTML += `<div><label>${header}</label><input type="text" id="edit_${header.replace(/\s/g, '_')}" value="${escapeHtml(value)}" style="width:100%;"></div>`;
         });
-        // add target route override dropdown 
-        const routeSelectHtml = `<div class="form-group"><label>Target Route (override)</label><select id="editTargetRouteSel">${availableRoutes.map(r=>`<option value="${r}" ${cust.__route===r?'selected':''}>${r}</option>`).join('')}</select></div>`;
-        container.innerHTML += routeSelectHtml;
+        
+        const routeSelect = `<div><label>Target Route</label><select id="editTargetRouteSel">${availableRoutes.map(r => `<option value="${r.replace('.csv', '')}" ${cust.__route === r.replace('.csv', '') ? 'selected' : ''}>${r.replace('.csv', '')}</option>`).join('')}</select></div>`;
+        container.innerHTML += routeSelect;
+        
         document.getElementById('edit_OrderNotes').value = cust['Notes'] || '';
         document.getElementById('editModal').style.display = 'flex';
-        populateProductSelectsInModal();
+        populateProductSelects();
     };
-
-    function populateProductSelectsInModal() {
-        const waterSel = document.getElementById('edit_WaterProduct');
-        if(waterSel) waterSel.innerHTML = '<option value="">Select water</option>' + productMap.water.map(p=>`<option>${p}</option>`).join('');
-        const coffeeSel = document.getElementById('edit_CoffeeProduct');
-        if(coffeeSel) coffeeSel.innerHTML = '<option value="">Select coffee</option>' + productMap.coffee.map(p=>`<option>${p}</option>`).join('');
-    }
 
     window.addItemToEditCart = function(type) {
         let product, qty, unit;
-        if(type==='water') {
+        if (type === 'water') {
             product = document.getElementById('edit_WaterProduct').value;
             qty = document.getElementById('edit_WaterQty').value;
             unit = document.getElementById('edit_WaterUnits').value;
@@ -297,127 +407,223 @@
             qty = document.getElementById('edit_CoffeeQty').value;
             unit = document.getElementById('edit_CoffeeUnits').value;
         }
-        if(!product || !qty || qty<=0) { alert("Select product & valid qty"); return; }
+        if (!product || !qty || qty <= 0) { alert("Select product & valid quantity"); return; }
         editCartItems.push(`${qty} ${unit} - ${product}`);
-        document.getElementById('editCartItemsDisplay').innerHTML = editCartItems.map(i=>`<div>• ${i}</div>`).join('');
+        document.getElementById('editCartItemsDisplay').innerHTML = editCartItems.map(i => `<div>• ${i}</div>`).join('');
     };
 
     document.getElementById('saveRecordBtn').onclick = () => {
-        if(currentEditIndex===null) return;
+        if (currentEditIndex === null) return;
         const cust = globalCustomers[currentEditIndex];
-        for(let h of csvHeaders) {
-            const inp = document.getElementById(`edit_${h.replace(/\s/g,'_')}`);
-            if(inp) cust[h] = inp.value;
+        for (let h of csvHeaders) {
+            const inp = document.getElementById(`edit_${h.replace(/\s/g, '_')}`);
+            if (inp) cust[h] = inp.value;
         }
         const routeOverride = document.getElementById('editTargetRouteSel')?.value;
-        if(routeOverride) cust.__route = routeOverride;
-        if(document.getElementById('edit_OrderNotes').value) cust['Notes'] = document.getElementById('edit_OrderNotes').value;
-        alert("Customer updated (local cache). Save to Drive feature will be added later.");
+        if (routeOverride) cust.__route = routeOverride;
+        alert("Customer updated locally. Sync will save to Drive in future updates.");
         closeModal('editModal');
         renderCustTable();
     };
-    
-    // CALL-IN LOGIC
-    window.managerCallInOrder = function() {
-        callInCart = [];
-        const container = document.getElementById('callInFormGrid');
-        container.innerHTML = '';
-        csvHeaders.forEach(header => {
-            container.innerHTML += `<div><label>${header}</label><input id="callin_${header.replace(/\s/g,'_')}" class="callin-input"></div>`;
-        });
-        container.innerHTML += `<div><label>Target Route</label><select id="callinRouteSelect">${availableRoutes.map(r=>`<option>${r}</option>`)}</select></div>`;
-        document.getElementById('callinCartDisplay').innerHTML = 'Empty';
-        populateCallinProductSelects();
-        document.getElementById('callInModal').style.display = 'flex';
-    };
-    function populateCallinProductSelects() {
-        // we already have dropdowns in static, but ensure dynamic
-        let waterHtml = '<select id="callinWaterProduct">'+productMap.water.map(p=>`<option>${p}</option>`).join('')+'</select>';
-        let coffeeHtml = '<select id="callinCoffeeProduct">'+productMap.coffee.map(p=>`<option>${p}</option>`).join('')+'</select>';
-        const extra = `<div><strong>Water:</strong> ${waterHtml} Qty:<input id="callinWaterQty" value="1" size=3> Unit:<select id="callinWaterUnit"><option>Bottles</option><option>Cases</option></select> <button class="btn-top" onclick="addCallInItem('water')">Add</button></div>
-        <div><strong>Coffee:</strong> ${coffeeHtml} Qty:<input id="callinCoffeeQty" value="1" size=3> Unit:<select id="callinCoffeeUnit"><option>Boxes</option><option>Cases</option></select> <button class="btn-top" onclick="addCallInItem('coffee')">Add</button></div>`;
-        document.getElementById('callInFormGrid').innerHTML += extra;
+
+    // ============ MAP & ROUTE FUNCTIONS ============
+    function initMap() {
+        map = L.map('map').setView([55.17, -118.79], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
     }
-    window.addCallInItem = function(type) {
-        let prod, qty, unit;
-        if(type==='water') { prod=document.getElementById('callinWaterProduct').value; qty=document.getElementById('callinWaterQty').value; unit=document.getElementById('callinWaterUnit').value; }
-        else { prod=document.getElementById('callinCoffeeProduct').value; qty=document.getElementById('callinCoffeeQty').value; unit=document.getElementById('callinCoffeeUnit').value; }
-        if(!prod || qty<=0) return;
-        callInCart.push(`${qty} ${unit} - ${prod}`);
-        document.getElementById('callinCartDisplay').innerHTML = callInCart.map(i=>`<div>• ${i}</div>`).join('');
-    };
-    document.getElementById('saveCallInBtn').onclick = () => {
-        let newCust = { __route: document.getElementById('callinRouteSelect')?.value || '' };
-        csvHeaders.forEach(h => {
-            let val = document.getElementById(`callin_${h.replace(/\s/g,'_')}`)?.value || '';
-            newCust[h] = val;
-        });
-        if(newCust['Company'] || newCust['Address']) {
-            globalCustomers.push(newCust);
-            renderCustTable();
-            alert("Call-in order added locally.");
-        } else alert("Please fill at least company/address");
-        closeModal('callInModal');
-    };
-    
-    function populateProductSelects() {
-        const waterSelAll = document.querySelectorAll('select[data-type="water"], #edit_WaterProduct, #callinWaterProduct');
-        const coffeeSelAll = document.querySelectorAll('select[data-type="coffee"], #edit_CoffeeProduct, #callinCoffeeProduct');
-        waterSelAll.forEach(sel => { if(sel) sel.innerHTML = '<option>Select</option>' + productMap.water.map(p=>`<option>${p}</option>`).join(''); });
-        coffeeSelAll.forEach(sel => { if(sel) sel.innerHTML = '<option>Select</option>' + productMap.coffee.map(p=>`<option>${p}</option>`).join(''); });
-    }
-    
-    // Route & Map features
-    let map, routeMarkers = [], currentStopIndex = 0;
-    function initMap() { map = L.map('map').setView([55.17, -118.79], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
+
     document.getElementById('btnStartRoute').onclick = () => {
         const selectedRoute = document.getElementById('routeDropdown').value;
-        if(!selectedRoute) { alert("Select route first"); return; }
+        if (!selectedRoute) { alert("Select a route first"); return; }
+        
         currentRouteStops = globalCustomers.filter(c => c.__route === selectedRoute);
-        if(!currentRouteStops.length) { alert("No stops for this route"); return; }
+        if (!currentRouteStops.length) { alert("No stops found for this route"); return; }
+        
         document.getElementById('currentRouteTitle').innerText = `🚛 Route: ${selectedRoute}`;
         const stopDiv = document.getElementById('stopList');
         stopDiv.innerHTML = currentRouteStops.map((stop, idx) => {
             const name = stop['Company'] || stop['Customer Name'] || stop['Company Name'] || 'Stop';
-            return `<div class="route-stop-item" onclick="selectStopByIndex(${idx})"><b>${idx+1}. ${name}</b><br><small>${stop['Address'] || ''}</small></div>`;
+            return `<div class="route-stop-item" onclick="selectStopByIndex(${idx})"><b>${idx+1}. ${escapeHtml(name)}</b><br><small>${escapeHtml(stop['Address'] || '')}</small></div>`;
         }).join('');
-        if(map && routeMarkers.length) routeMarkers.forEach(m=>map.removeLayer(m));
+        
+        // Clear old markers
+        if (routeMarkers.length) routeMarkers.forEach(m => map.removeLayer(m));
         routeMarkers = [];
-        currentRouteStops.forEach((s, i) => {
-            if(s['Latitude'] && s['Longitude']) {
-                let marker = L.marker([parseFloat(s['Latitude']), parseFloat(s['Longitude'])]).addTo(map).bindPopup(`${s['Company']}<br>${s['Address']}`);
+        
+        // Add markers for each stop
+        currentRouteStops.forEach((stop, i) => {
+            if (stop['Latitude'] && stop['Longitude']) {
+                let marker = L.marker([parseFloat(stop['Latitude']), parseFloat(stop['Longitude'])])
+                    .addTo(map)
+                    .bindPopup(`${stop['Company'] || 'Stop'}<br>${stop['Address'] || ''}`);
                 routeMarkers.push(marker);
-            } else if(s['Address']) {
-                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(s['Address'])}`).then(r=>r.json()).then(res=>{
-                    if(res[0]) { let lat=res[0].lat, lon=res[0].lon; let m = L.marker([lat,lon]).addTo(map).bindPopup(s['Company']); routeMarkers.push(m); }
-                });
+            } else if (stop['Address']) {
+                // Geocode address (simplified - you'd want to cache this)
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stop['Address'])}&limit=1`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res[0]) {
+                            let marker = L.marker([res[0].lat, res[0].lon])
+                                .addTo(map)
+                                .bindPopup(`${stop['Company'] || 'Stop'}<br>${stop['Address']}`);
+                            routeMarkers.push(marker);
+                        }
+                    })
+                    .catch(e => console.log("Geocoding error", e));
             }
         });
-        currentStopIndex = 0; updateNavBar();
+        
+        currentStopIndex = 0;
+        updateNavBar();
     };
-    window.selectStopByIndex = function(idx) { currentStopIndex = idx; updateNavBar(); openEditCustomer(globalCustomers.indexOf(currentRouteStops[idx])); };
-    function updateNavBar() { if(!currentRouteStops.length) return; let stop = currentRouteStops[currentStopIndex]; document.getElementById('navAddressBar').innerHTML = `📍 Address: ${stop['Address']||'---'}`; document.getElementById('navPhoneBar').innerHTML = `📞 Phone: ${stop['Phone']||'---'}`; document.getElementById('currentAddress').innerText = stop['Address']||'---'; document.getElementById('currentPhone').innerText = stop['Phone']||'---'; }
-    window.navigateStop = function(delta) { let newIdx = currentStopIndex + delta; if(newIdx>=0 && newIdx<currentRouteStops.length) { currentStopIndex = newIdx; updateNavBar(); openEditCustomer(globalCustomers.indexOf(currentRouteStops[currentStopIndex])); } else alert("End of route"); };
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    window.selectStopByIndex = function(idx) {
+        currentStopIndex = idx;
+        updateNavBar();
+        const globalIdx = globalCustomers.indexOf(currentRouteStops[idx]);
+        if (globalIdx >= 0) openEditCustomer(globalIdx);
+    };
+
+    function updateNavBar() {
+        if (!currentRouteStops.length) return;
+        let stop = currentRouteStops[currentStopIndex];
+        document.getElementById('navAddressBar').innerHTML = `📍 Address: ${escapeHtml(stop['Address'] || '---')}`;
+        document.getElementById('navPhoneBar').innerHTML = `📞 Phone: ${escapeHtml(stop['Phone'] || '---')}`;
+        document.getElementById('currentAddress').innerText = stop['Address'] || '---';
+        document.getElementById('currentPhone').innerText = stop['Phone'] || '---';
+    }
+
+    window.navigateStop = function(delta) {
+        let newIdx = currentStopIndex + delta;
+        if (newIdx >= 0 && newIdx < currentRouteStops.length) {
+            currentStopIndex = newIdx;
+            updateNavBar();
+            const globalIdx = globalCustomers.indexOf(currentRouteStops[currentStopIndex]);
+            if (globalIdx >= 0) openEditCustomer(globalIdx);
+        } else {
+            alert(delta > 0 ? "End of route reached" : "Beginning of route");
+        }
+    };
+
+    // ============ CALL-IN MODAL ============
+    window.managerCallInOrder = function() {
+        callInCart = [];
+        const container = document.getElementById('callInFormGrid');
+        container.innerHTML = '<div class="form-grid">';
+        csvHeaders.forEach(header => {
+            container.innerHTML += `<div><label>${header}</label><input id="callin_${header.replace(/\s/g, '_')}" style="width:100%;"></div>`;
+        });
+        container.innerHTML += `<div><label>Target Route</label><select id="callinRouteSelect">${availableRoutes.map(r => `<option>${r.replace('.csv', '')}</option>`).join('')}</select></div>`;
+        container.innerHTML += '</div><div class="form-grid" style="margin-top:10px;">';
+        container.innerHTML += `<div><label>💧 Water Product</label><select id="callinWaterProduct"></select></div>`;
+        container.innerHTML += `<div><label>Water Qty</label><input id="callinWaterQty" value="1" type="number" min="0"></div>`;
+        container.innerHTML += `<div><label>Water Unit</label><select id="callinWaterUnit"><option>Bottles</option><option>Cases</option></select></div>`;
+        container.innerHTML += `<div><button class="btn-top" onclick="addCallInItem('water')">+ Add Water</button></div>`;
+        container.innerHTML += `<div><label>☕ Coffee Product</label><select id="callinCoffeeProduct"></select></div>`;
+        container.innerHTML += `<div><label>Coffee Qty</label><input id="callinCoffeeQty" value="1" type="number" min="0"></div>`;
+        container.innerHTML += `<div><label>Coffee Unit</label><select id="callinCoffeeUnit"><option>Boxes</option><option>Cases</option></select></div>`;
+        container.innerHTML += `<div><button class="btn-top" onclick="addCallInItem('coffee')">+ Add Coffee</button></div>`;
+        container.innerHTML += '</div>';
+        
+        document.getElementById('callinCartDisplay').innerHTML = 'Empty';
+        populateProductSelects();
+        document.getElementById('callInModal').style.display = 'flex';
+    };
+
+    window.addCallInItem = function(type) {
+        let prod, qty, unit;
+        if (type === 'water') {
+            prod = document.getElementById('callinWaterProduct').value;
+            qty = document.getElementById('callinWaterQty').value;
+            unit = document.getElementById('callinWaterUnit').value;
+        } else {
+            prod = document.getElementById('callinCoffeeProduct').value;
+            qty = document.getElementById('callinCoffeeQty').value;
+            unit = document.getElementById('callinCoffeeUnit').value;
+        }
+        if (!prod || qty <= 0) { alert("Select product and valid quantity"); return; }
+        callInCart.push(`${qty} ${unit} - ${prod}`);
+        document.getElementById('callinCartDisplay').innerHTML = callInCart.map(i => `<div>• ${i}</div>`).join('');
+    };
+
+    document.getElementById('saveCallInBtn').onclick = () => {
+        let newCust = { __route: document.getElementById('callinRouteSelect')?.value || '' };
+        csvHeaders.forEach(h => {
+            let val = document.getElementById(`callin_${h.replace(/\s/g, '_')}`)?.value || '';
+            newCust[h] = val;
+        });
+        if (newCust['Company'] || newCust['Address']) {
+            globalCustomers.push(newCust);
+            renderCustTable();
+            alert("Call-in order added locally.");
+        } else {
+            alert("Please fill at least Company or Address");
+        }
+        closeModal('callInModal');
+    };
+
+    // ============ OTHER UI FUNCTIONS ============
     window.openNewCustomerModal = function() {
         const container = document.getElementById('newCustFields');
-        container.innerHTML = csvHeaders.map(h => `<div><label>${h}</label><input id="new_${h.replace(/\s/g,'_')}"></div>`).join('');
-        container.innerHTML += `<div><label>Route (CSV file)</label><select id="newRouteSelect">${availableRoutes.map(r=>`<option>${r}</option>`).join('')}</select></div>`;
+        container.innerHTML = '<div class="form-grid">';
+        csvHeaders.forEach(h => {
+            container.innerHTML += `<div><label>${h}</label><input id="new_${h.replace(/\s/g, '_')}" style="width:100%;"></div>`;
+        });
+        container.innerHTML += `<div><label>Route (CSV file)</label><select id="newRouteSelect">${availableRoutes.map(r => `<option>${r.replace('.csv', '')}</option>`).join('')}</select></div>`;
+        container.innerHTML += '</div>';
         document.getElementById('newCustModal').style.display = 'flex';
     };
+
     document.getElementById('saveNewCustBtn').onclick = () => {
         let newObj = { __route: document.getElementById('newRouteSelect')?.value || '' };
-        csvHeaders.forEach(h => { newObj[h] = document.getElementById(`new_${h.replace(/\s/g,'_')}`)?.value || ''; });
+        csvHeaders.forEach(h => {
+            newObj[h] = document.getElementById(`new_${h.replace(/\s/g, '_')}`)?.value || '';
+        });
         globalCustomers.push(newObj);
         renderCustTable();
         closeModal('newCustModal');
-        alert("New customer added (memory) – future Drive sync will persist");
+        alert("New customer added (memory)");
     };
+
+    window.managerProductMaint = () => {
+        alert(`📦 Current Products:\n\n💧 Water: ${productMap.water.join(', ') || 'None'}\n\n☕ Coffee: ${productMap.coffee.join(', ') || 'None'}`);
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // ============ EVENT LISTENERS ============
+    document.getElementById('googleSignInBtn').onclick = () => {
+        if (tokenClient) {
+            tokenClient.requestAccessToken();
+        } else {
+            alert("Please wait, Google API is initializing...");
+        }
+    };
+    
+    document.getElementById('btnLogout').onclick = () => signOut();
     document.getElementById('btnManager').onclick = () => { renderCustTable(); document.getElementById('mgrModal').style.display = 'flex'; };
-    document.getElementById('btnForceRefresh').onclick = () => { if(accessToken) loadAllDataFromDrive(); else alert("Please login first"); };
-    window.managerProductMaint = () => { alert(`Products loaded:\nWater: ${productMap.water.join(', ')}\nCoffee: ${productMap.coffee.join(', ')}`); };
-    window.addEventListener('load', () => { initMap(); initGapi(); });
+    document.getElementById('btnForceRefresh').onclick = () => { if (accessToken) loadAllDataFromDrive(); else alert("Please login first"); };
+    document.getElementById('btnFinishRoute').onclick = () => alert("Route finished! Summary would be generated here.");
+
+    // ============ INITIALIZATION ============
+    window.addEventListener('load', () => {
+        initMap();
+        initializeGapi();
+    });
 </script>
 </body>
 </html>
