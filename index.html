@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
@@ -26,7 +25,7 @@
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
         .mgmt-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
-        .mgmt-table th, .mgmt-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        .mgmt-table th, .mgmt-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .mgmt-table th { background: #f0f0f0; position: sticky; top: 0; }
         .mgmt-nav-btn { padding: 10px 20px; border: none; background: #eee; cursor: pointer; border-radius: 4px 4px 0 0; margin-right: 5px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
@@ -53,19 +52,40 @@
         .edit-field-group input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
         .modal-buttons-left { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
-        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #004a99 0%, #002a55 100%); display: flex; justify-content: center; align-items: center; z-index: 20000; }
-        .login-container { background: white; padding: 40px; border-radius: 16px; text-align: center; width: 400px; max-width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        .login-logo { font-size: 60px; color: #004a99; margin-bottom: 20px; }
-        .login-container h1 { color: #004a99; margin-bottom: 10px; font-size: 28px; }
-        .login-subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-        .login-btn { background: #4285f4; color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 15px; }
-        .login-btn:hover { background: #3367d6; }
-        .user-info { display: flex; align-items: center; gap: 10px; background: #e8f0fe; padding: 8px 15px; border-radius: 20px; }
-        .logout-btn { background: #dc3545; color: white; border: none; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 11px; }
+        
+        /* PIN Login Modal */
+        .pin-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #004a99 0%, #002a55 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+        }
+        .pin-container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            width: 360px;
+            max-width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .pin-container h1 { color: #004a99; margin-bottom: 10px; font-size: 28px; }
+        .pin-subtitle { color: #666; margin-bottom: 25px; font-size: 14px; }
+        .pin-input { font-size: 36px; text-align: center; letter-spacing: 8px; padding: 12px; width: 100%; margin-bottom: 20px; border: 2px solid #ccc; border-radius: 8px; font-family: monospace; }
+        .pin-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .pin-num-btn { padding: 15px; font-size: 20px; background: #f0f0f0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .pin-num-btn:hover { background: #ddd; }
+        .pin-clear { background: #ffc107; }
+        .pin-enter { background: #28a745; color: white; }
         .route-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; background: #fff; margin: 2px 0; border-radius: 4px; transition: background 0.2s; }
         .route-item:hover { background: #e8f0fe; }
-        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .sheet-id-input { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -74,13 +94,13 @@
     <div><h1 style="margin:0; font-size:1.5rem;">LogiFlow Delivery</h1></div>
     <div style="display:flex; gap:10px; align-items:center;">
         <div id="userInfoDisplay" style="display:none;" class="user-info"></div>
-        <span id="onlineStatus" class="badge" style="background:#dc3545;"><i class="fas fa-sign-out-alt"></i> Offline</span>
-        <button id="btnManager" class="btn-top" style="display:none;">Manager</button>
-        <button id="btnForceRefresh" class="btn-top" style="display:none;"><i class="fas fa-sync"></i></button>
+        <span id="onlineStatus" class="badge" style="background:#28a745;"><i class="fas fa-check-circle"></i> Online</span>
+        <button id="btnManager" class="btn-top">Manager</button>
+        <button id="btnForceRefresh" class="btn-top"><i class="fas fa-sync"></i></button>
     </div>
 </header>
 
-<div class="driver-nav-bar" style="display:none;" id="driverNavBar">
+<div class="driver-nav-bar" id="driverNavBar">
     <button id="btnStartRoute" class="btn-nav" style="background:#28a745;">START ROUTE</button>
     <button id="btnFinishRoute" class="btn-nav" style="background:#dc3545;">FINISH</button>
     <button id="btnDirections" class="btn-nav" style="background:#6f4e37;"><i class="fas fa-directions"></i> DIRECTIONS</button>
@@ -90,14 +110,14 @@
     <div id="navPhoneBar" class="info-bar">Phone: ---</div>
 </div>
 
-<div class="main-container" style="display:none;" id="mainContainer">
+<div class="main-container" id="mainContainer">
     <div id="map"></div>
     <div class="side-panel">
         <div class="panel-header">
             <h3 style="margin:0 0 10px 0;">Select a Route</h3>
             <select id="routeDropdown" class="btn-top" style="background:#0056b3; width:100%;"></select>
         </div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Login and select a route</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Select a route</p></div>
     </div>
 </div>
 
@@ -119,9 +139,10 @@
             <button id="btnViewSlips" class="mgmt-nav-btn">View Slips</button>
             <button id="btnViewPastLogs" class="mgmt-nav-btn">Past Logs</button>
             <button id="btnUserMgmt" class="mgmt-nav-btn">User Management</button>
+            <button id="btnRefreshData" class="mgmt-nav-btn" style="background:#17a2b8;">⟳ Refresh Data</button>
         </div>
-        <div id="custView"><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table></div>
-        <div id="prodView" style="display:none;"><div style="margin-bottom:10px;"><button id="btnLoadCoffee" class="btn-top">☕ Coffee</button><button id="btnLoadWater" class="btn-top">💧 Water</button></div><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody></table></div>
+        <div id="custView"><div class="search-bar"><input type="text" id="custSearch" placeholder="Search customers..." onkeyup="filterCustomers()"><span id="custCount" class="badge"></span></div><table class="mgmt-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody>}</div>
+        <div id="prodView" style="display:none;"><div class="search-bar"><input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterProducts()"><span id="prodCount" class="badge"></span></div><div style="margin-bottom:10px;"><button id="btnLoadCoffee" class="btn-top">☕ Coffee Products</button><button id="btnLoadWater" class="btn-top">💧 Water Products</button></div><table class="mgmt-table"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody>}</div>
     </div>
 </div>
 
@@ -143,7 +164,7 @@
             <input type="number" id="stopQty" value="1" min="1" style="width:80px; padding:8px;">
             <button class="btn-top" onclick="addToCart()">Add</button>
         </div>
-        <table class="cart-table"><thead><tr><th>Item</th><th>Qty</th><th></th></tr></thead><tbody id="cartItemsBody"></tbody></table>
+        <table class="cart-table"><thead><tr><th>Item</th><th>Qty</th><th></th></thead><tbody id="cartItemsBody"></tbody>}</div>
         <hr>
         <div class="form-group"><label>Received By</label><input type="text" id="receivedBy" placeholder="Customer name"></div>
         <div class="form-group"><label>Signature</label><canvas id="sig-canvas" width="400" height="120"></canvas><div style="margin-top:5px;"><button class="btn-top" onclick="clearSignature()">Clear</button><button class="btn-top btn-success" onclick="activateSignature()">Sign Here</button></div></div>
@@ -165,12 +186,16 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
-const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+// Google Sheet ID - You can change this to your sheet ID
+// Your sheet needs these tabs: Customers, Coffees, Waters, Routes, and route tabs
+const DEFAULT_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+
+// Store the current sheet ID
+var currentSheetId = localStorage.getItem('logiflow_sheet_id') || DEFAULT_SHEET_ID;
+var isLoggedIn = true;
+var currentUser = "Driver";
 
 // Global variables
-var accessToken = null;
-var userEmail = null;
 var currentProdList = [];
 var currentProdHeaders = [];
 var currentProductFile = 'Coffees';
@@ -187,101 +212,333 @@ var currentEditingProductIndex = -1;
 var allRoutes = [];
 
 // ============================================================
-// SIMPLE LOGIN MODAL
+// PIN LOGIN SYSTEM
 // ============================================================
-function showLoginModal() {
+function showPinLogin() {
     var modal = document.createElement('div');
-    modal.id = 'loginModal';
-    modal.className = 'login-overlay';
+    modal.id = 'pinModal';
+    modal.className = 'pin-overlay';
     modal.innerHTML = `
-        <div class="login-container">
-            <div class="login-logo"><i class="fas fa-truck"></i></div>
+        <div class="pin-container">
+            <div style="font-size:50px; margin-bottom:15px;">🚚</div>
             <h1>LogiFlow Delivery</h1>
-            <div class="login-subtitle">Sign in to access your delivery system</div>
-            <button id="demoLoginBtn" class="login-btn" style="background:#28a745;"><i class="fas fa-chalkboard-user"></i> Continue to Demo</button>
+            <div class="pin-subtitle">Enter PIN to access system</div>
+            <input type="password" id="pinInput" class="pin-input" maxlength="4" placeholder="****" autofocus>
+            <div class="pin-buttons">
+                <button class="pin-num-btn" data-num="1">1</button><button class="pin-num-btn" data-num="2">2</button><button class="pin-num-btn" data-num="3">3</button>
+                <button class="pin-num-btn" data-num="4">4</button><button class="pin-num-btn" data-num="5">5</button><button class="pin-num-btn" data-num="6">6</button>
+                <button class="pin-num-btn" data-num="7">7</button><button class="pin-num-btn" data-num="8">8</button><button class="pin-num-btn" data-num="9">9</button>
+                <button class="pin-num-btn" data-num="0">0</button><button class="pin-num-btn pin-clear" id="pinClear">Clear</button><button class="pin-num-btn pin-enter" id="pinEnter">Enter</button>
+            </div>
+            <div style="margin-top:20px; font-size:12px; color:#999;">
+                <i class="fas fa-info-circle"></i> Default PIN: <strong>1234</strong>
+            </div>
+            <div style="margin-top:15px;">
+                <button id="changeSheetBtn" style="background:none; border:none; color:#004a99; cursor:pointer; font-size:12px;">
+                    <i class="fas fa-database"></i> Change Google Sheet ID
+                </button>
+            </div>
         </div>
     `;
     document.body.appendChild(modal);
-    document.getElementById('demoLoginBtn').onclick = startDemoMode;
-}
-
-function startDemoMode() {
-    document.getElementById('loginModal').remove();
-    userEmail = 'demo@logiflow.com';
-    accessToken = null;
-    completeLogin();
-    showToast('Demo mode active. Data is from sample data.', false);
+    
+    var pinInput = document.getElementById('pinInput');
+    var clearBtn = document.getElementById('pinClear');
+    var enterBtn = document.getElementById('pinEnter');
+    
+    document.querySelectorAll('.pin-num-btn[data-num]').forEach(btn => {
+        btn.onclick = () => { if(pinInput.value.length < 4) pinInput.value += btn.dataset.num; };
+    });
+    
+    clearBtn.onclick = () => pinInput.value = '';
+    enterBtn.onclick = () => {
+        if (pinInput.value === '1234') {
+            modal.remove();
+            completeLogin();
+        } else {
+            alert('Invalid PIN. Try 1234');
+            pinInput.value = '';
+        }
+    };
+    
+    document.getElementById('changeSheetBtn').onclick = () => {
+        var newId = prompt('Enter your Google Sheet ID:', currentSheetId);
+        if (newId && newId.trim()) {
+            currentSheetId = newId.trim();
+            localStorage.setItem('logiflow_sheet_id', currentSheetId);
+            showToast('Sheet ID updated. Refresh data to load from new sheet.', false);
+        }
+    };
+    
+    pinInput.focus();
 }
 
 function completeLogin() {
-    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-check-circle"></i> Demo Mode';
-    document.getElementById('onlineStatus').style.background = '#ffc107';
-    document.getElementById('onlineStatus').style.color = '#333';
-    document.getElementById('btnManager').style.display = 'inline-block';
-    document.getElementById('btnForceRefresh').style.display = 'inline-block';
-    document.getElementById('driverNavBar').style.display = 'flex';
-    document.getElementById('mainContainer').style.display = 'flex';
+    document.getElementById('onlineStatus').innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+    document.getElementById('onlineStatus').style.background = '#28a745';
     
-    var userInfoDiv = document.getElementById('userInfoDisplay');
-    userInfoDiv.style.display = 'flex';
-    userInfoDiv.innerHTML = `<i class="fas fa-user-circle" style="font-size:24px;"></i><span>Demo User</span><button class="logout-btn" onclick="logout()">Logout</button>`;
+    // Initialize map
+    map = L.map('map').setView([55.17, -118.79], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
     
-    loadDemoCustomers();
-    loadDemoProducts();
-    loadDemoRoutes();
-    
-    if (!map) {
-        map = L.map('map').setView([55.17, -118.79], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    }
-    showToast('Demo mode ready!', false);
-}
-
-function logout() {
-    location.reload();
-}
-
-function showToast(msg, isErr) {
-    var toast = document.createElement('div');
-    toast.className = 'toast-notification' + (isErr ? ' toast-error' : '');
-    toast.innerHTML = msg;
-    document.body.appendChild(toast);
-    setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+    // Load data from Google Sheet using CSV export (works without OAuth)
+    loadAllData();
 }
 
 // ============================================================
-// DEMO DATA (Fully functional for testing)
+// LOAD DATA FROM GOOGLE SHEET USING CSV EXPORT (NO OAUTH NEEDED!)
+// ============================================================
+function loadAllData() {
+    showToast('Loading data from Google Sheet...', false);
+    loadCustomersFromSheet();
+    loadProductsFromSheet('Coffees');
+    loadRoutesFromSheet();
+}
+
+async function loadCustomersFromSheet() {
+    var tbody = document.getElementById('custTableBody');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner" style="display:inline-block; width:20px; height:20px; border:3px solid #f3f3f3; border-top:3px solid #3498db; border-radius:50%; animation: spin 1s linear infinite;"></div> Loading customers...</div>';
+    
+    try {
+        // Use CSV export format - works without authentication if sheet is published
+        var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=Customers`;
+        var response = await fetch(url);
+        if (!response.ok) throw new Error('Sheet not accessible');
+        var csvText = await response.text();
+        
+        var lines = csvText.split('\n').filter(l => l.trim());
+        if (lines.length < 2) {
+            tbody.innerHTML = '<tr><td colspan="10">No customer data found. Create a "Customers" tab in your sheet.</div>';
+            return;
+        }
+        
+        // Parse CSV
+        customerHeaders = parseCSVLine(lines[0]);
+        customers = [];
+        for (var i = 1; i < lines.length; i++) {
+            var vals = parseCSVLine(lines[i]);
+            var custObj = {};
+            for (var j = 0; j < customerHeaders.length && j < vals.length; j++) {
+                custObj[customerHeaders[j]] = vals[j];
+            }
+            customers.push(custObj);
+        }
+        
+        renderCustomerTable();
+        showToast(`Loaded ${customers.length} customers`, false);
+        
+    } catch(err) {
+        console.error('Error loading customers:', err);
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error loading customers. Make sure your Google Sheet is published or the ID is correct.</div>`;
+        loadDemoCustomers();
+    }
+}
+
+async function loadProductsFromSheet(sheetName) {
+    currentProductFile = sheetName;
+    var tbody = document.getElementById('prodTableBody');
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading products...</div>';
+    
+    try {
+        var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=${sheetName}`;
+        var response = await fetch(url);
+        if (!response.ok) throw new Error('Sheet not found');
+        var csvText = await response.text();
+        
+        var lines = csvText.split('\n').filter(l => l.trim());
+        if (lines.length < 2) {
+            tbody.innerHTML = `<tr><td colspan="10">No data in "${sheetName}" tab</div>`;
+            return;
+        }
+        
+        currentProdHeaders = parseCSVLine(lines[0]);
+        currentProdList = [];
+        for (var i = 1; i < lines.length; i++) {
+            var vals = parseCSVLine(lines[i]);
+            var obj = {};
+            for (var j = 0; j < currentProdHeaders.length && j < vals.length; j++) {
+                obj[currentProdHeaders[j]] = vals[j];
+            }
+            obj.Status = obj.Status || 'Active';
+            if (obj[currentProdHeaders[0]]) currentProdList.push(obj);
+        }
+        
+        renderProductTable();
+        showToast(`Loaded ${currentProdList.length} products from ${sheetName}`, false);
+        
+    } catch(err) {
+        tbody.innerHTML = `<table><td colspan="10">❌ Error loading products. Check sheet "${sheetName}"</div>`;
+        loadDemoProducts();
+    }
+}
+
+async function loadRoutesFromSheet() {
+    var dropdown = document.getElementById('routeDropdown');
+    dropdown.innerHTML = '<option><div class="loading-spinner"></div> Loading routes...</option>';
+    
+    try {
+        var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=Routes`;
+        var response = await fetch(url);
+        if (!response.ok) throw new Error('Routes sheet not found');
+        var csvText = await response.text();
+        
+        var lines = csvText.split('\n').filter(l => l.trim());
+        if (lines.length < 2) {
+            dropdown.innerHTML = '<option value="">No routes found</option>';
+            return;
+        }
+        
+        var headers = parseCSVLine(lines[0]);
+        var routeNameIdx = headers.findIndex(h => h.toLowerCase().includes('name')) || 0;
+        
+        allRoutes = [];
+        dropdown.innerHTML = '<option value="">-- Select Route --</option>';
+        
+        for (var i = 1; i < lines.length; i++) {
+            var vals = parseCSVLine(lines[i]);
+            var routeName = vals[routeNameIdx] || `Route ${i}`;
+            allRoutes.push(routeName);
+            var opt = document.createElement('option');
+            opt.value = i-1;
+            opt.textContent = routeName;
+            dropdown.appendChild(opt);
+        }
+        showToast(`Loaded ${allRoutes.length} routes`, false);
+        
+    } catch(err) {
+        dropdown.innerHTML = '<option value="">Error loading routes</option>';
+        loadDemoRoutes();
+    }
+}
+
+document.getElementById('routeDropdown').onchange = async function() {
+    var routeIndex = parseInt(this.value);
+    if (isNaN(routeIndex)) return;
+    var routeName = allRoutes[routeIndex];
+    var stopDiv = document.getElementById('stopList');
+    stopDiv.innerHTML = '<p><div class="loading-spinner"></div> Loading stops...</p>';
+    
+    try {
+        var url = `https://docs.google.com/spreadsheets/d/${currentSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(routeName)}`;
+        var response = await fetch(url);
+        if (!response.ok) throw new Error('Stop sheet not found');
+        var csvText = await response.text();
+        
+        var lines = csvText.split('\n').filter(l => l.trim());
+        if (lines.length < 2) {
+            stopDiv.innerHTML = '<p>No stops found</p>';
+            return;
+        }
+        
+        var headers = parseCSVLine(lines[0]);
+        var nameIdx = headers.findIndex(h => h.toLowerCase().includes('name')) || 0;
+        var addrIdx = headers.findIndex(h => h.toLowerCase().includes('address')) || 1;
+        var phoneIdx = headers.findIndex(h => h.toLowerCase().includes('phone'));
+        
+        stopDiv.innerHTML = '';
+        currentRouteStops = [];
+        
+        for (var i = 1; i < lines.length; i++) {
+            var vals = parseCSVLine(lines[i]);
+            var stop = {
+                name: vals[nameIdx] || `Stop ${i}`,
+                addr: vals[addrIdx] || 'No address',
+                phone: phoneIdx >= 0 ? vals[phoneIdx] : '--',
+                data: {}
+            };
+            for (var j = 0; j < headers.length && j < vals.length; j++) {
+                stop.data[headers[j]] = vals[j];
+            }
+            currentRouteStops.push(stop);
+            
+            var div = document.createElement('div');
+            div.className = 'route-item';
+            div.innerHTML = `<strong>${i}. ${escapeHtml(stop.name)}</strong><br><small>📍 ${escapeHtml(stop.addr)}</small><br><small>📞 ${escapeHtml(stop.phone)}</small>`;
+            div.onclick = (function(idx, s) { return function() { selectStop(idx, s); }; })(i-1, stop);
+            stopDiv.appendChild(div);
+        }
+        showToast(`Loaded ${currentRouteStops.length} stops`, false);
+        
+    } catch(err) {
+        stopDiv.innerHTML = '<p>Error loading stops</p>';
+        showToast('Error loading stops: ' + err.message, true);
+    }
+};
+
+function parseCSVLine(line) {
+    var result = [];
+    var current = '';
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+        var char = line[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current.trim());
+    return result;
+}
+
+function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { return m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'; }); }
+
+// ============================================================
+// DEMO DATA (FALLBACK)
 // ============================================================
 function loadDemoCustomers() {
     customers = [
-        { Name: "ABC Corporation", Address: "123 Main Street", Phone: "555-0101", Email: "contact@abccorp.com" },
-        { Name: "XYZ Industries", Address: "456 Oak Avenue", Phone: "555-0102", Email: "info@xyz.com" },
-        { Name: "Smith Trading Ltd", Address: "789 Pine Road", Phone: "555-0103", Email: "smith@trading.com" },
-        { Name: "Johnson & Sons", Address: "321 Elm Street", Phone: "555-0104", Email: "johnson@sons.com" },
-        { Name: "Williams Group", Address: "654 Maple Drive", Phone: "555-0105", Email: "williams@group.com" },
-        { Name: "Brown Enterprises", Address: "987 Cedar Lane", Phone: "555-0106", Email: "brown@enterprises.com" },
-        { Name: "Jones Logistics", Address: "147 Birch Way", Phone: "555-0107", Email: "jones@logistics.com" },
-        { Name: "Miller Supplies", Address: "258 Spruce Court", Phone: "555-0108", Email: "miller@supplies.com" },
-        { Name: "Davis Distributing", Address: "369 Ash Boulevard", Phone: "555-0109", Email: "davis@distributing.com" },
-        { Name: "Garcia Foods", Address: "741 Palm Street", Phone: "555-0110", Email: "garcia@foods.com" }
+        { Name: "ABC Corporation", Address: "123 Main St", Phone: "555-0101", Email: "contact@abccorp.com" },
+        { Name: "XYZ Industries", Address: "456 Oak Ave", Phone: "555-0102", Email: "info@xyz.com" },
+        { Name: "Smith Trading", Address: "789 Pine Rd", Phone: "555-0103", Email: "smith@trading.com" }
     ];
     customerHeaders = ["Name", "Address", "Phone", "Email"];
     renderCustomerTable();
-    showToast('Loaded 10 demo customers', false);
+    showToast('Using demo customer data', false);
 }
 
+function loadDemoProducts() {
+    currentProdList = [
+        { Product: "Spring Water - 500ml", Price: "$1.50", Status: "Active" },
+        { Product: "Coffee - Medium Roast", Price: "$12.99", Status: "Active" },
+        { Product: "Water Cooler", Price: "$89.99", Status: "Active" }
+    ];
+    currentProdHeaders = ["Product", "Price", "Status"];
+    renderProductTable();
+}
+
+function loadDemoRoutes() {
+    allRoutes = ['Demo Route A', 'Demo Route B'];
+    var dropdown = document.getElementById('routeDropdown');
+    dropdown.innerHTML = '<option value="">-- Select Route --</option>';
+    allRoutes.forEach((route, i) => {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = route + ' (Demo)';
+        dropdown.appendChild(opt);
+    });
+}
+
+// ============================================================
+// RENDER FUNCTIONS
+// ============================================================
 function renderCustomerTable() {
     var thead = document.getElementById('custTableHead');
     var tbody = document.getElementById('custTableBody');
     var headerHtml = '<th>Action</th>';
-    customerHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
+    customerHeaders.forEach(h => headerHtml += '<th>' + escapeHtml(h) + '</th>');
     thead.innerHTML = headerHtml;
     tbody.innerHTML = '';
     customers.forEach((cust, idx) => {
         var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + idx + ')">Edit</button></td>';
-        customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
-        row += '</tr>';
+        customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</td>');
+        row += '</td>';
         tbody.innerHTML += row;
     });
     document.getElementById('custCount').innerHTML = customers.length + ' records';
@@ -289,27 +546,63 @@ function renderCustomerTable() {
 
 function filterCustomers() {
     var search = document.getElementById('custSearch').value.toLowerCase();
+    var filtered = customers.filter(c => {
+        for (var key in c) {
+            if (c[key] && c[key].toLowerCase().includes(search)) return true;
+        }
+        return false;
+    });
     var tbody = document.getElementById('custTableBody');
-    var filtered = customers.filter(c => c.Name.toLowerCase().includes(search) || c.Address.toLowerCase().includes(search) || c.Phone.includes(search));
     tbody.innerHTML = '';
-    filtered.forEach(cust => {
-        var idx = customers.indexOf(cust);
+    filtered.forEach((cust, idx) => {
         var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + idx + ')">Edit</button></td>';
-        customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openCustomerEditModal(' + customers.indexOf(cust) + ')">Edit</button></td>';
+        customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
     });
 }
 
+function renderProductTable() {
+    var tbody = document.getElementById('prodTableBody');
+    tbody.innerHTML = '';
+    currentProdList.forEach((p, idx) => {
+        var row = '<td>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + idx + ')">Edit</button></td>';
+        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
+        currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
+        row += '</tr>';
+        tbody.innerHTML += row;
+    });
+    document.getElementById('prodCount').innerHTML = currentProdList.length + ' records';
+}
+
+function filterProducts() {
+    var search = document.getElementById('prodSearch').value.toLowerCase();
+    var filtered = currentProdList.filter(p => p.Product && p.Product.toLowerCase().includes(search));
+    var tbody = document.getElementById('prodTableBody');
+    tbody.innerHTML = '';
+    filtered.forEach((p, idx) => {
+        var row = '<tr>';
+        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">Edit</button></td>';
+        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
+        currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
+        row += '</tr>';
+        tbody.innerHTML += row;
+    });
+}
+
+// ============================================================
+// EDIT MODAL FUNCTIONS
+// ============================================================
 function openCustomerEditModal(idx) {
     currentEditingCustomerIndex = idx;
     var customer = customers[idx];
     var container = document.getElementById('customerEditFields');
-    document.getElementById('customerEditModalTitle').innerHTML = 'Edit Customer: ' + customer.Name;
+    document.getElementById('customerEditModalTitle').innerHTML = 'Edit Customer: ' + (customer.Name || 'Customer');
     container.innerHTML = '';
     customerHeaders.forEach(header => {
-        container.innerHTML += `<div class="edit-field-group"><label>${header}</label><input type="text" id="cust_${header}" value="${customer[header] || ''}"></div>`;
+        container.innerHTML += `<div class="edit-field-group"><label>${escapeHtml(header)}</label><input type="text" id="cust_${header.replace(/ /g, '_')}" value="${escapeHtml(customer[header] || '')}"></div>`;
     });
     document.getElementById('customerEditModal').style.display = 'flex';
 }
@@ -319,68 +612,23 @@ function closeCustomerEditModal() { document.getElementById('customerEditModal')
 function saveCustomerEdit() {
     if (currentEditingCustomerIndex === -1) return;
     customerHeaders.forEach(header => {
-        var input = document.getElementById('cust_' + header);
+        var input = document.getElementById('cust_' + header.replace(/ /g, '_'));
         if (input) customers[currentEditingCustomerIndex][header] = input.value;
     });
     renderCustomerTable();
     closeCustomerEditModal();
-    showToast('Customer saved', false);
-}
-
-function loadDemoProducts() {
-    currentProdList = [
-        { Product: "Spring Water - 500ml", Price: "$1.50", Status: "Active" },
-        { Product: "Spring Water - 1L", Price: "$2.50", Status: "Active" },
-        { Product: "Sparkling Water - 500ml", Price: "$2.00", Status: "Active" },
-        { Product: "Coffee - Medium Roast", Price: "$12.99", Status: "Active" },
-        { Product: "Coffee - Dark Roast", Price: "$12.99", Status: "Active" },
-        { Product: "Coffee - Decaf", Price: "$13.99", Status: "Inactive" },
-        { Product: "Water Cooler - Countertop", Price: "$89.99", Status: "Active" },
-        { Product: "Water Cooler - Floor Standing", Price: "$149.99", Status: "Active" }
-    ];
-    currentProdHeaders = ["Product", "Price", "Status"];
-    renderProductTable();
-    showToast('Loaded demo products', false);
-}
-
-function renderProductTable() {
-    var tbody = document.getElementById('prodTableBody');
-    tbody.innerHTML = '';
-    currentProdList.forEach((p, idx) => {
-        var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + idx + ')">Edit</button></td>';
-        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
-        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
-        row += '</tr>';
-        tbody.innerHTML += row;
-    });
-    document.getElementById('prodCount').innerHTML = currentProdList.length + ' records';
-}
-
-function filterProducts() {
-    var search = document.getElementById('prodSearch').value.toLowerCase();
-    var filtered = currentProdList.filter(p => p.Product.toLowerCase().includes(search));
-    var tbody = document.getElementById('prodTableBody');
-    tbody.innerHTML = '';
-    filtered.forEach((p, idx) => {
-        var row = '<tr>';
-        row += '<td><button class="btn-top" style="padding:4px 8px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">Edit</button></td>';
-        row += '<td>' + (p.Status === 'Active' ? '✅ Active' : '⭕ Inactive') + '</div>';
-        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
-        row += '</tr>';
-        tbody.innerHTML += row;
-    });
+    showToast('Customer saved locally', false);
 }
 
 function openProductEditModalNew(idx) {
     currentEditingProductIndex = idx;
     var product = currentProdList[idx];
     var container = document.getElementById('productEditFields');
-    document.getElementById('productEditModalTitleNew').innerHTML = 'Edit Product: ' + product.Product;
+    document.getElementById('productEditModalTitleNew').innerHTML = 'Edit Product: ' + (product.Product || 'Product');
     container.innerHTML = '';
     currentProdHeaders.forEach(header => {
         if (header !== 'Status') {
-            container.innerHTML += `<div class="edit-field-group"><label>${header}</label><input type="text" id="prod_${header}" value="${product[header] || ''}"></div>`;
+            container.innerHTML += `<div class="edit-field-group"><label>${escapeHtml(header)}</label><input type="text" id="prod_${header.replace(/ /g, '_')}" value="${escapeHtml(product[header] || '')}"></div>`;
         }
     });
     document.getElementById('productEditModalNew').style.display = 'flex';
@@ -392,13 +640,13 @@ function saveProductEditNew() {
     if (currentEditingProductIndex === -1) return;
     currentProdHeaders.forEach(header => {
         if (header !== 'Status') {
-            var input = document.getElementById('prod_' + header);
+            var input = document.getElementById('prod_' + header.replace(/ /g, '_'));
             if (input) currentProdList[currentEditingProductIndex][header] = input.value;
         }
     });
     renderProductTable();
     closeProductEditModalNew();
-    showToast('Product saved', false);
+    showToast('Product saved locally', false);
 }
 
 function toggleProductStatusNew() {
@@ -410,56 +658,9 @@ function toggleProductStatusNew() {
     showToast('Status toggled', false);
 }
 
-function loadDemoRoutes() {
-    allRoutes = ['Route A - Downtown', 'Route B - Northside', 'Route C - Southside'];
-    var dropdown = document.getElementById('routeDropdown');
-    dropdown.innerHTML = '<option value="">-- Select Route --</option>';
-    allRoutes.forEach((route, i) => {
-        var opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = route;
-        dropdown.appendChild(opt);
-    });
-}
-
-document.getElementById('routeDropdown').onchange = function() {
-    var routeIndex = parseInt(this.value);
-    if (isNaN(routeIndex)) return;
-    var routeName = allRoutes[routeIndex];
-    var stopDiv = document.getElementById('stopList');
-    
-    var stops = {
-        'Route A - Downtown': [
-            { name: "ABC Corp", addr: "123 Main St", phone: "555-0101", email: "contact@abccorp.com", instructions: "Call upon arrival" },
-            { name: "XYZ Inc", addr: "456 Oak Ave", phone: "555-0102", email: "info@xyz.com", instructions: "Delivery to back door" },
-            { name: "Smith Co", addr: "789 Pine Rd", phone: "555-0103", email: "smith@co.com", instructions: "" }
-        ],
-        'Route B - Northside': [
-            { name: "Johnson & Sons", addr: "321 Elm St", phone: "555-0104", email: "johnson@sons.com", instructions: "Ring bell twice" },
-            { name: "Williams Group", addr: "654 Maple Dr", phone: "555-0105", email: "williams@group.com", instructions: "" },
-            { name: "Brown Ent", addr: "987 Cedar Ln", phone: "555-0106", email: "brown@ent.com", instructions: "Leave with reception" }
-        ],
-        'Route C - Southside': [
-            { name: "Jones Logistics", addr: "147 Birch Way", phone: "555-0107", email: "jones@logistics.com", instructions: "" },
-            { name: "Miller Supplies", addr: "258 Spruce Ct", phone: "555-0108", email: "miller@supplies.com", instructions: "Call 10 min before" },
-            { name: "Davis Distributing", addr: "369 Ash Blvd", phone: "555-0109", email: "davis@distributing.com", instructions: "" }
-        ]
-    };
-    
-    var routeStops = stops[routeName] || [];
-    stopDiv.innerHTML = '';
-    currentRouteStops = routeStops;
-    
-    routeStops.forEach((stop, idx) => {
-        var div = document.createElement('div');
-        div.className = 'route-item';
-        div.innerHTML = `<strong>${idx+1}. ${stop.name}</strong><br><small>📍 ${stop.addr}</small><br><small>📞 ${stop.phone}</small>`;
-        div.onclick = function() { selectStop(idx, stop); };
-        stopDiv.appendChild(div);
-    });
-    showToast(`Loaded ${routeStops.length} stops`, false);
-};
-
+// ============================================================
+// DELIVERY FUNCTIONS
+// ============================================================
 function selectStop(idx, stop) {
     if (!driverName) { alert('Click START ROUTE first'); return; }
     currentStopIndex = idx;
@@ -468,12 +669,13 @@ function selectStop(idx, stop) {
     document.getElementById('stopModalTitle').innerHTML = 'Delivery: ' + stop.name;
     document.getElementById('metaAddress').innerHTML = stop.addr;
     document.getElementById('metaPhone').innerHTML = stop.phone;
-    document.getElementById('metaEmail').innerHTML = stop.email || '--';
-    document.getElementById('metaSpecInst').innerHTML = stop.instructions || '--';
+    document.getElementById('metaEmail').innerHTML = stop.data.email || stop.data.Email || '--';
+    document.getElementById('metaSpecInst').innerHTML = stop.data.instructions || stop.data['Special Instructions'] || '--';
     deliveryCart = [];
     renderCart();
     var canvas = document.getElementById('sig-canvas');
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     isSigBlank = true;
     document.getElementById('receivedBy').value = '';
     loadStopProducts();
@@ -482,13 +684,15 @@ function selectStop(idx, stop) {
 
 function loadStopProducts() {
     var target = document.getElementById('stopProductDropdown');
-    target.innerHTML = '<option value="">Select product</option>';
+    target.innerHTML = '<option value="">-- Select Product --</option>';
+    var added = {};
     currentProdList.forEach(p => {
-        if (p.Status === 'Active') {
+        if (p.Status === 'Active' && p.Product && !added[p.Product]) {
             var opt = document.createElement('option');
             opt.value = p.Product;
             opt.textContent = p.Product;
             target.appendChild(opt);
+            added[p.Product] = true;
         }
     });
 }
@@ -511,13 +715,19 @@ function renderCart() {
     if (!deliveryCart.length) { body.innerHTML = '<tr><td colspan="3">No items</div></tr>'; return; }
     body.innerHTML = '';
     deliveryCart.forEach((item, i) => {
-        body.innerHTML += `<tr><td>${item.name}</td><td>${item.qty}</td><td><button onclick="removeFromCart(${i})" style="background:none; border:none; color:red;">Remove</button></td></tr>`;
+        body.innerHTML += `<tr><td>${escapeHtml(item.name)}</div><td>${item.qty}</div><td><button onclick="removeFromCart(${i})" style="background:none; border:none; color:red;">Remove</button></div></tr>`;
     });
 }
 
 function removeFromCart(i) { deliveryCart.splice(i,1); renderCart(); }
 function closeStopModal() { document.getElementById('stopModal').style.display = 'none'; }
-function clearSignature() { var ctx = document.getElementById('sig-canvas').getContext('2d'); ctx.clearRect(0,0,400,120); isSigBlank = true; }
+
+function clearSignature() {
+    var canvas = document.getElementById('sig-canvas');
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    isSigBlank = true;
+}
 
 function activateSignature() {
     var canvas = document.getElementById('sig-canvas');
@@ -526,14 +736,15 @@ function activateSignature() {
     canvas.onmousedown = function(e) { drawing = true; ctx.beginPath(); isSigBlank = false; var rect = canvas.getBoundingClientRect(); ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top); };
     canvas.onmousemove = function(e) { if(drawing) { var rect = canvas.getBoundingClientRect(); ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top); ctx.stroke(); ctx.beginPath(); ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top); } };
     canvas.onmouseup = function() { drawing = false; };
-    canvas.onmouseleave = function() { drawing = false; };
     showToast('Draw your signature', false);
 }
 
 function markNotDelivered() {
     var reason = prompt('Reason for non-delivery:');
     if (!reason) return;
-    alert(`Not delivered: ${reason}`);
+    var customerName = document.getElementById('stopModalTitle').innerHTML.replace('Delivery: ', '');
+    var slipNum = Math.floor(100000 + Math.random() * 900000);
+    alert(`NOT DELIVERED\nCustomer: ${customerName}\nReason: ${reason}\nRef #: ${slipNum}`);
     closeStopModal();
 }
 
@@ -541,33 +752,42 @@ function completeDelivery() {
     var receiverName = document.getElementById('receivedBy').value.trim();
     if (!receiverName) { alert('Enter receiver name'); return; }
     if (isSigBlank) { alert('Signature required'); return; }
+    var customerName = document.getElementById('stopModalTitle').innerHTML.replace('Delivery: ', '');
     var slipNum = Math.floor(100000 + Math.random() * 900000);
-    var summary = `Delivery Complete!\nSlip: ${slipNum}\nCustomer: ${document.getElementById('stopModalTitle').innerHTML.replace('Delivery: ', '')}\nReceived by: ${receiverName}`;
-    alert(summary);
+    var products = deliveryCart.map(i => `${i.qty}x ${i.name}`).join(', ');
+    alert(`✅ DELIVERY COMPLETE!\n\nCustomer: ${customerName}\nReceived by: ${receiverName}\nSlip #: ${slipNum}\nProducts: ${products || '(none)'}`);
     closeStopModal();
 }
 
-// Driver controls
-document.getElementById('btnStartRoute').onclick = function() { var n = prompt('Driver name:'); if(n) { driverName = n; showToast(`Started: ${n}`, false); } };
+// ============================================================
+// DRIVER CONTROLS
+// ============================================================
+document.getElementById('btnStartRoute').onclick = function() {
+    var name = prompt('Enter driver name:');
+    if (name && name.trim()) { driverName = name.trim(); showToast(`Driver: ${driverName}`, false); }
+};
 document.getElementById('btnFinishRoute').onclick = function() { if(driverName) { driverName=''; showToast('Route finished', false); } };
 document.getElementById('btnPrevStop').onclick = function() { if(currentRouteStops.length && currentStopIndex>0) selectStop(currentStopIndex-1, currentRouteStops[currentStopIndex-1]); };
 document.getElementById('btnNextStop').onclick = function() { if(currentRouteStops.length && currentStopIndex<currentRouteStops.length-1) selectStop(currentStopIndex+1, currentRouteStops[currentStopIndex+1]); };
 document.getElementById('btnDirections').onclick = function() { if(currentStopIndex>=0) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(currentRouteStops[currentStopIndex].addr)}`); };
 
-// Manager buttons
+// ============================================================
+// MANAGER BUTTONS
+// ============================================================
 document.getElementById('btnManager').onclick = function() { document.getElementById('mgrModal').style.display = 'flex'; };
 document.getElementById('btnShowCust').onclick = function() { document.getElementById('custView').style.display = 'block'; document.getElementById('prodView').style.display = 'none'; renderCustomerTable(); };
 document.getElementById('btnShowProd').onclick = function() { document.getElementById('custView').style.display = 'none'; document.getElementById('prodView').style.display = 'block'; renderProductTable(); };
-document.getElementById('btnLoadCoffee').onclick = function() { loadDemoProducts(); };
-document.getElementById('btnLoadWater').onclick = function() { loadDemoProducts(); };
-document.getElementById('btnEndOfDay').onclick = function() { alert('End of Day Report\n\nCheck console for details'); console.log('Deliveries:', localStorage.getItem('deliveries')); };
-document.getElementById('btnLiveView').onclick = function() { alert('Live View - Check map'); };
-document.getElementById('btnCallInOrder').onclick = function() { alert('Call in Order - Use delivery form'); };
+document.getElementById('btnLoadCoffee').onclick = function() { loadProductsFromSheet('Coffees'); };
+document.getElementById('btnLoadWater').onclick = function() { loadProductsFromSheet('Waters'); };
+document.getElementById('btnRefreshData').onclick = function() { loadAllData(); };
+document.getElementById('btnEndOfDay').onclick = function() { alert('End of Day Report'); };
+document.getElementById('btnLiveView').onclick = function() { alert('Live View - Map shows current location'); };
+document.getElementById('btnCallInOrder').onclick = function() { alert('Call in Order'); };
 document.getElementById('btnBackup').onclick = function() { alert('Backup saved'); };
-document.getElementById('btnViewSlips').onclick = function() { alert('Delivery slips saved locally'); };
-document.getElementById('btnViewPastLogs').onclick = function() { alert('Past logs in TripLog'); };
+document.getElementById('btnViewSlips').onclick = function() { alert('Delivery slips'); };
+document.getElementById('btnViewPastLogs').onclick = function() { alert('Past logs'); };
 document.getElementById('btnUserMgmt').onclick = function() { alert('User Management'); };
-document.getElementById('btnForceRefresh').onclick = function() { loadDemoCustomers(); loadDemoProducts(); loadDemoRoutes(); showToast('Refreshed', false); };
+document.getElementById('btnForceRefresh').onclick = function() { loadAllData(); };
 
 // Bottom button
 var bottomBtn = document.createElement('button');
@@ -576,25 +796,21 @@ bottomBtn.innerHTML = '<i class="fas fa-cog"></i> MANAGER PANEL';
 bottomBtn.onclick = () => document.getElementById('mgrModal').style.display = 'flex';
 document.body.appendChild(bottomBtn);
 
-// Add search input for customers
-var searchDiv = document.createElement('div');
-searchDiv.className = 'search-bar';
-searchDiv.innerHTML = '<input type="text" id="custSearch" placeholder="Search customers..." onkeyup="filterCustomers()"><span id="custCount" class="badge"></span>';
-document.getElementById('custView').insertBefore(searchDiv, document.getElementById('custView').firstChild);
-
-// Add search for products
-var prodSearchDiv = document.createElement('div');
-prodSearchDiv.className = 'search-bar';
-prodSearchDiv.innerHTML = '<input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterProducts()"><span id="prodCount" class="badge"></span>';
-document.getElementById('prodView').insertBefore(prodSearchDiv, document.getElementById('prodView').firstChild);
-
 // Event listeners
 document.getElementById('saveCustomerEditBtn').onclick = saveCustomerEdit;
 document.getElementById('saveProductEditBtnNew').onclick = saveProductEditNew;
 document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStatusNew;
 
-// Start
-showLoginModal();
+function showToast(msg, isErr) {
+    var toast = document.createElement('div');
+    toast.className = 'toast-notification' + (isErr ? ' toast-error' : '');
+    toast.innerHTML = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+}
+
+// Start with PIN login
+showPinLogin();
 </script>
 </body>
 </html>
