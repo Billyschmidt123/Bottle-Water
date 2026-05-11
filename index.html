@@ -106,7 +106,7 @@
             <h3 style="margin:0 0 10px 0;">Select a Route</h3>
             <select id="routeDropdown" class="btn-top" style="background:#0056b3; width:100%;"></select>
         </div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Select a route from the dropdown</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; color:#999;">Sign in and select a route</p></div>
     </div>
 </div>
 
@@ -247,11 +247,25 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ============================================================
-// GOOGLE SHEETS CONFIGURATION
+// CONFIGURATION - LOAD FROM CONFIG.JS OR USE DEFAULTS
 // ============================================================
+// These are the credentials from your system
+const REPO_OWNER = 'Billyschmidt123';
+const REPO_NAME = 'Bottle-Water';
+
+// Google Sheets Configuration - UPDATE THESE WITH YOUR ACTUAL IDs
 const GOOGLE_SHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
-const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
 const GOOGLE_DRIVE_FOLDER_ID = '1AimlacYfkEfD-g-Y1c2wghgS1o3aktxk';
+const GOOGLE_CLIENT_ID = '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com';
+
+// Sheet names (tabs) in your Google Sheet
+const SHEET_NAMES = {
+    CUSTOMERS: 'Customers',
+    COFFEE_PRODUCTS: 'Coffees',
+    WATER_PRODUCTS: 'Waters',
+    ROUTES: 'Routes',
+    TRIP_LOG: 'TripLog'
+};
 
 // Global variables
 var accessToken = null;
@@ -260,7 +274,7 @@ var userName = null;
 var userPicture = null;
 var currentProdList = [];
 var currentProdHeaders = [];
-var currentProductFile = 'Coffee.csv';
+var currentProductFile = 'Coffees';
 var deliveryCart = [];
 var isSigBlank = true;
 var driverName = "";
@@ -271,6 +285,7 @@ var customers = [];
 var customerHeaders = [];
 var currentEditingCustomerIndex = -1;
 var currentEditingProductIndex = -1;
+var allRoutes = [];
 
 // ============================================================
 // GOOGLE SIGN-IN
@@ -347,18 +362,20 @@ function completeLogin() {
     userInfoDiv.style.display = 'flex';
     userInfoDiv.innerHTML = `<img src="${userPicture}" alt="${userName}"><span>${userName || userEmail}</span><button class="logout-btn" onclick="logout()">Logout</button>`;
     
-    // Load all live data
+    // Load ALL live data from Google Sheets
     loadCustomersFromSheet();
-    loadProductsFromSheet('Coffee.csv');
+    loadProductsFromSheet(SHEET_NAMES.COFFEE_PRODUCTS);
     loadRoutesFromSheet();
     
     // Initialize map
-    map = L.map('map').setView([55.17, -118.79], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    if (!map) {
+        map = L.map('map').setView([55.17, -118.79], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+    }
     
-    showToast(`Welcome ${userName}! Live data loaded.`, false);
+    showToast(`Welcome ${userName}! Loading live data from your Google Sheet...`, false);
 }
 
 function logout() {
@@ -383,40 +400,52 @@ function showToast(msg, isErr) {
 }
 
 // ============================================================
-// LOAD CUSTOMERS FROM GOOGLE SHEET
+// LOAD CUSTOMERS FROM GOOGLE SHEET (LIVE DATA - NO DEMO)
 // ============================================================
 async function loadCustomersFromSheet() {
     var tbody = document.getElementById('custTableBody');
     var sourceSpan = document.getElementById('customerDataSource');
-    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers...</div>';
-    sourceSpan.textContent = 'Loading...';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading customers from Google Sheets...</div>';
+    sourceSpan.textContent = 'Loading from Google...';
     
     if (!accessToken) {
-        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google</div>';
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first</div>';
+        sourceSpan.textContent = 'Not signed in';
         return;
     }
     
     try {
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.CUSTOMERS}!A1:Z`;
         var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (!response.ok) throw new Error('Failed to load');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Sheet "${SHEET_NAMES.CUSTOMERS}" not found`);
+        }
         
         var data = await response.json();
         var values = data.values;
         
         if (!values || values.length < 2) {
-            tbody.innerHTML = '<tr><td colspan="10">No customer data found. Please create a "Customers" tab in your Google Sheet.</div>';
-            sourceSpan.textContent = 'No data';
+            tbody.innerHTML = `<tr><td colspan="10">No customer data found. Please create a sheet named "${SHEET_NAMES.CUSTOMERS}" with headers in row 1.</div>`;
+            sourceSpan.textContent = 'No data found';
+            sourceSpan.style.background = '#dc3545';
             return;
         }
         
+        // Parse headers from first row
         customerHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
+        
+        // Parse customer data from subsequent rows
         customers = [];
         for (var i = 1; i < values.length; i++) {
             var row = values[i];
             var custObj = {};
             for (var j = 0; j < customerHeaders.length && j < row.length; j++) {
                 custObj[customerHeaders[j]] = row[j] ? row[j].trim() : '';
+            }
+            // Fill missing columns with empty strings
+            for (var j = row.length; j < customerHeaders.length; j++) {
+                custObj[customerHeaders[j]] = '';
             }
             customers.push(custObj);
         }
@@ -425,26 +454,29 @@ async function loadCustomersFromSheet() {
         sourceSpan.textContent = `Google Sheets (${customers.length} customers)`;
         sourceSpan.style.background = '#28a745';
         showToast(`Loaded ${customers.length} customers from Google Sheets`, false);
-    } catch(err) {
-        tbody.innerHTML = `<tr><td colspan="10">Error: ${err.message}</div>`;
-        sourceSpan.textContent = 'Error';
+        
+    } catch (err) {
+        console.error('Error loading customers:', err);
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error: ${err.message}. Make sure a sheet named "${SHEET_NAMES.CUSTOMERS}" exists in your Google Sheet.</div>`;
+        sourceSpan.textContent = 'Error loading';
         sourceSpan.style.background = '#dc3545';
-        showToast('Error loading customers', true);
+        showToast('Error loading customers from Google Sheets', true);
     }
 }
 
 function renderCustomerTable() {
     var thead = document.getElementById('custTableHead');
     var tbody = document.getElementById('custTableBody');
+    
     var headerHtml = '<th style="width:80px;">Action</th>';
-    customerHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
+    customerHeaders.forEach(h => headerHtml += '<th>' + escapeHtml(h) + '</th>');
     thead.innerHTML = headerHtml;
     
     tbody.innerHTML = '';
     customers.forEach((cust, idx) => {
-        var row = '</table>';
+        var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button></td>';
-        customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
+        customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
     });
@@ -465,7 +497,7 @@ function filterCustomers() {
         var idx = customers.indexOf(cust);
         var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openCustomerEditModal(' + idx + ')">✏️ Edit</button></td>';
-        customerHeaders.forEach(h => row += '<td>' + (cust[h] || '') + '</td>');
+        customerHeaders.forEach(h => row += '<td>' + escapeHtml(cust[h] || '') + '</table>');
         row += '</tr>';
         tbody.innerHTML += row;
     });
@@ -497,6 +529,8 @@ function closeCustomerEditModal() {
 
 async function saveCustomerEdit() {
     if (currentEditingCustomerIndex === -1) return;
+    
+    // Collect values from form
     for (var i = 0; i < customerHeaders.length; i++) {
         var header = customerHeaders[i];
         var input = document.getElementById('cust_edit_' + header.replace(/ /g, '_'));
@@ -506,58 +540,78 @@ async function saveCustomerEdit() {
     // Save back to Google Sheets
     if (accessToken) {
         try {
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z`;
+            // First, get current sheet data
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.CUSTOMERS}!A1:Z`;
             var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
             var data = await response.json();
             var values = data.values || [];
+            
+            // Update the specific row
             var rowIndex = currentEditingCustomerIndex + 1;
             if (rowIndex < values.length) {
                 for (var i = 0; i < customerHeaders.length; i++) {
-                    values[rowIndex][i] = customers[currentEditingCustomerIndex][customerHeaders[i]] || '';
+                    var header = customerHeaders[i];
+                    for (var j = 0; j < values[0].length; j++) {
+                        if (values[0][j] === header) {
+                            values[rowIndex][j] = customers[currentEditingCustomerIndex][header] || '';
+                            break;
+                        }
+                    }
                 }
             }
-            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Customers!A1:Z?valueInputOption=RAW`;
+            
+            // Write back to sheet
+            var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.CUSTOMERS}!A1:Z?valueInputOption=RAW`;
             await fetch(updateUrl, {
                 method: 'PUT',
                 headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ values: values })
             });
             showToast('Customer saved to Google Sheets', false);
-        } catch(err) { showToast('Error saving: ' + err.message, true); }
+        } catch(err) {
+            showToast('Error saving to Google Sheets: ' + err.message, true);
+        }
     }
     renderCustomerTable();
     closeCustomerEditModal();
 }
 
 // ============================================================
-// LOAD PRODUCTS FROM GOOGLE SHEET
+// LOAD PRODUCTS FROM GOOGLE SHEET (LIVE DATA - NO DEMO)
 // ============================================================
-async function loadProductsFromSheet(fileName) {
-    currentProductFile = fileName;
+async function loadProductsFromSheet(sheetName) {
+    currentProductFile = sheetName;
     var tbody = document.getElementById('prodTableBody');
     var thead = document.getElementById('prodTableHead');
     var sourceSpan = document.getElementById('productDataSource');
-    tbody.innerHTML = '<tr><td colspan="10"><div class="loading-spinner"></div> Loading products...</div>';
-    sourceSpan.textContent = 'Loading...';
+    tbody.innerHTML = `<td><td colspan="10"><div class="loading-spinner"></div> Loading ${sheetName} from Google Sheets...</div>`;
+    sourceSpan.textContent = 'Loading from Google...';
     
     if (!accessToken) {
-        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google</div>';
+        tbody.innerHTML = '<tr><td colspan="10">Please sign in with Google first</div>';
         return;
     }
     
-    var sheetName = fileName.replace('.csv', 's');
     try {
         var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z`;
         var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (!response.ok) throw new Error('Sheet not found');
+        
+        if (!response.ok) {
+            throw new Error(`Sheet "${sheetName}" not found`);
+        }
         
         var data = await response.json();
         var values = data.values;
-        if (!values || values.length < 2) throw new Error('No data');
+        
+        if (!values || values.length < 2) {
+            tbody.innerHTML = `<tr><td colspan="10">No product data found in "${sheetName}" sheet</div>`;
+            sourceSpan.textContent = 'No data';
+            return;
+        }
         
         currentProdHeaders = values[0].map(function(h) { return h ? h.trim() : ''; }).filter(function(h) { return h !== ''; });
         var headerHtml = '<th style="width:80px;">Action</th><th style="width:80px;">Status</th>';
-        currentProdHeaders.forEach(h => headerHtml += '<th>' + h + '</th>');
+        currentProdHeaders.forEach(h => headerHtml += '<th>' + escapeHtml(h) + '</th>');
         thead.innerHTML = headerHtml;
         
         currentProdList = [];
@@ -572,13 +626,15 @@ async function loadProductsFromSheet(fileName) {
         }
         
         renderProductTable();
-        sourceSpan.textContent = `${fileName} (${currentProdList.length} products)`;
+        sourceSpan.textContent = `${sheetName} (${currentProdList.length} products)`;
         sourceSpan.style.background = '#28a745';
-        showToast(`Loaded ${currentProdList.length} products from ${fileName}`, false);
+        showToast(`Loaded ${currentProdList.length} products from ${sheetName}`, false);
+        
     } catch(err) {
-        tbody.innerHTML = `<tr><td colspan="10">Error: ${err.message}. Make sure sheet "${sheetName}" exists.</div>`;
+        tbody.innerHTML = `<tr><td colspan="10">❌ Error: ${err.message}. Make sure a sheet named "${sheetName}" exists.</div>`;
         sourceSpan.textContent = 'Error';
         sourceSpan.style.background = '#dc3545';
+        showToast('Error loading products: ' + err.message, true);
     }
 }
 
@@ -591,7 +647,7 @@ function renderProductTable() {
         var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openProductEditModalNew(' + idx + ')">✏️ Edit</button></td>';
         row += '<td class="' + statusClass + '">' + statusText + '</div>';
-        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
+        currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
     });
@@ -609,7 +665,7 @@ function filterProducts() {
         var row = '<tr>';
         row += '<td><button class="btn-top" style="padding:4px 8px; font-size:11px;" onclick="openProductEditModalNew(' + currentProdList.indexOf(p) + ')">✏️ Edit</button></td>';
         row += '<td class="' + statusClass + '">' + statusText + '</div>';
-        currentProdHeaders.forEach(h => row += '<td>' + (p[h] || '') + '</td>');
+        currentProdHeaders.forEach(h => row += '<td>' + escapeHtml(p[h] || '') + '</td>');
         row += '</tr>';
         tbody.innerHTML += row;
     });
@@ -642,6 +698,8 @@ function closeProductEditModalNew() {
 
 async function saveProductEditNew() {
     if (currentEditingProductIndex === -1) return;
+    
+    // Collect values from form
     for (var i = 0; i < currentProdHeaders.length; i++) {
         var header = currentProdHeaders[i];
         if (header === 'Status') continue;
@@ -649,14 +707,16 @@ async function saveProductEditNew() {
         if (input) currentProdList[currentEditingProductIndex][header] = input.value;
     }
     
+    // Save back to Google Sheets
     if (accessToken) {
         try {
-            var sheetName = currentProductFile.replace('.csv', 's');
+            var sheetName = currentProductFile;
             var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z`;
             var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
             var data = await response.json();
             var values = data.values || [];
             var rowIndex = currentEditingProductIndex + 1;
+            
             if (rowIndex < values.length) {
                 for (var i = 0; i < currentProdHeaders.length; i++) {
                     var header = currentProdHeaders[i];
@@ -670,6 +730,7 @@ async function saveProductEditNew() {
                     }
                 }
             }
+            
             var updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z?valueInputOption=RAW`;
             await fetch(updateUrl, {
                 method: 'PUT',
@@ -677,7 +738,9 @@ async function saveProductEditNew() {
                 body: JSON.stringify({ values: values })
             });
             showToast('Product saved to Google Sheets', false);
-        } catch(err) { showToast('Error saving: ' + err.message, true); }
+        } catch(err) {
+            showToast('Error saving: ' + err.message, true);
+        }
     }
     renderProductTable();
     closeProductEditModalNew();
@@ -693,13 +756,11 @@ function toggleProductStatusNew() {
 }
 
 // ============================================================
-// LOAD ROUTES FROM GOOGLE SHEET
+// LOAD ROUTES FROM GOOGLE SHEET (LIVE DATA - NO DEMO)
 // ============================================================
-var allRoutes = [];
-
 async function loadRoutesFromSheet() {
     var dropdown = document.getElementById('routeDropdown');
-    dropdown.innerHTML = '<option value=""><div class="loading-spinner"></div> Loading routes...</option>';
+    dropdown.innerHTML = '<option value=""><div class="loading-spinner"></div> Loading routes from Google Sheets...</option>';
     
     if (!accessToken) {
         dropdown.innerHTML = '<option value="">Sign in with Google first</option>';
@@ -707,13 +768,21 @@ async function loadRoutesFromSheet() {
     }
     
     try {
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Routes!A1:Z`;
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.ROUTES}!A1:Z`;
         var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (!response.ok) throw new Error('Routes sheet not found');
+        
+        if (!response.ok) {
+            throw new Error(`Sheet "${SHEET_NAMES.ROUTES}" not found`);
+        }
         
         var data = await response.json();
         var values = data.values;
-        if (!values || values.length < 2) throw new Error('No route data');
+        
+        if (!values || values.length < 2) {
+            dropdown.innerHTML = '<option value="">No routes found</option>';
+            showToast(`No routes found. Create a sheet named "${SHEET_NAMES.ROUTES}"`, true);
+            return;
+        }
         
         var routeHeaders = values[0].map(h => h ? h.trim().toLowerCase() : '');
         var routeNameIdx = routeHeaders.findIndex(h => h.includes('name') || h === 'route');
@@ -735,7 +804,8 @@ async function loadRoutesFromSheet() {
             opt.textContent = routeName;
             dropdown.appendChild(opt);
         }
-        showToast(`Loaded ${allRoutes.length} routes`, false);
+        showToast(`Loaded ${allRoutes.length} routes from Google Sheets`, false);
+        
     } catch(err) {
         dropdown.innerHTML = '<option value="">Error loading routes</option>';
         showToast('Error loading routes: ' + err.message, true);
@@ -747,17 +817,26 @@ document.getElementById('routeDropdown').onchange = async function() {
     if (isNaN(routeIndex)) return;
     
     var stopDiv = document.getElementById('stopList');
-    stopDiv.innerHTML = '<p><div class="loading-spinner"></div> Loading stops...</p>';
+    stopDiv.innerHTML = '<p><div class="loading-spinner"></div> Loading stops from Google Sheets...</p>';
     
     try {
         var route = allRoutes[routeIndex - 1];
-        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${route.name}!A1:Z`;
+        var sheetName = route.name;
+        
+        var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheetName}!A1:Z`;
         var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (!response.ok) throw new Error('Stop sheet not found');
+        
+        if (!response.ok) {
+            throw new Error(`Sheet "${sheetName}" not found`);
+        }
         
         var data = await response.json();
         var values = data.values;
-        if (!values || values.length < 2) throw new Error('No stop data');
+        
+        if (!values || values.length < 2) {
+            stopDiv.innerHTML = '<p>No stops found in this route sheet</p>';
+            return;
+        }
         
         var headers = values[0].map(h => h ? h.trim().toLowerCase() : '');
         var nameIdx = headers.findIndex(h => h.includes('name') || h === 'company');
@@ -782,11 +861,12 @@ document.getElementById('routeDropdown').onchange = async function() {
             
             var div = document.createElement('div');
             div.className = 'route-item';
-            div.innerHTML = `<strong>${i}. ${name}</strong><br><small>📍 ${addr}</small><br><small>📞 ${phone}</small>`;
+            div.innerHTML = `<strong>${i}. ${escapeHtml(name)}</strong><br><small>📍 ${escapeHtml(addr)}</small><br><small>📞 ${escapeHtml(phone)}</small>`;
             div.onclick = (function(idx, s) { return function() { selectStop(idx, s); }; })(i-1, currentRouteStops[i-1]);
             stopDiv.appendChild(div);
         }
-        showToast(`Loaded ${currentRouteStops.length} stops`, false);
+        showToast(`Loaded ${currentRouteStops.length} stops from sheet "${sheetName}"`, false);
+        
     } catch(err) {
         stopDiv.innerHTML = '<p>Error loading stops</p>';
         showToast('Error loading stops: ' + err.message, true);
@@ -799,13 +879,13 @@ function selectStop(idx, stop) {
         return;
     }
     currentStopIndex = idx;
-    document.getElementById('navAddressBar').innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + stop.addr;
-    document.getElementById('navPhoneBar').innerHTML = '<i class="fas fa-phone"></i> ' + stop.phone;
-    document.getElementById('stopModalTitle').innerHTML = '📦 Delivery: ' + stop.name;
-    document.getElementById('metaAddress').innerHTML = stop.addr;
-    document.getElementById('metaPhone').innerHTML = stop.phone;
-    document.getElementById('metaEmail').innerHTML = stop.data.email || stop.data.Email || '--';
-    document.getElementById('metaSpecInst').innerHTML = stop.data['special instructions'] || stop.data['Special Instructions'] || '--';
+    document.getElementById('navAddressBar').innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + escapeHtml(stop.addr);
+    document.getElementById('navPhoneBar').innerHTML = '<i class="fas fa-phone"></i> ' + escapeHtml(stop.phone);
+    document.getElementById('stopModalTitle').innerHTML = '📦 Delivery: ' + escapeHtml(stop.name);
+    document.getElementById('metaAddress').innerHTML = escapeHtml(stop.addr);
+    document.getElementById('metaPhone').innerHTML = escapeHtml(stop.phone);
+    document.getElementById('metaEmail').innerHTML = escapeHtml(stop.data.email || stop.data.Email || '--');
+    document.getElementById('metaSpecInst').innerHTML = escapeHtml(stop.data['special instructions'] || stop.data['Special Instructions'] || '--');
     
     deliveryCart = [];
     renderCart();
@@ -827,7 +907,11 @@ async function loadStopProductDropdown() {
     target.innerHTML = '<option value="">-- Select Product --</option>';
     if (!accessToken) return;
     
-    for (var sheet of ['Coffees', 'Waters']) {
+    // Load from both Coffee and Water sheets
+    var productSheets = [SHEET_NAMES.COFFEE_PRODUCTS, SHEET_NAMES.WATER_PRODUCTS];
+    var icons = { [SHEET_NAMES.COFFEE_PRODUCTS]: '☕', [SHEET_NAMES.WATER_PRODUCTS]: '💧' };
+    
+    for (var sheet of productSheets) {
         try {
             var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${sheet}!A1:Z`;
             var response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
@@ -837,10 +921,11 @@ async function loadStopProductDropdown() {
                 if (values && values.length > 1) {
                     for (var i = 1; i < values.length; i++) {
                         var name = values[i][0];
-                        if (name && name !== 'Status') {
+                        var status = values[i].find((v, idx) => values[0][idx] === 'Status') || 'Active';
+                        if (name && name !== 'Status' && status !== 'Inactive') {
                             var opt = document.createElement('option');
                             opt.value = name;
-                            opt.textContent = (sheet === 'Coffees' ? '☕ ' : '💧 ') + name;
+                            opt.textContent = icons[sheet] + ' ' + name;
                             target.appendChild(opt);
                         }
                     }
@@ -874,7 +959,7 @@ function renderCart() {
     }
     body.innerHTML = '';
     deliveryCart.forEach((item, i) => {
-        body.innerHTML += `<tr><td>${item.name}</div><td>${item.qty}</div><td><button onclick="removeFromCart(${i})" style="background:none; border:none; color:#dc3545;"><i class="fas fa-trash"></i></button></div></tr>`;
+        body.innerHTML += `<tr><td>${escapeHtml(item.name)}</div><td>${item.qty}</div><td><button onclick="removeFromCart(${i})" style="background:none; border:none; color:#dc3545;"><i class="fas fa-trash"></i></button></div></tr>`;
     });
 }
 
@@ -910,14 +995,14 @@ async function markNotDelivered() {
     
     if (accessToken) {
         try {
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/TripLog!A1:E:append?valueInputOption=USER_ENTERED`;
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.TRIP_LOG}!A1:E:append?valueInputOption=USER_ENTERED`;
             await fetch(url, {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ values: [[timestamp, customerName, driverName, 'NOT DELIVERED', reason]] })
             });
             showToast('Recorded to Google Sheets', false);
-        } catch(e) { showToast('Error saving', true); }
+        } catch(e) { showToast('Error saving to sheet', true); }
     }
     alert(`Not delivered: ${customerName}\nReason: ${reason}`);
     closeStopModal();
@@ -935,14 +1020,14 @@ async function completeDelivery() {
     
     if (accessToken) {
         try {
-            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/TripLog!A1:G:append?valueInputOption=USER_ENTERED`;
+            var url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEET_NAMES.TRIP_LOG}!A1:G:append?valueInputOption=USER_ENTERED`;
             await fetch(url, {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ values: [[timestamp, customerName, driverName, receiverName, slipNum, 'DELIVERED', productText]] })
             });
             showToast('Saved to Google Sheets', false);
-        } catch(e) { showToast('Error saving to sheet', true); }
+        } catch(e) { showToast('Error saving to sheet: ' + e.message, true); }
     }
     
     alert(`✅ DELIVERY COMPLETED!\n\nSlip #: ${slipNum}\nCustomer: ${customerName}\nReceived by: ${receiverName}\nProducts: ${productText || '(none)'}`);
@@ -979,12 +1064,12 @@ document.getElementById('btnShowProd').onclick = function() {
     document.getElementById('prodView').style.display = 'block';
     if(accessToken) loadProductsFromSheet(currentProductFile);
 };
-document.getElementById('btnLoadCoffee').onclick = function() { loadProductsFromSheet('Coffee.csv'); };
-document.getElementById('btnLoadWater').onclick = function() { loadProductsFromSheet('Water.csv'); };
-document.getElementById('btnEndOfDay').onclick = function() { alert('End of Day - Check TripLog sheet'); };
+document.getElementById('btnLoadCoffee').onclick = function() { loadProductsFromSheet(SHEET_NAMES.COFFEE_PRODUCTS); };
+document.getElementById('btnLoadWater').onclick = function() { loadProductsFromSheet(SHEET_NAMES.WATER_PRODUCTS); };
+document.getElementById('btnEndOfDay').onclick = function() { window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}`, '_blank'); };
 document.getElementById('btnLiveView').onclick = function() { alert('Live View - Map shows current location'); };
 document.getElementById('btnCallInOrder').onclick = function() { alert('Call in Order - Use the delivery form'); };
-document.getElementById('btnBackup').onclick = function() { alert('Data backed up to Google Sheets'); };
+document.getElementById('btnBackup').onclick = function() { alert('Data is already backed up to Google Sheets'); };
 document.getElementById('btnViewSlips').onclick = function() { window.open(`https://drive.google.com/drive/folders/${GOOGLE_DRIVE_FOLDER_ID}`, '_blank'); };
 document.getElementById('btnViewPastLogs').onclick = function() { window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}`, '_blank'); };
 document.getElementById('btnUserMgmt').onclick = function() { alert('User Management - Manage drivers'); };
@@ -1011,7 +1096,7 @@ document.getElementById('productToggleStatusBtnNew').onclick = toggleProductStat
 
 function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { return m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'; }); }
 
-// Start
+// Start the application
 showLoginModal();
 </script>
 </body>
