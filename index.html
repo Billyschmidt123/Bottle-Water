@@ -8,6 +8,86 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        /* ===== ADDED: CLEANER MODAL STYLES (no existing code removed) ===== */
+        .modal-container {
+            border-radius: 20px;
+            overflow: hidden;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #0f5b9c 0%, #0a4b8a 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+        }
+        .modal-header h2, .modal-header h3 {
+            color: white;
+            margin: 0;
+        }
+        .modal-header button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            border-radius: 40px;
+            padding: 0.4rem 1rem;
+            transition: 0.2s;
+        }
+        .modal-header button:hover {
+            background: rgba(255,255,255,0.4);
+        }
+        .modal-body {
+            background: #f9fafb;
+            padding: 1.5rem;
+        }
+        .modal-footer {
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 1rem 1.5rem;
+        }
+        .section-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+            transition: 0.1s;
+        }
+        .section-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #1f2937;
+            border-left: 3px solid #0f5b9c;
+            padding-left: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .form-field label {
+            font-weight: 700;
+            color: #4b5563;
+        }
+        .form-field input, .form-field select, .form-field textarea {
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            padding: 0.6rem 0.8rem;
+        }
+        .btn-primary, .btn-success, .btn-secondary {
+            border-radius: 40px;
+            font-weight: 600;
+        }
+        .cart-container {
+            background: #f9fafb;
+            border-radius: 16px;
+        }
+        /* Force route dropdown text to be black */
+        #routeDropdown {
+            color: #000000 !important;
+            background: white !important;
+            font-weight: 500;
+        }
+        /* Keep product select dropdowns readable */
+        select {
+            color: #1f2937;
+            background-color: white;
+        }
+        /* ===== END OF ADDED STYLES ===== */
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
@@ -467,7 +547,7 @@
             let row = '<tr>';
             headers.forEach(h => row += `<td>${escapeHtml(cust[h] || '')}</td>`);
             row += `<td><button class="btn btn-primary" style="padding:0.2rem 0.6rem;" onclick="openEditCustomer(${globalIdx})">Edit</button></td>`;
-            row += '</tr>';
+            row += '<tr>';
             tbody.innerHTML += row;
         });
         
@@ -620,7 +700,7 @@
         for (const route of routes) {
             htmlContent += `<h3>📁 ${escapeHtml(route.name)} (${route.customers.length} stops)</h3>`;
             htmlContent += `<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">`;
-            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th></tr>`;
+            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th> </tr>`;
             for (const cust of route.customers.slice(0, 50)) {
                 htmlContent += `<tr><td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Company || cust.CustomerID || '')}</td>`;
                 htmlContent += `<td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Address || '')}</td>`;
@@ -734,6 +814,20 @@
         initMap(); 
         initAuth(); 
     });
+    
+    // ===== ADDED: FIX PRODUCT DROPDOWNS (no existing code changed) =====
+    // This ensures product dropdowns are properly populated even if productMap loads late
+    function ensureProductDropdowns() {
+        if (productMap.water.length > 0 && productMap.coffee.length > 0) {
+            populateProductSelects();
+        } else {
+            setTimeout(ensureProductDropdowns, 500);
+        }
+    }
+    window.addEventListener('load', function() {
+        ensureProductDropdowns();
+    });
+    // ===== END OF FIX =====
 </script>
 </body>
 </html>
