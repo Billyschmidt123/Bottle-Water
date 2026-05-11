@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Pro | CSV Routes from Google Drive</title>
+    <title>LogiFlow Pro | CSV Routes from Drive</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -27,7 +27,7 @@
 
         body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
         .logo-area { display: flex; align-items: center; gap: 0.75rem; }
         .logo-area h1 { font-size: 1.3rem; }
         .header-actions { display: flex; gap: 0.75rem; }
@@ -87,7 +87,7 @@
 <body>
 
 <header>
-    <div class="logo-area"><i class="fas fa-cloud-upload-alt"></i><h1>LogiFlow Routes</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem; min-width:150px;"><option>Loading routes...</option></select></div>
+    <div class="logo-area"><i class="fas fa-file-csv"></i><h1>LogiFlow Routes</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem; min-width:200px;"><option>Loading routes from Drive...</option></select></div>
     <div class="header-actions"><div id="userDisplay" style="display:none;" class="badge"><img id="userAvatar" style="width:24px;height:24px;border-radius:50%;"><span id="userName"></span></div><button id="btnManager" class="btn" style="background:#4b5563; color:white;">Manager</button><button id="btnRefresh" class="btn" style="background:#0d9488; color:white;"><i class="fas fa-sync-alt"></i> Sync</button><button id="btnLogout" class="btn" style="background:#6c757d; color:white; display:none;">Logout</button></div>
 </header>
 
@@ -104,7 +104,7 @@
     <div id="map"></div>
     <div class="side-panel">
         <div class="panel-header"><h3><i class="fas fa-route"></i> Route Stops</h3></div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-spinner fa-spin"></i> Select a route from the dropdown</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-folder-open"></i> Select a route from the dropdown</p></div>
     </div>
 </div>
 
@@ -116,7 +116,8 @@
         <div class="modal-header"><h2><i class="fab fa-google"></i> Connect to Google Drive</h2></div>
         <div class="modal-body" style="text-align:center;">
             <p style="margin-bottom:1rem;">LogiFlow reads CSV route files from your Google Drive folder.</p>
-            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;"><i class="fas fa-folder-open"></i> Route CSV files are loaded and used as route names.</p>
+            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;"><i class="fas fa-folder-open"></i> Folder ID: <strong>1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr</strong></p>
+            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;">Each CSV filename becomes a route name.</p>
             <button id="googleSignInBtn" class="btn btn-primary" style="padding:0.8rem 2rem;"><i class="fab fa-google"></i> Sign in with Google</button>
         </div>
     </div>
@@ -190,17 +191,15 @@
 <script>
     // ========== GOOGLE DRIVE CONFIGURATION ==========
     const ROUTES_FOLDER_ID = '1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr';
-    const SPREADSHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
+    const PRODUCTS_SPREADSHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
     const PDF_FOLDER_ID = '1hLs-zGSNii-Py47bJoK1R6ZjOypQrBKR';
     
     const CONFIG = {
         GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-        SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+        SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly',
         ROUTES_FOLDER_ID: ROUTES_FOLDER_ID,
-        SPREADSHEET_ID: SPREADSHEET_ID,
-        PDF_FOLDER_ID: PDF_FOLDER_ID,
-        PRODUCTS_SHEET_NAME: 'Products',
-        CUSTOMERS_SHEET_NAME: 'Customers'
+        PRODUCTS_SPREADSHEET_ID: PRODUCTS_SPREADSHEET_ID,
+        PDF_FOLDER_ID: PDF_FOLDER_ID
     };
 
     let tokenClient = null;
@@ -208,9 +207,8 @@
     let currentUser = null;
     
     // Data stores
-    let routeFiles = [];           // { name, id, content, customers[] }
-    let globalCustomers = [];      // All customers from all routes (with route name)
-    let csvHeaders = [];
+    let routes = [];           // { name, fileId, customers: [], headers }
+    let allCustomers = [];
     let productMap = { water: [], coffee: [] };
     let callInCart = [];
     let currentRouteStops = [];
@@ -245,30 +243,37 @@
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
-        if (!response.ok) throw new Error(`Failed to load file: ${response.status}`);
+        if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
         return await response.text();
     }
 
-    async function loadSheetData(sheetName) {
-        if (!accessToken) throw new Error("Not authenticated");
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:Z1000`;
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        if (!response.ok) throw new Error(`Failed to load ${sheetName}: ${response.status}`);
-        const data = await response.json();
-        return data.values || [];
-    }
-
-    async function appendRowToSheet(sheetName, rowData) {
-        if (!accessToken) return false;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:append?valueInputOption=RAW`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values: [rowData] })
-        });
-        return response.ok;
+    async function loadProductsFromSheet() {
+        if (!accessToken) return;
+        try {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.PRODUCTS_SPREADSHEET_ID}/values/Products!A1:Z100`;
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const values = data.values || [];
+                if (values.length > 1) {
+                    productMap.water = [];
+                    productMap.coffee = [];
+                    for (let i = 1; i < values.length; i++) {
+                        if (values[i][0]) productMap.water.push(values[i][0].trim());
+                        if (values[i][1]) productMap.coffee.push(values[i][1].trim());
+                    }
+                }
+            }
+        } catch (e) {
+            console.log("Products sheet not accessible, using defaults");
+        }
+        
+        if (productMap.water.length === 0) {
+            productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
+            productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
+        }
     }
 
     async function uploadPDFToDrive(pdfBlob, fileName) {
@@ -301,101 +306,106 @@
         setTimeout(() => { indicator.style.display = 'none'; }, 2000);
     }
 
-    // ========== PARSE CSV AND LOAD ROUTES ==========
+    // ========== PARSE CSV AND BUILD ROUTES ==========
     function parseCSVToCustomers(csvText, routeName) {
         const lines = csvText.split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) return [];
         
-        const headers = lines[0].split(',').map(h => h.trim());
-        if (csvHeaders.length === 0) csvHeaders = [...headers];
-        
-        // Add Route column if not present
-        if (!csvHeaders.includes('Route')) {
-            csvHeaders.push('Route');
-        }
+        // Parse headers - handle quoted fields properly
+        const headers = parseCSVLine(lines[0]);
         
         const customers = [];
         for (let i = 1; i < lines.length; i++) {
-            const vals = lines[i].split(',').map(v => v.trim());
-            let obj = {};
-            headers.forEach((h, idx) => { obj[h] = vals[idx] || ''; });
-            obj.Route = routeName;
+            if (!lines[i].trim()) continue;
+            const values = parseCSVLine(lines[i]);
+            let obj = { Route: routeName };
+            headers.forEach((h, idx) => {
+                obj[h] = (idx < values.length ? values[idx] : '').trim();
+            });
             customers.push(obj);
         }
         return customers;
     }
+    
+    function parseCSVLine(line) {
+        const result = [];
+        let inQuotes = false;
+        let current = '';
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current);
+        return result;
+    }
 
-    async function loadAllRoutesAndCustomers() {
+    async function loadAllRoutes() {
         try {
             // 1. Get all CSV files from Routes folder
-            const files = await listCSVFilesInFolder(CONFIG.ROUTES_FOLDER_ID);
-            console.log("Found route files:", files.map(f => f.name));
+            const csvFiles = await listCSVFilesInFolder(CONFIG.ROUTES_FOLDER_ID);
+            console.log("Found CSV files:", csvFiles.map(f => f.name));
             
-            if (files.length === 0) {
-                alert("No CSV files found in your Routes folder. Please add route CSV files to folder ID: " + CONFIG.ROUTES_FOLDER_ID);
+            if (csvFiles.length === 0) {
+                alert("No CSV files found in your Routes folder.\n\nFolder ID: " + CONFIG.ROUTES_FOLDER_ID);
                 loadDemoRoutes();
                 return;
             }
             
-            routeFiles = [];
-            globalCustomers = [];
-            csvHeaders = [];
+            routes = [];
+            allCustomers = [];
+            let totalCustomers = 0;
             
-            // 2. Load each CSV file and parse customers
-            for (const file of files) {
+            // 2. Load each CSV file
+            for (const file of csvFiles) {
                 try {
                     const csvContent = await loadCSVFile(file.id);
-                    const routeName = file.name.replace('.csv', ''); // Use filename as route name
+                    const routeName = file.name.replace(/\.csv$/i, ''); // Remove .csv extension
                     const customers = parseCSVToCustomers(csvContent, routeName);
                     
-                    routeFiles.push({
+                    routes.push({
                         name: routeName,
                         fileId: file.id,
-                        customers: customers
+                        customers: customers,
+                        customerCount: customers.length
                     });
                     
-                    globalCustomers.push(...customers);
+                    allCustomers.push(...customers);
+                    totalCustomers += customers.length;
                     console.log(`Loaded route "${routeName}" with ${customers.length} customers`);
                 } catch (err) {
                     console.error(`Error loading ${file.name}:`, err);
                 }
             }
             
-            // 3. Load products from Products sheet
-            try {
-                const productsData = await loadSheetData(CONFIG.PRODUCTS_SHEET_NAME);
-                if (productsData && productsData.length > 1) {
-                    productMap.water = [];
-                    productMap.coffee = [];
-                    for (let i = 1; i < productsData.length; i++) {
-                        if (productsData[i][0]) productMap.water.push(productsData[i][0].trim());
-                        if (productsData[i][1]) productMap.coffee.push(productsData[i][1].trim());
-                    }
-                }
-            } catch (err) {
-                console.log("Products sheet not found, using defaults");
-                productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
-                productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
-            }
+            // 3. Load products
+            await loadProductsFromSheet();
             
-            // 4. Update UI with route dropdown
+            // 4. Update dropdown
             const routeSelect = document.getElementById('routeDropdown');
-            routeSelect.innerHTML = '<option value="">-- Select Route --</option>' + 
-                routeFiles.map(r => `<option value="${r.name}">${r.name} (${r.customers.length} stops)</option>`).join('');
+            routeSelect.innerHTML = '<option value="">-- Select a Route --</option>' + 
+                routes.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} (${r.customers.length} stops)</option>`).join('');
             
             const filterSelect = document.getElementById('tableRouteFilter');
             if (filterSelect) {
                 filterSelect.innerHTML = '<option value="All">All Routes</option>' + 
-                    routeFiles.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+                    routes.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`).join('');
             }
             
             // 5. Update stop list panel
-            document.getElementById('stopList').innerHTML = '<p style="text-align:center; padding:2rem; color:gray;">Select a route from the dropdown above</p>';
+            document.getElementById('stopList').innerHTML = '<p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-arrow-left"></i> Select a route from the dropdown</p>';
             
             renderCustomerTable();
             populateProductSelects();
             
-            alert(`Loaded ${routeFiles.length} routes with ${globalCustomers.length} total stops!`);
+            alert(`✅ Loaded ${routes.length} routes with ${totalCustomers} total stops!\n\nRoutes: ${routes.map(r => r.name).join(', ')}`);
             
         } catch (err) {
             console.error("Load error:", err);
@@ -405,72 +415,79 @@
     }
 
     function loadDemoRoutes() {
-        routeFiles = [
-            { name: "Downtown Route", customers: [
-                { CustomerID: "C001", Company: "Coffee Shop A", Address: "123 Main St", Phone: "555-0101", Route: "Downtown Route", Notes: "" },
-                { CustomerID: "C002", Company: "Office Building B", Address: "456 Oak Ave", Phone: "555-0102", Route: "Downtown Route", Notes: "" }
+        routes = [
+            { name: "Dawson Creek - Dawson Creek", customers: [
+                { CustomerID: "C001", Company: "ABC Corp", Address: "123 Main St", Phone: "555-0101", Route: "Dawson Creek - Dawson Creek", Notes: "" }
             ]},
-            { name: "Northside Route", customers: [
-                { CustomerID: "C003", Company: "Restaurant C", Address: "789 Pine Rd", Phone: "555-0103", Route: "Northside Route", Notes: "" },
-                { CustomerID: "C004", Company: "Hotel D", Address: "321 Elm St", Phone: "555-0104", Route: "Northside Route", Notes: "" }
+            { name: "Week 1 Thursday", customers: [
+                { CustomerID: "C002", Company: "XYZ Ltd", Address: "456 Oak Ave", Phone: "555-0102", Route: "Week 1 Thursday", Notes: "" }
+            ]},
+            { name: "Fox Creek - Valleyview", customers: [
+                { CustomerID: "C003", Company: "Smith Ind", Address: "789 Pine Rd", Phone: "555-0103", Route: "Fox Creek - Valleyview", Notes: "" }
             ]}
         ];
         
-        globalCustomers = [];
-        routeFiles.forEach(route => {
-            globalCustomers.push(...route.customers);
+        allCustomers = [];
+        routes.forEach(route => {
+            allCustomers.push(...route.customers);
         });
         
-        csvHeaders = ['CustomerID', 'Company', 'Address', 'Phone', 'Route', 'Notes'];
         productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
         productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
         
         const routeSelect = document.getElementById('routeDropdown');
-        routeSelect.innerHTML = '<option value="">-- Select Route --</option>' + 
-            routeFiles.map(r => `<option value="${r.name}">${r.name} (${r.customers.length} stops)</option>`).join('');
+        routeSelect.innerHTML = '<option value="">-- Select a Route --</option>' + 
+            routes.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} (${r.customers.length} stops)</option>`).join('');
         
         const filterSelect = document.getElementById('tableRouteFilter');
         if (filterSelect) {
             filterSelect.innerHTML = '<option value="All">All Routes</option>' + 
-                routeFiles.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+                routes.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`).join('');
         }
         
         renderCustomerTable();
         populateProductSelects();
-        alert("Demo routes loaded. To use real routes, add CSV files to your Google Drive Routes folder.");
+        alert("Demo routes loaded. To use real routes, add CSV files to your Google Drive folder.");
     }
 
     function renderCustomerTable() {
         const filter = document.getElementById('tableRouteFilter')?.value || 'All';
-        let filtered = filter === 'All' ? globalCustomers : globalCustomers.filter(c => c.Route === filter);
+        let filtered = filter === 'All' ? allCustomers : allCustomers.filter(c => c.Route === filter);
+        
+        // Get all unique headers
+        const allHeaders = new Set();
+        filtered.forEach(c => Object.keys(c).forEach(k => allHeaders.add(k)));
+        const headers = Array.from(allHeaders);
         
         const tbody = document.getElementById('custTableBody');
         if (!tbody) return;
         tbody.innerHTML = '';
         filtered.slice(0, 100).forEach((cust, idx) => {
-            const globalIdx = globalCustomers.indexOf(cust);
+            const globalIdx = allCustomers.indexOf(cust);
             let row = '<tr>';
-            csvHeaders.forEach(h => row += `<td>${escapeHtml(cust[h] || '')}</td>`);
+            headers.forEach(h => row += `<td>${escapeHtml(cust[h] || '')}</td>`);
             row += `<td><button class="btn btn-primary" style="padding:0.2rem 0.6rem;" onclick="openEditCustomer(${globalIdx})">Edit</button></td>`;
             row += '</tr>';
             tbody.innerHTML += row;
         });
         
         const thead = document.getElementById('custTableHead');
-        if (thead) thead.innerHTML = `<tr>${csvHeaders.map(h => `<th>${h}</th>`).join('')}<th>Action</th></tr>`;
+        if (thead) {
+            thead.innerHTML = `<tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}<th>Action</th></tr>`;
+        }
     }
 
     function updateStopListForRoute(routeName) {
-        const route = routeFiles.find(r => r.name === routeName);
+        const route = routes.find(r => r.name === routeName);
         if (!route || !route.customers.length) {
             document.getElementById('stopList').innerHTML = '<p style="text-align:center; padding:2rem; color:gray;">No stops found for this route</p>';
             return;
         }
         
         document.getElementById('stopList').innerHTML = route.customers.map((stop, i) => `
-            <div class="route-stop-item" onclick="alert('Company: ${stop.Company || stop.CustomerID || 'Stop'}\\nAddress: ${stop.Address || 'N/A'}\\nPhone: ${stop.Phone || 'N/A'}')">
-                <b>${i+1}. ${stop.Company || stop.CustomerID || 'Stop'}</b>
-                <div style="font-size:0.7rem;color:gray;">${stop.Address || 'No address'}</div>
+            <div class="route-stop-item" onclick="alert('Company: ${escapeHtml(stop.Company || stop.CustomerID || 'Stop')}\\nAddress: ${escapeHtml(stop.Address || 'N/A')}\\nPhone: ${escapeHtml(stop.Phone || 'N/A')}')">
+                <b>${i+1}. ${escapeHtml(stop.Company || stop.CustomerID || 'Stop')}</b>
+                <div style="font-size:0.7rem;color:gray;">${escapeHtml(stop.Address || 'No address')}</div>
             </div>
         `).join('');
         
@@ -481,34 +498,42 @@
 
     window.openEditCustomer = function(idx) {
         currentEditIndex = idx;
-        const cust = globalCustomers[idx];
+        const cust = allCustomers[idx];
         const container = document.getElementById('editFieldsContainer');
         container.innerHTML = '';
-        csvHeaders.forEach(header => {
-            container.innerHTML += `<div class="form-field"><label>${header}</label><input type="text" id="edit_${header.replace(/\s/g, '_')}" value="${escapeHtml(cust[header] || '')}"></div>`;
+        const headers = Object.keys(cust);
+        headers.forEach(header => {
+            container.innerHTML += `<div class="form-field"><label>${escapeHtml(header)}</label><input type="text" id="edit_${header.replace(/\s/g, '_')}" value="${escapeHtml(cust[header] || '')}"></div>`;
         });
         document.getElementById('editModal').style.display = 'flex';
     };
 
     document.getElementById('saveEditBtn').onclick = async () => {
         if (currentEditIndex === null) return;
-        const cust = globalCustomers[currentEditIndex];
-        for (let h of csvHeaders) {
-            const inp = document.getElementById(`edit_${h.replace(/\s/g, '_')}`);
-            if (inp) cust[h] = inp.value;
-        }
+        const cust = allCustomers[currentEditIndex];
+        const container = document.getElementById('editFieldsContainer');
+        const inputs = container.querySelectorAll('input');
+        inputs.forEach(input => {
+            const fieldName = input.id.replace('edit_', '').replace(/_/g, ' ');
+            cust[fieldName] = input.value;
+        });
         
-        // Also update the route's customer array
-        const routeName = cust.Route;
-        const route = routeFiles.find(r => r.name === routeName);
+        // Update in route as well
+        const route = routes.find(r => r.name === cust.Route);
         if (route) {
             const custIndex = route.customers.findIndex(c => c.CustomerID === cust.CustomerID);
             if (custIndex >= 0) route.customers[custIndex] = cust;
         }
         
-        showSaveNotification('Customer updated locally');
+        showSaveNotification('Customer updated');
         renderCustomerTable();
         closeModal('editModal');
+        
+        // Refresh stop list if this route is active
+        const currentRoute = document.getElementById('routeDropdown').value;
+        if (currentRoute === cust.Route) {
+            updateStopListForRoute(cust.Route);
+        }
     };
 
     function populateProductSelects() {
@@ -524,11 +549,11 @@
         callInCart = [];
         const container = document.getElementById('callinCustomerFields');
         container.innerHTML = '';
-        ['CustomerID', 'Company', 'Address', 'Phone', 'Notes'].forEach(field => {
+        const fields = ['CustomerID', 'Company', 'Address', 'Phone', 'Notes'];
+        fields.forEach(field => {
             container.innerHTML += `<div class="form-field"><label>${field}</label><input type="text" id="callin_${field}"></div>`;
         });
-        // Route dropdown from loaded routes
-        container.innerHTML += `<div class="form-field"><label>Route</label><select id="callin_Route">${routeFiles.map(r => `<option value="${r.name}">${r.name}</option>`).join('')}</select></div>`;
+        container.innerHTML += `<div class="form-field"><label>Route</label><select id="callin_Route">${routes.map(r => `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`).join('')}</select></div>`;
         document.getElementById('callinCartDisplay').innerHTML = '<em>No items</em>';
         document.getElementById('cartCount').innerText = '0 items';
         document.getElementById('callInModal').style.display = 'flex';
@@ -546,7 +571,7 @@
     };
 
     document.getElementById('saveCallInBtn').onclick = async () => {
-        const selectedRoute = document.getElementById('callin_Route')?.value || (routeFiles[0]?.name || 'Route A');
+        const selectedRoute = document.getElementById('callin_Route')?.value || (routes[0]?.name || 'Route');
         const newCust = {
             CustomerID: document.getElementById('callin_CustomerID')?.value || `C${Date.now()}`,
             Company: document.getElementById('callin_Company')?.value || 'New Customer',
@@ -558,19 +583,11 @@
         };
         
         // Add to local data
-        globalCustomers.push(newCust);
-        const route = routeFiles.find(r => r.name === selectedRoute);
+        allCustomers.push(newCust);
+        const route = routes.find(r => r.name === selectedRoute);
         if (route) route.customers.push(newCust);
         
-        // Try to append to Google Sheet if available
-        try {
-            await appendRowToSheet(CONFIG.CUSTOMERS_SHEET_NAME, csvHeaders.map(h => newCust[h] || ''));
-            showSaveNotification('Order saved to Drive');
-        } catch (err) {
-            console.log("Sheet append failed, saved locally only");
-            showSaveNotification('Order saved locally');
-        }
-        
+        showSaveNotification('Order saved');
         alert(`Order saved for ${newCust.Company} on ${selectedRoute}`);
         closeModal('callInModal');
         renderCustomerTable();
@@ -583,7 +600,7 @@
     };
 
     window.viewProducts = () => {
-        alert(`Water: ${productMap.water.join(', ')}\n\nCoffee: ${productMap.coffee.join(', ')}`);
+        alert(`💧 Water Products:\n${productMap.water.join('\n')}\n\n☕ Coffee Products:\n${productMap.coffee.join('\n')}`);
     };
 
     // ========== PDF GENERATION ==========
@@ -591,22 +608,31 @@
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-US');
         
-        const pdfHtml = `
+        let htmlContent = `
             <html><body style="font-family: Arial; padding: 40px;">
-                <h1>LogiFlow End of Day Report</h1>
-                <p>Date: ${dateStr}</p>
-                <p>Total Routes: ${routeFiles.length}</p>
-                <p>Total Customers: ${globalCustomers.length}</p>
+                <h1 style="color:#0f5b9c;">LogiFlow End of Day Report</h1>
+                <p><strong>Date:</strong> ${dateStr}</p>
+                <p><strong>Total Routes:</strong> ${routes.length}</p>
+                <p><strong>Total Customers:</strong> ${allCustomers.length}</p>
                 <hr>
-                ${routeFiles.map(route => `
-                    <h3>${route.name} (${route.customers.length} stops)</h3>
-                    ${route.customers.map(c => `<p><strong>${c.Company || c.CustomerID}</strong> - ${c.Address || ''}</p>`).join('')}
-                `).join('')}
-            </body></html>
         `;
         
+        for (const route of routes) {
+            htmlContent += `<h3>📁 ${escapeHtml(route.name)} (${route.customers.length} stops)</h3>`;
+            htmlContent += `<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">`;
+            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th></tr>`;
+            for (const cust of route.customers.slice(0, 50)) {
+                htmlContent += `<tr><td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Company || cust.CustomerID || '')}</td>`;
+                htmlContent += `<td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Address || '')}</td>`;
+                htmlContent += `<td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Phone || '')}</td></tr>`;
+            }
+            htmlContent += `</table>`;
+        }
+        
+        htmlContent += `<hr><p style="font-size:12px; color:gray;">Generated by LogiFlow Delivery System</p></body></html>`;
+        
         const element = document.createElement('div');
-        element.innerHTML = pdfHtml;
+        element.innerHTML = htmlContent;
         element.style.position = 'absolute';
         element.style.left = '-9999px';
         document.body.appendChild(element);
@@ -619,7 +645,7 @@
             
             await uploadPDFToDrive(pdfBlob, fileName);
             showSaveNotification('PDF saved to Drive');
-            alert(`PDF saved to Google Drive!\nFile: ${fileName}`);
+            alert(`✅ PDF saved to Google Drive!\nFile: ${fileName}\nFolder: ${PDF_FOLDER_ID}`);
         } catch (error) {
             document.body.removeChild(element);
             alert("PDF error: " + error.message);
@@ -627,7 +653,7 @@
     }
     
     async function endOfDayReport() {
-        if (globalCustomers.length === 0) {
+        if (allCustomers.length === 0) {
             alert("No customer data to report.");
             return;
         }
@@ -642,7 +668,7 @@
     
     document.getElementById('btnStartRoute').onclick = () => {
         let routeName = document.getElementById('routeDropdown').value;
-        if (!routeName || routeName === '-- Select Route --' || routeName === '') {
+        if (!routeName || routeName === '-- Select a Route --' || routeName === '') {
             alert("Please select a route from the dropdown");
             return;
         }
@@ -652,17 +678,19 @@
     function updateNavBar() {
         if (!currentRouteStops.length) return;
         let stop = currentRouteStops[currentStopIndex];
-        document.getElementById('navAddressBar').innerHTML = `<i class="fas fa-location-dot"></i> Address: ${stop.Address || '---'}`;
-        document.getElementById('navPhoneBar').innerHTML = `<i class="fas fa-phone"></i> Phone: ${stop.Phone || '---'}`;
+        document.getElementById('navAddressBar').innerHTML = `<i class="fas fa-location-dot"></i> Address: ${escapeHtml(stop.Address || '---')}`;
+        document.getElementById('navPhoneBar').innerHTML = `<i class="fas fa-phone"></i> Phone: ${escapeHtml(stop.Phone || '---')}`;
     }
     
     window.navigateStop = function(delta) {
-        if (currentRouteStops.length === 0) return;
+        if (currentRouteStops.length === 0) {
+            alert("No route loaded. Please select a route and click Start Route.");
+            return;
+        }
         let newIdx = currentStopIndex + delta;
         if (newIdx >= 0 && newIdx < currentRouteStops.length) {
             currentStopIndex = newIdx;
             updateNavBar();
-            // Show stop details
             const stop = currentRouteStops[currentStopIndex];
             alert(`Stop ${currentStopIndex + 1} of ${currentRouteStops.length}\nCompany: ${stop.Company || stop.CustomerID}\nAddress: ${stop.Address || 'N/A'}\nPhone: ${stop.Phone || 'N/A'}`);
         } else {
@@ -682,12 +710,12 @@
             client_id: CONFIG.GOOGLE_CLIENT_ID,
             scope: CONFIG.SCOPES,
             callback: async (resp) => {
-                if (resp.error) return alert("Authentication Failed");
+                if (resp.error) return alert("Authentication Failed: " + resp.error);
                 accessToken = resp.access_token;
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('btnLogout').style.display = 'inline-block';
                 document.getElementById('userDisplay').style.display = 'flex';
-                await loadAllRoutesAndCustomers();
+                await loadAllRoutes();
             }
         });
         tokenClient.requestAccessToken();
@@ -696,7 +724,7 @@
     // ========== EVENT LISTENERS ==========
     document.getElementById('googleSignInBtn').onclick = () => tokenClient.requestAccessToken();
     document.getElementById('btnManager').onclick = () => { renderCustomerTable(); document.getElementById('mgrModal').style.display = 'flex'; };
-    document.getElementById('btnRefresh').onclick = () => { if(accessToken) loadAllRoutesAndCustomers(); else initAuth(); };
+    document.getElementById('btnRefresh').onclick = () => { if(accessToken) loadAllRoutes(); else initAuth(); };
     document.getElementById('btnLogout').onclick = () => { fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' }); location.reload(); };
     document.getElementById('btnEndOfDay').onclick = endOfDayReport;
     document.getElementById('managerEndOfDayBtn').onclick = () => { closeModal('mgrModal'); endOfDayReport(); };
