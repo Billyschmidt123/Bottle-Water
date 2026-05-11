@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Pro | Complete Google Drive Integration</title>
+    <title>LogiFlow Pro | Auto-Save to Google Drive</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -15,29 +15,25 @@
             --primary-dark: #0a4b8a;
             --primary-light: #e6f0fa;
             --success: #2b6e3c;
-            --success-light: #e8f5e9;
             --danger: #b91c1c;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
             --gray-600: #4b5563;
             --gray-800: #1f2937;
             --radius-lg: 1rem;
             --radius-xl: 1.5rem;
-            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
         }
 
-        body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; }
         .logo-area { display: flex; align-items: center; gap: 0.75rem; }
-        .logo-area i { font-size: 1.6rem; }
-        .logo-area h1 { font-size: 1.3rem; font-weight: 600; }
+        .logo-area h1 { font-size: 1.3rem; }
         .header-actions { display: flex; gap: 0.75rem; }
 
         .driver-nav-bar { background: white; padding: 0.6rem 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--gray-200); }
-        .nav-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .nav-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
         .nav-btn-primary { background: var(--primary); color: white; }
         .nav-btn-success { background: var(--success); color: white; }
         .info-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 2rem; padding: 0.5rem 1.2rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; flex: 1; }
@@ -50,15 +46,14 @@
         .route-stop-item { background: white; border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 0.75rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; }
         .route-stop-item:hover { border-color: var(--primary); background: var(--primary-light); }
 
-        .btn { padding: 0.6rem 1.2rem; border-radius: 2rem; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+        .btn { padding: 0.6rem 1.2rem; border-radius: 2rem; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-primary:hover { background: var(--primary-dark); }
         .btn-secondary { background: var(--gray-200); color: var(--gray-800); }
         .btn-success { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-container { background: white; border-radius: var(--radius-xl); width: 90%; max-width: 950px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: fadeIn 0.2s ease; }
+        .modal-container { background: white; border-radius: var(--radius-xl); width: 90%; max-width: 950px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; animation: fadeIn 0.2s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 2px solid var(--gray-100); }
         .modal-header h2 { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem; }
@@ -67,12 +62,12 @@
 
         .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
         .form-field { display: flex; flex-direction: column; gap: 0.35rem; }
-        .form-field label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); }
-        .form-field input, .form-field select, .form-field textarea { padding: 0.7rem 0.8rem; border: 1px solid var(--gray-300); border-radius: 0.75rem; font-size: 0.85rem; transition: 0.2s; }
-        .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 91, 156, 0.1); }
+        .form-field label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--gray-600); }
+        .form-field input, .form-field select { padding: 0.7rem 0.8rem; border: 1px solid var(--gray-300); border-radius: 0.75rem; font-size: 0.85rem; }
+        .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--primary); }
 
         .section-card { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--gray-200); }
-        .section-title { font-size: 0.9rem; font-weight: 700; color: var(--gray-800); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; border-left: 3px solid var(--primary); padding-left: 0.75rem; }
+        .section-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; border-left: 3px solid var(--primary); padding-left: 0.75rem; }
         
         .product-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
         .product-row .form-field { flex: 1; margin-bottom: 0; }
@@ -84,6 +79,7 @@
         .badge { background: var(--primary-light); color: var(--primary); border-radius: 2rem; padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 600; }
         .save-indicator { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 8px 16px; border-radius: 2rem; font-size: 0.8rem; display: none; align-items: center; gap: 8px; z-index: 1000; animation: slideUp 0.3s ease; }
         @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .auto-save-badge { background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 6px; }
 
         @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .side-panel { width: 300px; } }
     </style>
@@ -91,8 +87,8 @@
 <body>
 
 <header>
-    <div class="logo-area"><i class="fas fa-table"></i><h1>LogiFlow Drive</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem;"></select></div>
-    <div class="header-actions"><div id="userDisplay" style="display:none;" class="badge"><img id="userAvatar" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;"><span id="userName"></span></div><button id="btnManager" class="btn" style="background:#4b5563; color:white;">Manager</button><button id="btnRefresh" class="btn" style="background:#0d9488; color:white;"><i class="fas fa-sync-alt"></i> Sync</button><button id="btnLogout" class="btn" style="background:#6c757d; color:white; display:none;">Logout</button></div>
+    <div class="logo-area"><i class="fas fa-cloud-upload-alt"></i><h1>LogiFlow Auto-Save</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem;"></select></div>
+    <div class="header-actions"><div id="userDisplay" style="display:none;" class="badge"><img id="userAvatar" style="width:24px;height:24px;border-radius:50%;"><span id="userName"></span></div><button id="btnManager" class="btn" style="background:#4b5563; color:white;">Manager</button><button id="btnRefresh" class="btn" style="background:#0d9488; color:white;"><i class="fas fa-sync-alt"></i> Sync</button><button id="btnLogout" class="btn" style="background:#6c757d; color:white; display:none;">Logout</button></div>
 </header>
 
 <div class="driver-nav-bar">
@@ -101,13 +97,14 @@
     <div style="display: flex; gap: 0.5rem;"><button class="nav-btn nav-btn-primary" onclick="navigateStop(-1)"><i class="fas fa-chevron-left"></i> Prev</button><button class="nav-btn nav-btn-primary" onclick="navigateStop(1)">Next <i class="fas fa-chevron-right"></i></button></div>
     <div id="navAddressBar" class="info-card"><i class="fas fa-location-dot"></i> Address: ---</div>
     <div id="navPhoneBar" class="info-card"><i class="fas fa-phone"></i> Phone: ---</div>
+    <div class="auto-save-badge"><i class="fas fa-sync-alt fa-fw"></i> Auto-saving to Drive</div>
 </div>
 
 <div class="main-container">
     <div id="map"></div>
     <div class="side-panel">
         <div class="panel-header"><h3><i class="fas fa-route"></i> Route Stops</h3></div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-spinner fa-spin"></i> Loading routes...</p></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-spinner fa-spin"></i> Loading...</p></div>
     </div>
 </div>
 
@@ -118,8 +115,8 @@
     <div class="modal-container" style="max-width: 480px;">
         <div class="modal-header"><h2><i class="fab fa-google"></i> Connect to Google Drive</h2></div>
         <div class="modal-body" style="text-align:center;">
-            <p style="margin-bottom:1rem;">LogiFlow stores all data in your Google Drive.</p>
-            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;"><i class="fas fa-database"></i> Customers, Orders, and PDF Reports are saved automatically.</p>
+            <p style="margin-bottom:1rem;">All data saves automatically to your Google Drive.</p>
+            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;"><i class="fas fa-database"></i> Customers, orders, and PDFs save in real-time.</p>
             <button id="googleSignInBtn" class="btn btn-primary" style="padding:0.8rem 2rem;"><i class="fab fa-google"></i> Sign in with Google</button>
         </div>
     </div>
@@ -138,15 +135,15 @@
                 <div class="section-title">Add Items</div>
                 <div class="product-row" style="margin-bottom:1rem;">
                     <div class="form-field"><label>Water Product</label><select id="callinWaterProduct"></select></div>
-                    <div class="form-field"><label>Quantity</label><input type="number" id="callinWaterQty" value="1" min="1"></div>
+                    <div class="form-field"><label>Qty</label><input type="number" id="callinWaterQty" value="1" min="1"></div>
                     <div class="form-field"><label>Unit</label><select id="callinWaterUnit"><option>Bottles</option><option>Cases</option></select></div>
-                    <button class="btn btn-primary" onclick="addCallInItem('water')">Add Water</button>
+                    <button class="btn btn-primary" onclick="addCallInItem('water')">Add</button>
                 </div>
                 <div class="product-row">
                     <div class="form-field"><label>Coffee Product</label><select id="callinCoffeeProduct"></select></div>
-                    <div class="form-field"><label>Quantity</label><input type="number" id="callinCoffeeQty" value="1" min="1"></div>
+                    <div class="form-field"><label>Qty</label><input type="number" id="callinCoffeeQty" value="1" min="1"></div>
                     <div class="form-field"><label>Unit</label><select id="callinCoffeeUnit"><option>Boxes</option><option>Cases</option></select></div>
-                    <button class="btn btn-primary" onclick="addCallInItem('coffee')">Add Coffee</button>
+                    <button class="btn btn-primary" onclick="addCallInItem('coffee')">Add</button>
                 </div>
             </div>
             <div class="cart-container">
@@ -154,7 +151,7 @@
                 <div id="callinCartDisplay" class="cart-items"><em>No items</em></div>
             </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('callInModal')">Cancel</button><button class="btn btn-success" id="saveCallInBtn">Place Order & Save to Drive</button></div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('callInModal')">Cancel</button><button class="btn btn-success" id="saveCallInBtn">Save to Drive</button></div>
     </div>
 </div>
 
@@ -170,7 +167,7 @@
 <!-- Manager Modal -->
 <div id="mgrModal" class="modal-overlay">
     <div class="modal-container" style="max-width: 1100px;">
-        <div class="modal-header"><h2><i class="fas fa-chalkboard-user"></i> Manager Console</h2><button class="btn btn-secondary" onclick="closeModal('mgrModal')">Close</button></div>
+        <div class="modal-header"><h2><i class="fas fa-chalkboard-user"></i> Manager</h2><button class="btn btn-secondary" onclick="closeModal('mgrModal')">Close</button></div>
         <div class="modal-body">
             <div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
                 <button class="btn btn-primary" onclick="openCallInModal()"><i class="fas fa-phone-alt"></i> Call-in Order</button>
@@ -191,9 +188,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
 <script>
-    // ========== YOUR GOOGLE DRIVE CONFIGURATION ==========
+    // ========== GOOGLE DRIVE CONFIGURATION ==========
     const SPREADSHEET_ID = '1aXhZszxshtmJwDXu0HSft7r3FjglYkt6nAOYdIzM-WA';
-    const PDF_FOLDER_ID = '1hLs-zGSNii-Py47bJoK1R6ZjOypQrBKR';  // Your PDF folder ID
+    const PDF_FOLDER_ID = '1hLs-zGSNii-Py47bJoK1R6ZjOypQrBKR';
     
     const CONFIG = {
         GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
@@ -217,27 +214,42 @@
     let map, routeMarkers = [];
     let currentEditIndex = null;
 
-    // ========== GOOGLE DRIVE API HELPERS ==========
+    // ========== GOOGLE DRIVE API - DIRECT SAVE ==========
     async function loadSheetData(sheetName) {
         if (!accessToken) throw new Error("Not authenticated");
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:Z1000`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:Z2000`;
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
-        if (!response.ok) throw new Error(`Failed to load ${sheetName}: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         return data.values || [];
     }
 
-    async function updateEntireSheet(sheetName, data) {
+    async function saveSheetData(sheetName, data) {
         if (!accessToken) return false;
+        
+        // First, clear existing data
+        const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:Z${data.length + 100}:clear`;
+        await fetch(clearUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        }).catch(e => console.log("Clear warning:", e));
+        
+        // Then write new data
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${sheetName}!A1:Z${data.length}?valueInputOption=RAW`;
         const response = await fetch(url, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ values: data })
         });
-        return response.ok;
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.error("Save error:", error);
+            return false;
+        }
+        return true;
     }
 
     async function appendRowToSheet(sheetName, rowData) {
@@ -251,7 +263,6 @@
         return response.ok;
     }
 
-    // Upload PDF to Google Drive folder
     async function uploadPDFToDrive(pdfBlob, fileName) {
         if (!accessToken) throw new Error("Not authenticated");
         
@@ -271,50 +282,64 @@
             body: formData
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`Upload failed: ${error.error?.message || response.statusText}`);
-        }
-        
-        const result = await response.json();
-        return result;
+        if (!response.ok) throw new Error("Upload failed");
+        return await response.json();
     }
 
-    function showSaveNotification(message = 'Saved to Google Drive') {
+    function showSaveNotification(message) {
         const indicator = document.getElementById('saveIndicator');
         indicator.querySelector('span').innerText = message;
         indicator.style.display = 'flex';
-        setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+        setTimeout(() => { indicator.style.display = 'none'; }, 2000);
     }
 
-    // ========== LOAD DATA FROM GOOGLE SHEETS ==========
+    // ========== SAVE TO GOOGLE DRIVE IMMEDIATELY ==========
+    async function saveAllCustomersToDrive() {
+        if (!accessToken) {
+            console.warn("No access token, cannot save");
+            return false;
+        }
+        
+        const sheetData = [csvHeaders];
+        globalCustomers.forEach(cust => {
+            const row = csvHeaders.map(h => cust[h] || '');
+            sheetData.push(row);
+        });
+        
+        const success = await saveSheetData(CONFIG.CUSTOMERS_SHEET_NAME, sheetData);
+        if (success) {
+            showSaveNotification('Customers saved to Drive');
+            console.log("Saved to Drive:", globalCustomers.length, "customers");
+        } else {
+            console.error("Save failed");
+        }
+        return success;
+    }
+
+    // Auto-save after any modification
+    async function autoSave() {
+        await saveAllCustomersToDrive();
+    }
+
+    // ========== LOAD FROM GOOGLE DRIVE ==========
     async function loadAllData() {
         try {
             // Load products
             const productsData = await loadSheetData(CONFIG.PRODUCTS_SHEET_NAME);
             if (productsData && productsData.length > 1) {
-                const headers = productsData[0];
-                const waterCol = headers.findIndex(h => h.toLowerCase().includes('water'));
-                const coffeeCol = headers.findIndex(h => h.toLowerCase().includes('coffee'));
-                
                 productMap.water = [];
                 productMap.coffee = [];
-                
                 for (let i = 1; i < productsData.length; i++) {
-                    const row = productsData[i];
-                    if (waterCol >= 0 && row[waterCol] && row[waterCol].trim()) {
-                        productMap.water.push(row[waterCol].trim());
-                    }
-                    if (coffeeCol >= 0 && row[coffeeCol] && row[coffeeCol].trim()) {
-                        productMap.coffee.push(row[coffeeCol].trim());
-                    }
+                    if (productsData[i][0]) productMap.water.push(productsData[i][0].trim());
+                    if (productsData[i][1]) productMap.coffee.push(productsData[i][1].trim());
                 }
             }
             
-            // Fallback products
             if (productMap.water.length === 0) {
                 productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
                 productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
+                // Save default products to Drive
+                await saveSheetData(CONFIG.PRODUCTS_SHEET_NAME, [['WaterProducts', 'CoffeeProducts'], ...productMap.water.map((w, i) => [w, productMap.coffee[i] || ''])]);
             }
             
             // Load customers
@@ -332,21 +357,23 @@
                 if (routeCol >= 0) {
                     availableRoutes = [...new Set(globalCustomers.map(c => c[csvHeaders[routeCol]]).filter(r => r && r.trim()))];
                 }
-                if (availableRoutes.length === 0) {
-                    availableRoutes = ['Route A', 'Route B', 'Route C'];
-                }
-            } else {
+            }
+            
+            if (availableRoutes.length === 0) {
+                availableRoutes = ['Route A', 'Route B'];
+            }
+            
+            if (csvHeaders.length === 0) {
                 csvHeaders = ['CustomerID', 'Company', 'Address', 'Phone', 'Route', 'Notes', 'OrderItems'];
-                globalCustomers = [];
-                availableRoutes = ['Route A', 'Route B', 'Route C'];
-                await updateEntireSheet(CONFIG.CUSTOMERS_SHEET_NAME, [csvHeaders]);
+                await saveAllCustomersToDrive();
             }
             
             updateUI();
             alert(`Loaded from Google Drive!\nCustomers: ${globalCustomers.length}\nRoutes: ${availableRoutes.length}`);
+            
         } catch (err) {
             console.error("Load error:", err);
-            alert("Could not load from Google Drive. Using demo data.");
+            alert("Error loading from Drive. Using demo data. Make sure your spreadsheet exists and is shared.");
             loadDemoData();
         }
     }
@@ -354,25 +381,14 @@
     function loadDemoData() {
         csvHeaders = ['CustomerID', 'Company', 'Address', 'Phone', 'Route', 'Notes', 'OrderItems'];
         globalCustomers = [
-            { CustomerID: 'C001', Company: 'ABC Corporation', Address: '123 Main Street', Phone: '555-0101', Route: 'Route A', Notes: '', OrderItems: '' },
-            { CustomerID: 'C002', Company: 'XYZ Limited', Address: '456 Oak Avenue', Phone: '555-0102', Route: 'Route A', Notes: '', OrderItems: '' },
-            { CustomerID: 'C003', Company: 'Smith Industries', Address: '789 Pine Road', Phone: '555-0103', Route: 'Route B', Notes: '', OrderItems: '' }
+            { CustomerID: 'C001', Company: 'ABC Corp', Address: '123 Main St', Phone: '555-0101', Route: 'Route A', Notes: '', OrderItems: '' },
+            { CustomerID: 'C002', Company: 'XYZ Ltd', Address: '456 Oak Ave', Phone: '555-0102', Route: 'Route A', Notes: '', OrderItems: '' },
+            { CustomerID: 'C003', Company: 'Smith Ind', Address: '789 Pine Rd', Phone: '555-0103', Route: 'Route B', Notes: '', OrderItems: '' }
         ];
-        availableRoutes = ['Route A', 'Route B', 'Route C'];
+        availableRoutes = ['Route A', 'Route B'];
         productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
         productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
         updateUI();
-    }
-
-    async function saveAllCustomersToSheets() {
-        const sheetData = [csvHeaders];
-        globalCustomers.forEach(cust => {
-            const row = csvHeaders.map(h => cust[h] || '');
-            sheetData.push(row);
-        });
-        const success = await updateEntireSheet(CONFIG.CUSTOMERS_SHEET_NAME, sheetData);
-        if (success) showSaveNotification('Customers saved to Drive');
-        return success;
     }
 
     function updateUI() {
@@ -397,7 +413,7 @@
         const tbody = document.getElementById('custTableBody');
         if (!tbody) return;
         tbody.innerHTML = '';
-        filtered.slice(0, 100).forEach((cust, idx) => {
+        filtered.forEach((cust, idx) => {
             let row = '<tr>';
             csvHeaders.forEach(h => row += `<td>${escapeHtml(cust[h] || '')}</td>`);
             row += `<td><button class="btn btn-primary" style="padding:0.2rem 0.6rem;" onclick="openEditCustomer(${globalCustomers.indexOf(cust)})">Edit</button></td>`;
@@ -427,9 +443,10 @@
             const inp = document.getElementById(`edit_${h.replace(/\s/g, '_')}`);
             if (inp) cust[h] = inp.value;
         }
-        await saveAllCustomersToSheets();
+        await autoSave();  // Save to Drive immediately
         renderCustomerTable();
         closeModal('editModal');
+        alert("Customer saved to Google Drive!");
     };
 
     function populateProductSelects() {
@@ -457,8 +474,8 @@
         let product = type === 'water' ? document.getElementById('callinWaterProduct').value : document.getElementById('callinCoffeeProduct').value;
         let qty = type === 'water' ? document.getElementById('callinWaterQty').value : document.getElementById('callinCoffeeQty').value;
         let unit = type === 'water' ? document.getElementById('callinWaterUnit').value : document.getElementById('callinCoffeeUnit').value;
-        if (!product) return alert("Please select a product");
-        if (qty <= 0) return alert("Quantity must be greater than zero");
+        if (!product) return alert("Select a product");
+        if (qty <= 0) return alert("Valid quantity required");
         callInCart.push(`${qty} ${unit} - ${product}`);
         document.getElementById('callinCartDisplay').innerHTML = callInCart.map(i => `<div class="cart-item">${escapeHtml(i)}</div>`).join('');
         document.getElementById('cartCount').innerText = `${callInCart.length} item(s)`;
@@ -483,111 +500,62 @@
             showSaveNotification('Order saved to Drive');
             alert("Order saved to Google Drive!");
         } else {
-            alert("Failed to save to Google Drive.");
+            alert("Failed to save. Check your connection.");
         }
         closeModal('callInModal');
         renderCustomerTable();
     };
 
     window.viewProducts = () => {
-        alert(`Water Products:\n${productMap.water.join('\n')}\n\nCoffee Products:\n${productMap.coffee.join('\n')}`);
+        alert(`Water: ${productMap.water.join(', ')}\n\nCoffee: ${productMap.coffee.join(', ')}`);
     };
 
-    // ========== PDF GENERATION & UPLOAD TO GOOGLE DRIVE ==========
+    // ========== PDF TO GOOGLE DRIVE ==========
     async function generateAndUploadPDF() {
         const today = new Date();
-        const dateStr = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        
-        const totalRevenue = globalCustomers.reduce((sum, c) => sum + (parseFloat(c.Amount) || 0), 0);
-        const totalDeliveries = globalCustomers.length;
+        const dateStr = today.toLocaleDateString('en-US');
         
         const pdfHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>LogiFlow End of Day Report</title>
-                <style>
-                    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0f5b9c; padding-bottom: 20px; }
-                    .header h1 { color: #0f5b9c; margin: 0; }
-                    .summary { background: #f0f7ff; padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-around; }
-                    .summary-box { text-align: center; }
-                    .summary-box .number { font-size: 28px; font-weight: bold; color: #0f5b9c; }
-                    .summary-box .label { color: #666; margin-top: 5px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-                    th { background: #0f5b9c; color: white; }
-                    .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>LogiFlow Delivery Report</h1>
-                    <p>End of Day Summary</p>
-                    <p><strong>Date:</strong> ${dateStr} | <strong>Time:</strong> ${timeStr}</p>
-                </div>
-                <div class="summary">
-                    <div class="summary-box"><div class="number">${totalDeliveries}</div><div class="label">Total Deliveries</div></div>
-                    <div class="summary-box"><div class="number">$${totalRevenue.toFixed(2)}</div><div class="label">Total Revenue</div></div>
-                    <div class="summary-box"><div class="number">${totalDeliveries > 0 ? Math.round(totalRevenue / totalDeliveries) : 0}</div><div class="label">Avg per Delivery</div></div>
-                </div>
-                <h3>Delivery Details</h3>
-                <table>
-                    <thead><tr><th>Customer</th><th>Address</th><th>Route</th><th>Items</th></tr></thead>
-                    <tbody>
-                        ${globalCustomers.slice(0, 50).map(c => `
-                            <tr><td>${escapeHtml(c.Company || c.CustomerID || '')}</td><td>${escapeHtml(c.Address || '')}</td><td>${escapeHtml(c.Route || '')}</td><td>${escapeHtml(c.OrderItems || '')}</td></tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                <div class="footer"><p>LogiFlow Delivery System - Report generated on ${dateStr}</p></div>
-            </body>
-            </html>
+            <html><body style="font-family: Arial; padding: 40px;">
+                <h1>LogiFlow End of Day Report</h1>
+                <p>Date: ${dateStr}</p>
+                <p>Total Customers: ${globalCustomers.length}</p>
+                <hr>
+                <h3>Customer List:</h3>
+                ${globalCustomers.map(c => `<p><strong>${c.Company || c.CustomerID}</strong> - ${c.Address || ''} - ${c.Route || ''}</p>`).join('')}
+            </body></html>
         `;
         
-        // Create PDF element
         const element = document.createElement('div');
         element.innerHTML = pdfHtml;
         element.style.position = 'absolute';
         element.style.left = '-9999px';
         document.body.appendChild(element);
         
-        const fileName = `logiflow_report_${today.toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+        const fileName = `logiflow_report_${today.toISOString().slice(0, 10)}.pdf`;
         
         try {
-            // Generate PDF
-            const pdfBlob = await html2pdf().set({
-                margin: [0.5, 0.5, 0.5, 0.5],
-                filename: fileName,
-                image: { type: 'jpeg', quality: 0.98 },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-            }).from(element).outputPdf('blob');
-            
+            const pdfBlob = await html2pdf().set({ filename: fileName }).from(element).outputPdf('blob');
             document.body.removeChild(element);
             
-            // Upload to Google Drive
             const result = await uploadPDFToDrive(pdfBlob, fileName);
-            showSaveNotification('PDF saved to Google Drive');
-            alert(`PDF saved to your Google Drive!\nFolder ID: ${CONFIG.PDF_FOLDER_ID}\nFile: ${fileName}`);
-            
+            showSaveNotification('PDF saved to Drive');
+            alert(`PDF saved to Google Drive!\nFile: ${fileName}`);
         } catch (error) {
             document.body.removeChild(element);
-            console.error("PDF error:", error);
-            alert("Error generating/saving PDF: " + error.message);
+            alert("PDF error: " + error.message);
         }
     }
     
     async function endOfDayReport() {
         if (globalCustomers.length === 0) {
-            alert("No deliveries recorded. Add customers first.");
+            alert("No customer data to report.");
             return;
         }
         await generateAndUploadPDF();
     }
 
-    // ========== MAP & ROUTE FUNCTIONS ==========
+    // ========== MAP & ROUTE ==========
     function initMap() { 
         map = L.map('map').setView([55.17, -118.79], 12); 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); 
@@ -595,18 +563,17 @@
     
     document.getElementById('btnStartRoute').onclick = () => {
         let route = document.getElementById('routeDropdown').value;
-        if (!route || route === '-- Select Route --') return alert("Please select a route first");
+        if (!route || route === '-- Select Route --') return alert("Select a route");
         const routeCol = csvHeaders.findIndex(h => h.toLowerCase() === 'route');
-        if (routeCol < 0) return alert("No route column found");
+        if (routeCol < 0) return alert("No route column");
         
         currentRouteStops = globalCustomers.filter(c => c[csvHeaders[routeCol]] === route);
-        if (!currentRouteStops.length) return alert("No stops found on this route");
+        if (!currentRouteStops.length) return alert("No stops");
         
-        const stopDiv = document.getElementById('stopList');
-        stopDiv.innerHTML = currentRouteStops.map((s, i) => `
-            <div class="route-stop-item" onclick="alert('Company: ${s.Company || 'N/A'}\\nAddress: ${s.Address || 'N/A'}\\nPhone: ${s.Phone || 'N/A'}')">
-                <b>${i+1}. ${s.Company || s.CustomerID || 'Stop'}</b>
-                <div style="font-size:0.7rem;color:gray;">${s.Address || 'No address'}</div>
+        document.getElementById('stopList').innerHTML = currentRouteStops.map((s, i) => `
+            <div class="route-stop-item" onclick="alert('${s.Company || s.CustomerID}\\n${s.Address}\\n${s.Phone}')">
+                <b>${i+1}. ${s.Company || s.CustomerID}</b>
+                <div style="font-size:0.7rem;">${s.Address || 'No address'}</div>
             </div>
         `).join('');
         
@@ -626,8 +593,6 @@
         if (newIdx >= 0 && newIdx < currentRouteStops.length) {
             currentStopIndex = newIdx;
             updateNavBar();
-        } else {
-            alert(delta > 0 ? "End of route reached" : "Beginning of route");
         }
     };
     
@@ -637,13 +602,13 @@
         return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); 
     }
 
-    // ========== AUTHENTICATION ==========
+    // ========== AUTH & INIT ==========
     function initAuth() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CONFIG.GOOGLE_CLIENT_ID,
             scope: CONFIG.SCOPES,
             callback: async (resp) => {
-                if (resp.error) return alert("Authentication Failed");
+                if (resp.error) return alert("Auth Failed");
                 accessToken = resp.access_token;
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('btnLogout').style.display = 'inline-block';
@@ -654,7 +619,6 @@
         tokenClient.requestAccessToken();
     }
 
-    // ========== EVENT LISTENERS ==========
     document.getElementById('googleSignInBtn').onclick = () => tokenClient.requestAccessToken();
     document.getElementById('btnManager').onclick = () => { renderCustomerTable(); document.getElementById('mgrModal').style.display = 'flex'; };
     document.getElementById('btnRefresh').onclick = () => { if(accessToken) loadAllData(); else initAuth(); };
@@ -662,11 +626,7 @@
     document.getElementById('btnEndOfDay').onclick = endOfDayReport;
     document.getElementById('managerEndOfDayBtn').onclick = () => { closeModal('mgrModal'); endOfDayReport(); };
     
-    // ========== INITIALIZATION ==========
-    window.addEventListener('load', () => { 
-        initMap(); 
-        initAuth(); 
-    });
+    window.addEventListener('load', () => { initMap(); initAuth(); });
 </script>
 </body>
 </html>
