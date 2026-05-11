@@ -2,230 +2,90 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiFlow Delivery System | Professional Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiFlow Delivery | Fixed Product Import</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        /* --- Modern CSS Variables --- */
-        :root {
-            --primary: #0f5b9c;
-            --primary-dark: #084178;
-            --primary-light: #e8f0fe;
-            --success: #2b6e3c;
-            --success-light: #e6f4ea;
-            --danger: #b91c1c;
-            --danger-light: #fef2f2;
-            --warning: #b45309;
-            --warning-light: #fff7ed;
-            --gray-50: #f9fafb;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-400: #9ca3af;
-            --gray-600: #4b5563;
-            --gray-700: #374151;
-            --gray-800: #1f2937;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            --radius-sm: 0.5rem;
-            --radius-md: 0.75rem;
-            --radius-lg: 1rem;
-            --radius-xl: 1.5rem;
-        }
-
-        body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-        /* --- Header --- */
-        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: var(--shadow-md); z-index: 10; }
-        .logo-area { display: flex; align-items: center; gap: 0.75rem; }
-        .logo-area i { font-size: 1.8rem; }
-        .logo-area h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.3px; margin: 0; }
-        .header-actions { display: flex; gap: 0.75rem; align-items: center; }
-
-        /* --- Navigation Bar --- */
-        .driver-nav-bar { background: white; padding: 0.6rem 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); }
-        .nav-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease; }
-        .nav-btn-primary { background: var(--primary); color: white; }
-        .nav-btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
-        .nav-btn-success { background: var(--success); color: white; }
-        .nav-btn-danger { background: var(--danger); color: white; }
-        .nav-btn-warning { background: var(--warning); color: white; }
-        .info-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 2rem; padding: 0.5rem 1.2rem; font-size: 0.85rem; font-weight: 500; color: var(--gray-700); display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 200px; }
-
-        /* --- Layout --- */
-        .main-container { display: flex; flex: 1; overflow: hidden; gap: 0; }
-        #map { flex: 2; height: 100%; z-index: 1; background: #e9ecef; }
-        .side-panel { width: 380px; background: white; border-left: 1px solid var(--gray-200); display: flex; flex-direction: column; box-shadow: var(--shadow-lg); z-index: 2; }
-        .panel-header { padding: 1.25rem; border-bottom: 1px solid var(--gray-100); background: white; }
-        .panel-header h3 { color: var(--gray-800); font-weight: 600; margin-bottom: 0.5rem; }
-        .stop-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
-
-        /* --- Modern Stop Items --- */
-        .route-stop-item { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; }
-        .route-stop-item:hover { border-color: var(--primary); background: var(--primary-light); transform: translateX(4px); box-shadow: var(--shadow-sm); }
-        .stop-number { background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 2rem; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; margin-right: 0.75rem; }
-        .stop-name { font-weight: 700; color: var(--gray-800); }
-        .stop-address { font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem; display: flex; align-items: center; gap: 0.3rem; }
-
-        /* --- MODAL PROFESSIONAL STYLES --- */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-container { background: white; border-radius: var(--radius-xl); width: 90%; max-width: 1100px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-xl); animation: modalFadeIn 0.2s ease; }
-        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--gray-200); background: var(--gray-50); }
-        .modal-header h2, .modal-header h3 { font-size: 1.25rem; font-weight: 600; color: var(--gray-800); margin: 0; display: flex; align-items: center; gap: 0.6rem; }
-        .modal-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
-        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); background: var(--gray-50); display: flex; justify-content: flex-end; gap: 1rem; }
-        .btn { padding: 0.6rem 1.2rem; border-radius: 2rem; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
-        .btn-secondary { background: var(--gray-200); color: var(--gray-700); }
-        .btn-secondary:hover { background: var(--gray-300); }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .form-field { display: flex; flex-direction: column; gap: 0.35rem; }
-        .form-field label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); }
-        .form-field input, .form-field select, .form-field textarea { padding: 0.6rem 0.8rem; border: 1px solid var(--gray-300); border-radius: var(--radius-md); font-size: 0.85rem; transition: 0.2s; background: white; }
-        .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 91, 156, 0.1); }
-        .section-title { font-size: 1rem; font-weight: 700; color: var(--gray-800); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary-light); display: flex; align-items: center; gap: 0.5rem; }
-        .cart-item-list { background: var(--gray-50); border-radius: var(--radius-md); padding: 0.75rem; max-height: 150px; overflow-y: auto; }
-        .cart-item { background: white; padding: 0.5rem 0.75rem; border-radius: 2rem; margin-bottom: 0.5rem; font-size: 0.8rem; border: 1px solid var(--gray-200); display: inline-block; margin-right: 0.5rem; }
-        .product-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; background: var(--gray-50); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; }
-        .product-row .form-field { flex: 1; margin-bottom: 0; }
-
-        /* Login Modal specific */
-        .login-card { text-align: center; padding: 1rem; }
-        .google-btn { background: white; border: 1px solid var(--gray-300); padding: 0.8rem 1.8rem; border-radius: 3rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.8rem; margin: 1rem 0; cursor: pointer; transition: 0.2s; }
-        .google-btn:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-
-        /* Manager Table */
-        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        .data-table th { text-align: left; padding: 0.75rem 0.5rem; background: var(--gray-100); font-weight: 600; color: var(--gray-700); border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; }
-        .data-table td { padding: 0.7rem 0.5rem; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
-        .badge { background: var(--primary-light); color: var(--primary); border-radius: 2rem; padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 600; }
-
-        /* Responsive */
-        @media (max-width: 768px) { .side-panel { width: 300px; } .modal-container { width: 95%; } .product-row { flex-direction: column; align-items: stretch; } }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+        header { background: #0a4b8a; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        #map { flex: 2; height: 100%; }
+        .side-panel { width: 360px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        .driver-nav-bar { background: #eef2f7; padding: 8px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 6px 14px; border-radius: 30px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: #0a4b8a; color: white; }
+        .btn-success { background: #2b6e3c; color: white; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 16px; width: 90%; max-width: 800px; max-height: 80vh; overflow-y: auto; padding: 20px; }
+        .product-list { background: #f8f9fa; border-radius: 12px; padding: 15px; margin: 10px 0; max-height: 300px; overflow-y: auto; }
+        .product-item { padding: 8px; border-bottom: 1px solid #e0e0e0; font-size: 0.85rem; }
+        .info-bar { background: white; border-radius: 40px; padding: 8px 16px; font-size: 0.85rem; flex: 1; }
+        .stop-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .route-stop-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 8px; margin-bottom: 4px; }
+        .route-stop-item:hover { background: #e6f4ff; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="logo-area">
-        <i class="fas fa-truck-fast"></i>
-        <h1>LogiFlow Delivery</h1>
-        <select id="routeDropdown" class="btn" style="background: rgba(255,255,255,0.2); color: white; margin-left: 1rem;"></select>
-    </div>
-    <div class="header-actions">
-        <div id="userDisplay" style="display:none;" class="user-info"><img id="userAvatar" style="width:32px;height:32px;border-radius:50%;"><span id="userName"></span></div>
-        <button id="btnManager" class="btn" style="background: var(--gray-600);">📋 Manager</button>
-        <button id="btnForceRefresh" class="btn" style="background: #0d9488;"><i class="fas fa-sync-alt"></i> Sync</button>
-        <button id="btnLogout" class="btn" style="background: var(--gray-600); display:none;">Logout</button>
+    <div><h1>🚚 LogiFlow Delivery</h1></div>
+    <div>
+        <button id="btnManager" class="btn btn-primary">📋 Manager</button>
+        <button id="btnRefresh" class="btn btn-primary">🔄 Refresh</button>
     </div>
 </header>
 
 <div class="driver-nav-bar">
-    <button id="btnStartRoute" class="nav-btn nav-btn-success"><i class="fas fa-play"></i> Start Route</button>
-    <button id="btnFinishRoute" class="nav-btn nav-btn-danger"><i class="fas fa-stop"></i> Finish</button>
-    <div style="display: flex; gap: 0.5rem;">
-        <button class="nav-btn nav-btn-primary" onclick="navigateStop(-1)"><i class="fas fa-chevron-left"></i> Prev</button>
-        <button class="nav-btn nav-btn-primary" onclick="navigateStop(1)">Next <i class="fas fa-chevron-right"></i></button>
-    </div>
-    <div id="navAddressBar" class="info-card"><i class="fas fa-location-dot"></i> <span>Address: ---</span></div>
-    <div id="navPhoneBar" class="info-card"><i class="fas fa-phone"></i> <span>Phone: ---</span></div>
+    <button id="btnStartRoute" class="btn btn-success">▶ START ROUTE</button>
+    <div id="navAddressBar" class="info-bar">📍 Address: ---</div>
+    <div id="navPhoneBar" class="info-bar">📞 Phone: ---</div>
 </div>
 
 <div class="main-container">
     <div id="map"></div>
     <div class="side-panel">
-        <div class="panel-header"><h3><i class="fas fa-route"></i> Route Stops</h3><div id="currentAddress" style="font-size:0.8rem;color:gray;"></div></div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-map-marked-alt"></i> Select a route to begin</p></div>
-    </div>
-</div>
-
-<!-- LOGIN MODAL -->
-<div id="loginModal" class="modal-overlay" style="display:flex;">
-    <div class="modal-container" style="max-width: 480px;">
-        <div class="modal-header"><h2><i class="fab fa-google"></i> Sign in to Drive</h2></div>
-        <div class="modal-body login-card">
-            <p>Connect to Google Drive to load routes, customers & products.</p>
-            <button id="googleSignInBtn" class="google-btn"><img src="https://www.google.com/favicon.ico" width="20"> Sign in with Google</button>
-            <div class="badge" style="margin-top:1rem;">🔒 Read-only access to specified folders</div>
+        <div class="panel-header" style="padding: 15px;">
+            <select id="routeDropdown" style="width:100%; padding:8px; border-radius:8px;">
+                <option>-- Select Route --</option>
+            </select>
         </div>
+        <div id="stopList" class="stop-list"></div>
     </div>
 </div>
 
-<!-- MANAGER MODAL -->
+<!-- Manager Modal -->
 <div id="mgrModal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 1200px;">
-        <div class="modal-header"><h3><i class="fas fa-chalkboard-user"></i> Manager Control Panel</h3><button class="btn btn-secondary" onclick="closeModal('mgrModal')"><i class="fas fa-times"></i> Close</button></div>
-        <div class="modal-body">
-            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.5rem;">
-                <button class="btn btn-primary" onclick="renderCustTable()"><i class="fas fa-users"></i> Customers</button>
-                <button class="btn btn-secondary" onclick="managerProductMaint()"><i class="fas fa-box"></i> Products</button>
-                <button class="btn btn-success" onclick="managerCallInOrder()"><i class="fas fa-phone-alt"></i> Call-in Order</button>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap:wrap; gap:10px;">
-                <div><i class="fas fa-filter"></i> <select id="tableRouteFilter" onchange="renderCustTable()" style="padding:0.4rem 1rem; border-radius:2rem;"></select></div>
-                <button class="btn btn-primary" onclick="openNewCustomerModal()"><i class="fas fa-plus"></i> New Customer</button>
-                <div id="tableStatus" class="badge"></div>
-            </div>
-            <div style="overflow-x:auto; border-radius: var(--radius-md); border:1px solid var(--gray-200);">
-                <table class="data-table"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table>
+    <div class="modal-content">
+        <h3>📁 Manager Console</h3>
+        <hr>
+        <button class="btn btn-primary" onclick="showProducts()">📦 View Products</button>
+        <button class="btn btn-primary" onclick="renderCustTable()">👥 Customers</button>
+        <div id="productPreview" style="margin-top: 15px;"></div>
+        <div style="margin-top: 15px;">
+            <select id="tableRouteFilter" onchange="renderCustTable()"></select>
+            <div id="custTableContainer" style="overflow-x:auto; margin-top:10px;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                    <thead id="custTableHead"></thead>
+                    <tbody id="custTableBody"></tbody>
+                </table>
             </div>
         </div>
+        <button class="btn" onclick="closeModal('mgrModal')" style="margin-top:15px;">Close</button>
     </div>
 </div>
 
-<!-- EDIT CUSTOMER MODAL (Unified & Modern) -->
+<!-- Edit Modal -->
 <div id="editModal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 1000px;">
-        <div class="modal-header"><h3><i class="fas fa-pen-alt"></i> Edit Customer / Order</h3><button class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button></div>
-        <div class="modal-body">
-            <div class="form-grid" id="editFieldsContainer"></div>
-            <div class="section-title"><i class="fas fa-tint"></i> Water Selection</div>
-            <div class="product-row">
-                <div class="form-field"><label>Water Product</label><select id="edit_WaterProduct"></select></div>
-                <div class="form-field"><label>Unit</label><select id="edit_WaterUnits"><option>Bottles</option><option>Cases</option></select></div>
-                <div class="form-field"><label>Qty</label><input type="number" id="edit_WaterQty" value="1" min="0"></div>
-                <button class="btn btn-primary" onclick="addItemToEditCart('water')" style="margin-bottom:0.2rem;"><i class="fas fa-cart-plus"></i> Add</button>
-            </div>
-            <div class="section-title"><i class="fas fa-mug-hot"></i> Coffee Selection</div>
-            <div class="product-row">
-                <div class="form-field"><label>Coffee Product</label><select id="edit_CoffeeProduct"></select></div>
-                <div class="form-field"><label>Unit</label><select id="edit_CoffeeUnits"><option>Boxes</option><option>Cases</option></select></div>
-                <div class="form-field"><label>Qty</label><input type="number" id="edit_CoffeeQty" value="1" min="0"></div>
-                <button class="btn btn-primary" onclick="addItemToEditCart('coffee')"><i class="fas fa-cart-plus"></i> Add</button>
-            </div>
-            <div class="section-title"><i class="fas fa-shopping-cart"></i> Order Cart</div>
-            <div id="editCartItemsDisplay" class="cart-item-list"><span style="color:gray;">No items added</span></div>
-            <div class="form-field" style="margin-top:1rem;"><label>📝 Order Notes</label><input type="text" id="edit_OrderNotes" placeholder="Special instructions..."></div>
-        </div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('editModal')">Discard</button><button class="btn btn-primary" id="saveRecordBtn"><i class="fas fa-save"></i> Save Changes</button></div>
-    </div>
-</div>
-
-<!-- NEW CUSTOMER MODAL (Compact) -->
-<div id="newCustModal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 700px;">
-        <div class="modal-header"><h3><i class="fas fa-user-plus"></i> New Customer Record</h3><button class="btn btn-secondary" onclick="closeModal('newCustModal')">Close</button></div>
-        <div class="modal-body"><div id="newCustFields" class="form-grid"></div></div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('newCustModal')">Cancel</button><button class="btn btn-success" id="saveNewCustBtn">Create Customer</button></div>
-    </div>
-</div>
-
-<!-- CALL IN ORDER MODAL (Streamlined) -->
-<div id="callInModal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 800px;">
-        <div class="modal-header"><h3><i class="fas fa-phone-volume"></i> Call-in Order Entry</h3><button class="btn btn-secondary" onclick="closeModal('callInModal')">Close</button></div>
-        <div class="modal-body"><div id="callInFormGrid"></div><div class="section-title"><i class="fas fa-receipt"></i> Cart Summary</div><div id="callinCartDisplay" class="cart-item-list"></div></div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('callInModal')">Cancel</button><button class="btn btn-success" id="saveCallInBtn">Place Order</button></div>
+    <div class="modal-content">
+        <h3>✏️ Edit Customer</h3>
+        <div id="editFields"></div>
+        <button class="btn btn-primary" id="saveEditBtn">Save</button>
+        <button class="btn" onclick="closeModal('editModal')">Cancel</button>
     </div>
 </div>
 
@@ -235,155 +95,192 @@
     // Configuration
     const CONFIG = {
         GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-        SCOPES: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
+        SCOPES: 'https://www.googleapis.com/auth/drive.readonly',
         ROUTES_FOLDER_ID: '1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr',
         WATER_PRODUCTS_FILE_ID: '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX',
         COFFEE_PRODUCTS_FILE_ID: '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs'
     };
-    let tokenClient, accessToken, currentUser, globalCustomers = [], csvHeaders = [], availableRoutes = [], productMap = { water: [], coffee: [] };
-    let currentEditIndex = null, editCartItems = [], callInCart = [], currentRouteStops = [], map, routeMarkers = [], currentStopIndex = 0;
+
+    let tokenClient = null;
+    let accessToken = null;
+    let globalCustomers = [];
+    let csvHeaders = [];
+    let availableRoutes = [];
+    let productMap = { water: [], coffee: [] };
+    let currentRouteStops = [];
+    let map;
 
     // Google Auth
-    function initializeGapi() {
-        tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CONFIG.GOOGLE_CLIENT_ID, scope: CONFIG.SCOPES, callback: async (resp) => {
-            if (resp.error) return alert("Auth Failed");
-            accessToken = resp.access_token;
-            await fetchUserInfo();
-            document.getElementById('loginModal').style.display = 'none';
-            document.getElementById('btnLogout').style.display = 'inline-block';
-            document.getElementById('userDisplay').style.display = 'flex';
-            await loadAllDataFromDrive();
-        }});
+    function initAuth() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CONFIG.GOOGLE_CLIENT_ID,
+            scope: CONFIG.SCOPES,
+            callback: async (resp) => {
+                if (resp.error) return alert("Auth failed");
+                accessToken = resp.access_token;
+                document.getElementById('loginPrompt')?.remove();
+                await loadAllData();
+            }
+        });
+        tokenClient.requestAccessToken();
     }
-    async function fetchUserInfo() {
-        try { const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { 'Authorization': `Bearer ${accessToken}` } }); currentUser = await res.json(); document.getElementById('userName').innerText = currentUser.name; if(currentUser.picture) document.getElementById('userAvatar').src = currentUser.picture; } catch(e) {}
+
+    async function loadFile(fileId) {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.text();
     }
-    function signOut() { fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' }); accessToken = null; location.reload(); }
-    async function loadTextFromDrive(fileId) { const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } }); if (!res.ok) throw new Error(`HTTP ${res.status}`); return await res.text(); }
-    async function listCSVFilesInFolder(folderId) { let all = [], page = null; do { let url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='text/csv'&fields=files(id,name)&pageSize=100${page ? `&pageToken=${page}` : ''}`; const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } }); const data = await res.json(); if(data.files) all.push(...data.files); page = data.nextPageToken; } while(page); return all; }
-    async function loadAllDataFromDrive() {
-        const btn = document.getElementById('btnForceRefresh'); const old = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+
+    async function listRouteFiles() {
+        let url = `https://www.googleapis.com/drive/v3/files?q='${CONFIG.ROUTES_FOLDER_ID}'+in+parents+and+mimeType='text/csv'&fields=files(id,name)`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        const data = await res.json();
+        return data.files || [];
+    }
+
+    // FIXED: Proper CSV parsing for products
+    async function loadAllData() {
         try {
-            const waterText = await loadTextFromDrive(CONFIG.WATER_PRODUCTS_FILE_ID);
-            const coffeeText = await loadTextFromDrive(CONFIG.COFFEE_PRODUCTS_FILE_ID);
-            productMap.water = waterText.split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(',')[1]?.trim()).filter(Boolean);
-            productMap.coffee = coffeeText.split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(',')[1]?.trim()).filter(Boolean);
-            const routeFiles = await listCSVFilesInFolder(CONFIG.ROUTES_FOLDER_ID);
+            // Load product files
+            const waterRaw = await loadFile(CONFIG.WATER_PRODUCTS_FILE_ID);
+            const coffeeRaw = await loadFile(CONFIG.COFFEE_PRODUCTS_FILE_ID);
+            
+            // Parse water - each line is a product, first column is product name
+            const waterLines = waterRaw.split('\n').filter(l => l.trim() && !l.startsWith(','));
+            productMap.water = [];
+            for (let line of waterLines) {
+                // Get first column (before comma) or whole line
+                let product = line.split(',')[0]?.trim() || line.trim();
+                // Skip empty or header-like lines
+                if (product && product.length > 0 && !product.toLowerCase().includes('product') && product !== 'NOT DELIVERED') {
+                    productMap.water.push(product);
+                }
+            }
+            
+            // Parse coffee similarly
+            const coffeeLines = coffeeRaw.split('\n').filter(l => l.trim());
+            productMap.coffee = [];
+            for (let line of coffeeLines) {
+                let product = line.split(',')[0]?.trim() || line.trim();
+                if (product && product.length > 0 && !product.toLowerCase().includes('product') && !product.includes('NOT DELIVERED')) {
+                    // Clean up extra quotes
+                    product = product.replace(/^["']|["']$/g, '');
+                    productMap.coffee.push(product);
+                }
+            }
+            
+            console.log('✅ Water products loaded:', productMap.water);
+            console.log('✅ Coffee products loaded:', productMap.coffee);
+            
+            // Load route files
+            const routeFiles = await listRouteFiles();
             availableRoutes = routeFiles.map(f => f.name);
-            document.getElementById('routeDropdown').innerHTML = '<option>-- Select Route --</option>' + availableRoutes.map(r => `<option>${r.replace('.csv','')}</option>`).join('');
-            document.getElementById('tableRouteFilter').innerHTML = '<option value="All">All Routes</option>' + availableRoutes.map(r => `<option>${r.replace('.csv','')}</option>`).join('');
-            globalCustomers = []; csvHeaders = [];
-            for(let file of routeFiles) {
-                const csvText = await loadTextFromDrive(file.id);
-                const lines = csvText.split(/\r?\n/).filter(l=>l.trim());
-                if(lines.length<2) continue;
-                const headers = lines[0].split(',').map(h=>h.trim());
-                if(csvHeaders.length===0) csvHeaders = [...headers];
-                for(let i=1;i<lines.length;i++) {
-                    let vals = lines[i].split(',').map(v=>v.trim());
-                    let obj = { __route: file.name.replace('.csv','') };
-                    headers.forEach((h,idx)=> obj[h] = vals[idx] || '');
+            document.getElementById('routeDropdown').innerHTML = '<option>-- Select Route --</option>' + 
+                availableRoutes.map(r => `<option>${r.replace('.csv', '')}</option>`).join('');
+            document.getElementById('tableRouteFilter').innerHTML = '<option value="All">All Routes</option>' + 
+                availableRoutes.map(r => `<option>${r.replace('.csv', '')}</option>`).join('');
+            
+            // Load customer data
+            globalCustomers = [];
+            csvHeaders = [];
+            for (let file of routeFiles) {
+                const csvText = await loadFile(file.id);
+                const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+                if (lines.length < 2) continue;
+                const headers = lines[0].split(',').map(h => h.trim());
+                if (csvHeaders.length === 0) csvHeaders = headers;
+                for (let i = 1; i < lines.length; i++) {
+                    const vals = lines[i].split(',').map(v => v.trim());
+                    let obj = { __route: file.name.replace('.csv', '') };
+                    headers.forEach((h, idx) => obj[h] = vals[idx] || '');
                     globalCustomers.push(obj);
                 }
             }
-            rebuildTableHeader(); renderCustTable(); populateProductSelects();
-            alert(`Loaded ${globalCustomers.length} customers, ${availableRoutes.length} routes.`);
-        } catch(e) { console.error(e); alert("Drive Error: " + e.message); } finally { btn.innerHTML = old; }
+            
+            alert(`✅ Loaded:\n📊 ${globalCustomers.length} customers\n🗺️ ${availableRoutes.length} routes\n💧 ${productMap.water.length} water products\n☕ ${productMap.coffee.length} coffee products`);
+            renderCustTable();
+            
+        } catch (err) {
+            console.error(err);
+            alert("Error: " + err.message);
+        }
     }
-    function rebuildTableHeader() { document.getElementById('custTableHead').innerHTML = `<tr><th>Action</th>${csvHeaders.map(h=>`<th>${h}</th>`).join('')}</tr>`; }
-    function populateProductSelects() {
-        let wOpt = '<option>Select water</option>' + productMap.water.map(p=>`<option>${p}</option>`).join('');
-        let cOpt = '<option>Select coffee</option>' + productMap.coffee.map(p=>`<option>${p}</option>`).join('');
-        document.querySelectorAll('#edit_WaterProduct, #callinWaterProduct').forEach(s=>s.innerHTML = wOpt);
-        document.querySelectorAll('#edit_CoffeeProduct, #callinCoffeeProduct').forEach(s=>s.innerHTML = cOpt);
-    }
-    window.renderCustTable = function() {
-        let filter = document.getElementById('tableRouteFilter').value;
-        let filtered = filter === 'All' ? globalCustomers : globalCustomers.filter(c=>c.__route === filter);
-        let tbody = document.getElementById('custTableBody'); tbody.innerHTML = '';
-        filtered.slice(0,150).forEach((c,idx)=>{
-            let gIdx = globalCustomers.indexOf(c);
-            let row = `<tr><td><button class="btn" style="background:var(--primary-light);color:var(--primary);padding:0.2rem 0.6rem;" onclick="openEditCustomer(${gIdx})">Edit</button></td>`;
-            csvHeaders.forEach(h=> row += `<td>${c[h] || ''}</td>`);
-            tbody.innerHTML += row + `<\/tr>`;
+
+    function renderCustTable() {
+        let filter = document.getElementById('tableRouteFilter')?.value || 'All';
+        let filtered = filter === 'All' ? globalCustomers : globalCustomers.filter(c => c.__route === filter);
+        let tbody = document.getElementById('custTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        filtered.slice(0, 100).forEach((cust, idx) => {
+            let row = `<tr>`;
+            csvHeaders.forEach(h => row += `<td>${cust[h] || ''}</td>`);
+            row += `</tr>`;
+            tbody.innerHTML += row;
         });
-        document.getElementById('tableStatus').innerText = `${filtered.length} records`;
-    };
-    window.openEditCustomer = function(idx) {
-        const cust = globalCustomers[idx]; currentEditIndex = idx; editCartItems = [];
-        document.getElementById('editCartItemsDisplay').innerHTML = '<span style="color:gray;">No items</span>';
-        let container = document.getElementById('editFieldsContainer'); container.innerHTML = '';
-        csvHeaders.forEach(h => { container.innerHTML += `<div class="form-field"><label>${h}</label><input type="text" id="edit_${h.replace(/\s/g,'_')}" value="${escapeHtml(cust[h] || '')}"></div>`; });
-        container.innerHTML += `<div class="form-field"><label>Target Route</label><select id="editTargetRouteSel">${availableRoutes.map(r=>`<option value="${r.replace('.csv','')}" ${cust.__route===r.replace('.csv','')?'selected':''}>${r.replace('.csv','')}</option>`).join('')}</select></div>`;
-        document.getElementById('edit_OrderNotes').value = cust['Notes'] || '';
-        document.getElementById('editModal').style.display = 'flex';
-        populateProductSelects();
-    };
-    window.addItemToEditCart = (type) => {
-        let product, qty, unit; if(type==='water') { product=document.getElementById('edit_WaterProduct').value; qty=document.getElementById('edit_WaterQty').value; unit=document.getElementById('edit_WaterUnits').value; }
-        else { product=document.getElementById('edit_CoffeeProduct').value; qty=document.getElementById('edit_CoffeeQty').value; unit=document.getElementById('edit_CoffeeUnits').value; }
-        if(!product || qty<=0) return alert("Select product & qty");
-        editCartItems.push(`${qty} ${unit} - ${product}`);
-        document.getElementById('editCartItemsDisplay').innerHTML = editCartItems.map(i=>`<div class="cart-item">${i}</div>`).join('');
-    };
-    document.getElementById('saveRecordBtn').onclick = () => {
-        if(currentEditIndex===null) return;
-        let cust = globalCustomers[currentEditIndex];
-        csvHeaders.forEach(h => { let inp = document.getElementById(`edit_${h.replace(/\s/g,'_')}`); if(inp) cust[h] = inp.value; });
-        let routeOverride = document.getElementById('editTargetRouteSel')?.value; if(routeOverride) cust.__route = routeOverride;
-        alert("Updated locally"); closeModal('editModal'); renderCustTable();
-    };
-    window.managerCallInOrder = function() {
-        callInCart = []; let container = document.getElementById('callInFormGrid');
-        container.innerHTML = `<div class="form-grid">${csvHeaders.map(h=>`<div class="form-field"><label>${h}</label><input id="callin_${h.replace(/\s/g,'_')}"></div>`).join('')}<div class="form-field"><label>Route</label><select id="callinRouteSelect">${availableRoutes.map(r=>`<option>${r.replace('.csv','')}</option>`).join('')}</select></div></div>`;
-        container.innerHTML += `<div class="section-title">Add Products</div><div class="product-row"><div class="form-field"><label>💧 Water</label><select id="callinWaterProduct"></select></div><div class="form-field"><label>Qty</label><input id="callinWaterQty" value="1"></div><div class="form-field"><label>Unit</label><select><option>Bottles</option></select></div><button class="btn btn-primary" onclick="addCallInItem('water')">Add</button></div>`;
-        container.innerHTML += `<div class="product-row"><div class="form-field"><label>☕ Coffee</label><select id="callinCoffeeProduct"></select></div><div class="form-field"><label>Qty</label><input id="callinCoffeeQty" value="1"></div><div class="form-field"><label>Unit</label><select><option>Boxes</option></select></div><button class="btn btn-primary" onclick="addCallInItem('coffee')">Add</button></div>`;
-        document.getElementById('callinCartDisplay').innerHTML = ''; populateProductSelects(); document.getElementById('callInModal').style.display = 'flex';
-    };
-    window.addCallInItem = (type) => {
-        let prod = type==='water' ? document.getElementById('callinWaterProduct').value : document.getElementById('callinCoffeeProduct').value;
-        let qty = type==='water' ? document.getElementById('callinWaterQty').value : document.getElementById('callinCoffeeQty').value;
-        if(!prod || qty<=0) return;
-        callInCart.push(`${qty} x ${prod}`);
-        document.getElementById('callinCartDisplay').innerHTML = callInCart.map(i=>`<div class="cart-item">${i}</div>`).join('');
-    };
-    document.getElementById('saveCallInBtn').onclick = () => {
-        let newCust = { __route: document.getElementById('callinRouteSelect')?.value };
-        csvHeaders.forEach(h => newCust[h] = document.getElementById(`callin_${h.replace(/\s/g,'_')}`)?.value || '');
-        globalCustomers.push(newCust); renderCustTable(); alert("Call-in order added."); closeModal('callInModal');
-    };
-    window.openNewCustomerModal = function() {
-        let container = document.getElementById('newCustFields'); container.innerHTML = '';
-        csvHeaders.forEach(h => { container.innerHTML += `<div class="form-field"><label>${h}</label><input id="new_${h.replace(/\s/g,'_')}"></div>`; });
-        container.innerHTML += `<div class="form-field"><label>Route</label><select id="newRouteSelect">${availableRoutes.map(r=>`<option>${r.replace('.csv','')}</option>`).join('')}</select></div>`;
-        document.getElementById('newCustModal').style.display = 'flex';
-    };
-    document.getElementById('saveNewCustBtn').onclick = () => {
-        let obj = { __route: document.getElementById('newRouteSelect').value };
-        csvHeaders.forEach(h => obj[h] = document.getElementById(`new_${h.replace(/\s/g,'_')}`)?.value || '');
-        globalCustomers.push(obj); renderCustTable(); closeModal('newCustModal');
-    };
-    window.managerProductMaint = () => alert(`💧 Water: ${productMap.water.join(', ')}\n\n☕ Coffee: ${productMap.coffee.join(', ')}`);
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
-    function initMap() { map = L.map('map').setView([55.17, -118.79], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
+        let thead = document.getElementById('custTableHead');
+        if (thead && csvHeaders.length) {
+            thead.innerHTML = `<tr>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        }
+    }
+
+    function showProducts() {
+        let container = document.getElementById('productPreview');
+        container.innerHTML = `
+            <h4>💧 Water Products (${productMap.water.length})</h4>
+            <div class="product-list">${productMap.water.map(p => `<div class="product-item">• ${p}</div>`).join('') || '<em>No products loaded</em>'}</div>
+            <h4>☕ Coffee Products (${productMap.coffee.length})</h4>
+            <div class="product-list">${productMap.coffee.map(p => `<div class="product-item">• ${p}</div>`).join('') || '<em>No products loaded</em>'}</div>
+        `;
+    }
+
+    // Map & Route
+    function initMap() {
+        map = L.map('map').setView([55.17, -118.79], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    }
+
     document.getElementById('btnStartRoute').onclick = () => {
-        let route = document.getElementById('routeDropdown').value; if(!route) return;
-        currentRouteStops = globalCustomers.filter(c=>c.__route === route);
-        if(!currentRouteStops.length) return alert("No stops");
-        document.getElementById('stopList').innerHTML = currentRouteStops.map((s,i)=>`<div class="route-stop-item" onclick="selectStopByIndex(${i})"><div><span class="stop-number">${i+1}</span><span class="stop-name">${s['Company']||s['Customer Name']||'Stop'}</span></div><div class="stop-address"><i class="fas fa-map-pin"></i> ${s['Address']||'No Address'}</div></div>`).join('');
-        if(routeMarkers.length) routeMarkers.forEach(m=>map.removeLayer(m)); routeMarkers=[];
-        currentRouteStops.forEach(s=>{ if(s.Latitude && s.Longitude) routeMarkers.push(L.marker([s.Latitude, s.Longitude]).addTo(map).bindPopup(s.Company)); });
-        currentStopIndex=0; updateNavBar();
+        let route = document.getElementById('routeDropdown').value;
+        if (!route || route === '-- Select Route --') return alert("Select a route");
+        currentRouteStops = globalCustomers.filter(c => c.__route === route);
+        if (!currentRouteStops.length) return alert("No stops");
+        let stopDiv = document.getElementById('stopList');
+        stopDiv.innerHTML = currentRouteStops.map((s, i) => `
+            <div class="route-stop-item" onclick="alert('Address: ${s['Address'] || 'N/A'}\nPhone: ${s['Phone'] || 'N/A'}')">
+                <strong>${i+1}. ${s['Company'] || s['Customer Name'] || 'Stop'}</strong><br>
+                <small>${s['Address'] || 'No address'}</small>
+            </div>
+        `).join('');
     };
-    window.selectStopByIndex = function(i) { currentStopIndex=i; updateNavBar(); openEditCustomer(globalCustomers.indexOf(currentRouteStops[i])); };
-    function updateNavBar() { if(!currentRouteStops.length) return; let s = currentRouteStops[currentStopIndex]; document.getElementById('navAddressBar').innerHTML = `<i class="fas fa-location-dot"></i> Address: ${s['Address']||'---'}`; document.getElementById('navPhoneBar').innerHTML = `<i class="fas fa-phone"></i> Phone: ${s['Phone']||'---'}`; }
-    window.navigateStop = (d) => { let n = currentStopIndex+d; if(n>=0 && n<currentRouteStops.length) { currentStopIndex=n; updateNavBar(); openEditCustomer(globalCustomers.indexOf(currentRouteStops[n])); } };
-    document.getElementById('btnLogout').onclick = signOut;
-    document.getElementById('btnManager').onclick = () => { renderCustTable(); document.getElementById('mgrModal').style.display = 'flex'; };
-    document.getElementById('btnForceRefresh').onclick = () => { if(accessToken) loadAllDataFromDrive(); else alert("Login first"); };
-    document.getElementById('googleSignInBtn').onclick = () => tokenClient.requestAccessToken();
-    window.addEventListener('load', () => { initMap(); initializeGapi(); });
+
+    document.getElementById('btnManager').onclick = () => {
+        renderCustTable();
+        showProducts();
+        document.getElementById('mgrModal').style.display = 'flex';
+    };
+    document.getElementById('btnRefresh').onclick = () => { if (accessToken) loadAllData(); else initAuth(); };
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // Auto-start
+    window.addEventListener('load', () => {
+        initMap();
+        // Show login overlay if needed
+        if (!accessToken) {
+            let loginDiv = document.createElement('div');
+            loginDiv.id = 'loginPrompt';
+            loginDiv.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:10000;';
+            loginDiv.innerHTML = `<div style="background:white; padding:30px; border-radius:20px; text-align:center;"><h2>LogiFlow Drive</h2><button id="loginBtn" class="btn btn-primary" style="padding:10px 30px;">Sign in with Google</button></div>`;
+            document.body.appendChild(loginDiv);
+            document.getElementById('loginBtn').onclick = () => {
+                loginDiv.remove();
+                initAuth();
+            };
+        }
+    });
 </script>
 </body>
 </html>
