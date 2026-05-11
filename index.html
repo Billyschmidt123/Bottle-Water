@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>LogiFlow Pro | Elegant Call-in Order</title>
+    <title>LogiFlow Pro | Google Sheets Integration</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -17,7 +17,7 @@
             --success: #2b6e3c;
             --success-light: #e8f5e9;
             --warning: #e65100;
-            --warning-light: #fff3e0;
+            --danger: #b91c1c;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -26,26 +26,23 @@
             --gray-800: #1f2937;
             --radius-lg: 1rem;
             --radius-xl: 1.5rem;
-            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
         }
 
         body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f1f5f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* Header */
-        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10; }
+        header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .logo-area { display: flex; align-items: center; gap: 0.75rem; }
         .logo-area i { font-size: 1.6rem; }
-        .logo-area h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.3px; }
+        .logo-area h1 { font-size: 1.3rem; font-weight: 600; }
         .header-actions { display: flex; gap: 0.75rem; }
 
-        /* Navigation */
         .driver-nav-bar { background: white; padding: 0.6rem 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--gray-200); }
         .nav-btn { padding: 0.5rem 1rem; border-radius: 2rem; border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
         .nav-btn-primary { background: var(--primary); color: white; }
         .nav-btn-success { background: var(--success); color: white; }
         .info-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 2rem; padding: 0.5rem 1.2rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; flex: 1; }
 
-        /* Main Layout */
         .main-container { display: flex; flex: 1; overflow: hidden; }
         #map { flex: 2; height: 100%; background: #e9ecef; }
         .side-panel { width: 380px; background: white; border-left: 1px solid var(--gray-200); display: flex; flex-direction: column; }
@@ -54,47 +51,40 @@
         .route-stop-item { background: white; border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 0.75rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; }
         .route-stop-item:hover { border-color: var(--primary); background: var(--primary-light); transform: translateX(4px); }
 
-        /* Buttons */
-        .btn { padding: 0.6rem 1.2rem; border-radius: 2rem; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn { padding: 0.6rem 1.2rem; border-radius: 2rem; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
         .btn-secondary { background: var(--gray-200); color: var(--gray-800); }
-        .btn-secondary:hover { background: var(--gray-300); }
         .btn-success { background: var(--success); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--gray-300); color: var(--gray-700); }
+        .btn-danger { background: var(--danger); color: white; }
 
-        /* Modal Overlay */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-container { background: white; border-radius: var(--radius-xl); width: 90%; max-width: 950px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: fadeIn 0.2s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 2px solid var(--gray-100); background: white; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 2px solid var(--gray-100); }
         .modal-header h2 { font-size: 1.3rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 0.6rem; }
         .modal-body { flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--gray-50); }
         .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); background: white; display: flex; justify-content: flex-end; gap: 1rem; }
 
-        /* Form Styles */
         .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
         .form-field { display: flex; flex-direction: column; gap: 0.35rem; }
         .form-field label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); }
-        .form-field input, .form-field select, .form-field textarea { padding: 0.7rem 0.8rem; border: 1px solid var(--gray-300); border-radius: 0.75rem; font-size: 0.85rem; transition: 0.2s; background: white; }
+        .form-field input, .form-field select, .form-field textarea { padding: 0.7rem 0.8rem; border: 1px solid var(--gray-300); border-radius: 0.75rem; font-size: 0.85rem; transition: 0.2s; }
         .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 91, 156, 0.1); }
 
-        /* Section Cards */
-        .section-card { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid var(--gray-200); }
+        .section-card { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--gray-200); }
         .section-title { font-size: 0.9rem; font-weight: 700; color: var(--gray-800); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; border-left: 3px solid var(--primary); padding-left: 0.75rem; }
+        
         .product-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
         .product-row .form-field { flex: 1; margin-bottom: 0; }
 
-        /* Cart Styles */
         .cart-container { background: var(--gray-50); border-radius: 1rem; padding: 1rem; border: 1px solid var(--gray-200); }
-        .cart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-weight: 600; color: var(--gray-800); }
         .cart-items { max-height: 180px; overflow-y: auto; }
-        .cart-item { background: white; border-radius: 2rem; padding: 0.4rem 0.8rem; margin: 0.3rem 0.4rem; display: inline-block; font-size: 0.75rem; border: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); }
-        .empty-cart { color: var(--gray-400); text-align: center; padding: 1rem; font-style: italic; }
+        .cart-item { background: white; border-radius: 2rem; padding: 0.4rem 0.8rem; margin: 0.3rem 0.4rem; display: inline-block; font-size: 0.75rem; border: 1px solid var(--gray-200); }
 
-        /* Badge & Login */
         .badge { background: var(--primary-light); color: var(--primary); border-radius: 2rem; padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 600; }
-        .google-btn { background: white; border: 1px solid var(--gray-300); padding: 0.7rem 1.8rem; border-radius: 3rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.8rem; margin: 1rem 0; cursor: pointer; transition: 0.2s; }
+        .save-indicator { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 8px 16px; border-radius: 2rem; font-size: 0.8rem; display: none; align-items: center; gap: 8px; z-index: 1000; animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .side-panel { width: 300px; } }
     </style>
@@ -102,7 +92,7 @@
 <body>
 
 <header>
-    <div class="logo-area"><i class="fas fa-truck-fast"></i><h1>LogiFlow Pro</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem;"></select></div>
+    <div class="logo-area"><i class="fas fa-table"></i><h1>LogiFlow Sheets</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem;"></select></div>
     <div class="header-actions"><div id="userDisplay" style="display:none;" class="badge"><img id="userAvatar" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;"><span id="userName"></span></div><button id="btnManager" class="btn" style="background:#4b5563; color:white;">📋 Manager</button><button id="btnRefresh" class="btn" style="background:#0d9488; color:white;"><i class="fas fa-sync-alt"></i> Sync</button><button id="btnLogout" class="btn" style="background:#6c757d; color:white; display:none;">Logout</button></div>
 </header>
 
@@ -116,86 +106,394 @@
 <div class="main-container">
     <div id="map"></div>
     <div class="side-panel">
-        <div class="panel-header"><h3><i class="fas fa-route"></i> Stops & Orders</h3><span id="currentAddress" style="font-size:0.75rem;color:gray;"></span></div>
-        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-map-marked-alt"></i> Select a route</p></div>
+        <div class="panel-header"><h3><i class="fas fa-route"></i> Route Stops</h3></div>
+        <div id="stopList" class="stop-list"><p style="text-align:center; padding:2rem; color:gray;"><i class="fas fa-spinner fa-spin"></i> Loading routes...</p></div>
     </div>
 </div>
+
+<div id="saveIndicator" class="save-indicator"><i class="fas fa-check-circle"></i> <span>Saved to Google Sheets</span></div>
 
 <!-- LOGIN MODAL -->
 <div id="loginModal" class="modal-overlay" style="display:flex;">
-    <div class="modal-container" style="max-width: 450px;">
-        <div class="modal-header"><h2><i class="fab fa-google"></i> Secure Access</h2></div>
-        <div class="modal-body" style="text-align:center;"><p>Connect to Google Drive to load your routes, products & customers.</p><button id="googleSignInBtn" class="google-btn"><img src="https://www.google.com/favicon.ico" width="20"> Sign in with Google</button><div class="badge">🔒 Read-only access to specified folders</div></div>
+    <div class="modal-container" style="max-width: 480px;">
+        <div class="modal-header"><h2><i class="fab fa-google"></i> Connect to Google Sheets</h2></div>
+        <div class="modal-body" style="text-align:center;">
+            <p style="margin-bottom:1rem;">LogiFlow uses Google Sheets for real-time data storage.</p>
+            <p style="margin-bottom:1rem; font-size:0.85rem; color:gray;"><i class="fas fa-database"></i> Your routes, customers, and products will be saved automatically.</p>
+            <button id="googleSignInBtn" class="btn btn-primary" style="padding:0.8rem 2rem;"><i class="fab fa-google"></i> Sign in with Google</button>
+        </div>
     </div>
 </div>
 
-<!-- PROFESSIONAL CALL-IN MODAL (Redesigned) -->
+<!-- CALL-IN MODAL -->
 <div id="callInModal" class="modal-overlay">
     <div class="modal-container">
-        <div class="modal-header">
-            <h2><i class="fas fa-phone-alt"></i> Call-in Order Entry</h2>
-            <button class="btn btn-secondary" onclick="closeModal('callInModal')"><i class="fas fa-times"></i> Close</button>
-        </div>
+        <div class="modal-header"><h2><i class="fas fa-phone-alt"></i> Call-in Order</h2><button class="btn btn-secondary" onclick="closeModal('callInModal')">Close</button></div>
         <div class="modal-body">
-            <!-- Customer Information Section -->
             <div class="section-card">
-                <div class="section-title"><i class="fas fa-user-circle"></i> Customer Details</div>
+                <div class="section-title">Customer Details</div>
                 <div class="form-grid" id="callinCustomerFields"></div>
             </div>
-
-            <!-- Order Items Section -->
             <div class="section-card">
-                <div class="section-title"><i class="fas fa-shopping-basket"></i> Add Order Items</div>
-                <div style="margin-bottom: 1rem;">
-                    <div class="product-row" style="margin-bottom: 1rem;">
-                        <div class="form-field"><label><i class="fas fa-tint"></i> Water Product</label><select id="callinWaterProduct" class="product-select"></select></div>
-                        <div class="form-field"><label>Quantity</label><input type="number" id="callinWaterQty" value="1" min="1" style="width:100px;"></div>
-                        <div class="form-field"><label>Unit</label><select id="callinWaterUnit"><option>Bottles</option><option>Cases</option><option>Sleive</option></select></div>
-                        <button class="btn btn-primary" onclick="addCallInItem('water')" style="align-self: flex-end;"><i class="fas fa-cart-plus"></i> Add</button>
-                    </div>
-                    <div class="product-row">
-                        <div class="form-field"><label><i class="fas fa-mug-hot"></i> Coffee Product</label><select id="callinCoffeeProduct" class="product-select"></select></div>
-                        <div class="form-field"><label>Quantity</label><input type="number" id="callinCoffeeQty" value="1" min="1" style="width:100px;"></div>
-                        <div class="form-field"><label>Unit</label><select id="callinCoffeeUnit"><option>Boxes</option><option>Cases</option><option>Packs</option></select></div>
-                        <button class="btn btn-primary" onclick="addCallInItem('coffee')" style="align-self: flex-end;"><i class="fas fa-cart-plus"></i> Add</button>
-                    </div>
+                <div class="section-title">Add Items</div>
+                <div class="product-row" style="margin-bottom:1rem;">
+                    <div class="form-field"><label>Water Product</label><select id="callinWaterProduct"></select></div>
+                    <div class="form-field"><label>Qty</label><input type="number" id="callinWaterQty" value="1" min="1"></div>
+                    <div class="form-field"><label>Unit</label><select id="callinWaterUnit"><option>Bottles</option><option>Cases</option></select></div>
+                    <button class="btn btn-primary" onclick="addCallInItem('water')">Add</button>
+                </div>
+                <div class="product-row">
+                    <div class="form-field"><label>Coffee Product</label><select id="callinCoffeeProduct"></select></div>
+                    <div class="form-field"><label>Qty</label><input type="number" id="callinCoffeeQty" value="1" min="1"></div>
+                    <div class="form-field"><label>Unit</label><select id="callinCoffeeUnit"><option>Boxes</option><option>Cases</option></select></div>
+                    <button class="btn btn-primary" onclick="addCallInItem('coffee')">Add</button>
                 </div>
             </div>
-
-            <!-- Order Cart -->
-            <div class="section-card">
-                <div class="cart-container">
-                    <div class="cart-header"><span><i class="fas fa-receipt"></i> Current Order Cart</span><span class="badge" id="cartCount">0 items</span></div>
-                    <div id="callinCartDisplay" class="cart-items"><div class="empty-cart">No items added yet</div></div>
-                </div>
+            <div class="cart-container">
+                <div class="cart-header"><strong>Order Cart</strong> <span id="cartCount" class="badge">0 items</span></div>
+                <div id="callinCartDisplay" class="cart-items"><em>No items</em></div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('callInModal')"><i class="fas fa-ban"></i> Cancel</button>
-            <button class="btn btn-success" id="saveCallInBtn"><i class="fas fa-check-circle"></i> Place Order</button>
-        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('callInModal')">Cancel</button><button class="btn btn-success" id="saveCallInBtn">Place Order & Save</button></div>
     </div>
 </div>
 
-<!-- MANAGER MODAL (simplified for brevity) -->
-<div id="mgrModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>Manager Panel</h3><button class="btn btn-secondary" onclick="closeModal('mgrModal')">Close</button></div><div class="modal-body"><button class="btn btn-primary" onclick="openCallInModal()"><i class="fas fa-phone-alt"></i> Call-in Order</button><button class="btn btn-primary" onclick="alert('Products: see console')">Products</button></div></div></div>
-
 <!-- EDIT MODAL -->
-<div id="editModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>Edit Customer</h3><button class="btn btn-secondary" onclick="closeModal('editModal')">Close</button></div><div class="modal-body"><div id="editFieldsContainer"></div></div><div class="modal-footer"><button class="btn btn-primary" id="saveEditBtn">Save</button></div></div></div>
+<div id="editModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header"><h2><i class="fas fa-edit"></i> Edit Customer</h2><button class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button></div>
+        <div class="modal-body"><div class="form-grid" id="editFieldsContainer"></div></div>
+        <div class="modal-footer"><button class="btn btn-primary" id="saveEditBtn"><i class="fas fa-save"></i> Save to Sheets</button></div>
+    </div>
+</div>
+
+<!-- MANAGER MODAL -->
+<div id="mgrModal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 1100px;">
+        <div class="modal-header"><h2><i class="fas fa-chalkboard-user"></i> Manager Console</h2><button class="btn btn-secondary" onclick="closeModal('mgrModal')">Close</button></div>
+        <div class="modal-body">
+            <div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="openCallInModal()"><i class="fas fa-phone-alt"></i> Call-in Order</button>
+                <button class="btn btn-secondary" onclick="viewProducts()"><i class="fas fa-box"></i> Products</button>
+                <button class="btn btn-success" onclick="exportToCSV()"><i class="fas fa-download"></i> Export Backup</button>
+            </div>
+            <div style="margin-bottom:1rem;"><select id="tableRouteFilter" onchange="renderCustomerTable()" style="padding:0.5rem; border-radius:0.5rem;"></select></div>
+            <div style="overflow-x:auto; border:1px solid var(--gray-200); border-radius:0.5rem;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                    <thead id="custTableHead" style="background:var(--gray-100);"></thead>
+                    <tbody id="custTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
 <script>
     // ========== CONFIGURATION ==========
+    // IMPORTANT: Replace these with YOUR Google Sheet IDs
     const CONFIG = {
         GOOGLE_CLIENT_ID: '343809984671-b59be5om2i4lf0qu3lpvgasa5ac8elfs.apps.googleusercontent.com',
-        SCOPES: 'https://www.googleapis.com/auth/drive.readonly',
-        ROUTES_FOLDER_ID: '1f1hEt8DDGSWP2TDxwX1SsWsmaTmdGclr',
-        WATER_PRODUCTS_FILE_ID: '13wQBhl-izIADfyHUpMeBYdF9DnvAxslX',
-        COFFEE_PRODUCTS_FILE_ID: '1qE8UXyMXkx-A-TbirZaqgBUMMSUw-vxs'
+        SCOPES: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly',
+        // You need to create a Google Sheet and share it with your email
+        MAIN_SPREADSHEET_ID: 'YOUR_SPREADSHEET_ID_HERE', // Replace with your Sheet ID
+        ROUTES_SHEET_NAME: 'Routes',
+        CUSTOMERS_SHEET_NAME: 'Customers',
+        PRODUCTS_SHEET_NAME: 'Products'
     };
-    let tokenClient, accessToken, currentUser, globalCustomers = [], csvHeaders = [], availableRoutes = [], productMap = { water: [], coffee: [] };
-    let callInCart = [], currentRouteStops = [], currentStopIndex = 0, map, routeMarkers = [];
+
+    let tokenClient = null;
+    let accessToken = null;
+    let currentUser = null;
+    let globalCustomers = [];
+    let csvHeaders = [];
+    let availableRoutes = [];
+    let productMap = { water: [], coffee: [] };
+    let callInCart = [];
+    let currentRouteStops = [];
+    let currentStopIndex = 0;
+    let map, routeMarkers = [];
+    let currentEditIndex = null;
+
+    // ========== GOOGLE SHEETS API ==========
+    async function loadSheetData(sheetName) {
+        if (!accessToken) throw new Error("Not authenticated");
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.MAIN_SPREADSHEET_ID}/values/${sheetName}!A1:Z1000`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error(`Failed to load ${sheetName}: ${response.status}`);
+        const data = await response.json();
+        return data.values || [];
+    }
+
+    async function updateSheetCell(sheetName, row, column, value) {
+        if (!accessToken) return false;
+        const range = `${sheetName}!${column}${row}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.MAIN_SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`;
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[value]] })
+        });
+        return response.ok;
+    }
+
+    async function appendRowToSheet(sheetName, rowData) {
+        if (!accessToken) return false;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.MAIN_SPREADSHEET_ID}/values/${sheetName}!A1:append?valueInputOption=RAW`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [rowData] })
+        });
+        return response.ok;
+    }
+
+    async function updateEntireSheet(sheetName, data) {
+        if (!accessToken) return false;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.MAIN_SPREADSHEET_ID}/values/${sheetName}!A1:Z${data.length}?valueInputOption=RAW`;
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: data })
+        });
+        return response.ok;
+    }
+
+    function showSaveNotification() {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.style.display = 'flex';
+        setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+    }
+
+    // ========== LOAD DATA FROM GOOGLE SHEETS ==========
+    async function loadAllData() {
+        try {
+            // Load products
+            const productsData = await loadSheetData(CONFIG.PRODUCTS_SHEET_NAME);
+            if (productsData && productsData.length > 1) {
+                const headers = productsData[0];
+                const waterCol = headers.findIndex(h => h.toLowerCase().includes('water'));
+                const coffeeCol = headers.findIndex(h => h.toLowerCase().includes('coffee'));
+                
+                for (let i = 1; i < productsData.length; i++) {
+                    const row = productsData[i];
+                    if (waterCol >= 0 && row[waterCol]) productMap.water.push(row[waterCol]);
+                    if (coffeeCol >= 0 && row[coffeeCol]) productMap.coffee.push(row[coffeeCol]);
+                }
+            }
+            
+            // Fallback product data if sheet is empty
+            if (productMap.water.length === 0) {
+                productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml', 'Spring Water 1L'];
+                productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf', 'French Vanilla'];
+            }
+            
+            // Load customers
+            const customersData = await loadSheetData(CONFIG.CUSTOMERS_SHEET_NAME);
+            if (customersData && customersData.length > 1) {
+                csvHeaders = customersData[0];
+                globalCustomers = [];
+                for (let i = 1; i < customersData.length; i++) {
+                    let obj = {};
+                    csvHeaders.forEach((h, idx) => { obj[h] = customersData[i][idx] || ''; });
+                    globalCustomers.push(obj);
+                }
+                // Extract unique routes
+                const routeCol = csvHeaders.findIndex(h => h.toLowerCase() === 'route' || h.toLowerCase() === '__route');
+                if (routeCol >= 0) {
+                    availableRoutes = [...new Set(globalCustomers.map(c => c[csvHeaders[routeCol]]).filter(r => r))];
+                } else {
+                    availableRoutes = ['Route A', 'Route B', 'Route C'];
+                }
+            }
+            
+            updateUI();
+            alert(`✅ Loaded from Google Sheets!\n📊 ${globalCustomers.length} customers\n🗺️ ${availableRoutes.length} routes\n💧 ${productMap.water.length} products`);
+        } catch (err) {
+            console.error("Load error:", err);
+            alert("Could not load from Google Sheets. Please make sure:\n1. You've created the spreadsheet\n2. The sheet IDs are correct\n3. You've shared the sheet with your Google account\n\nUsing demo data instead.");
+            loadDemoData();
+        }
+    }
+
+    function loadDemoData() {
+        csvHeaders = ['CustomerID', 'Company', 'Address', 'Phone', 'Route', 'Notes'];
+        globalCustomers = [
+            { CustomerID: '001', Company: 'ABC Corp', Address: '123 Main St', Phone: '555-0101', Route: 'Route A', Notes: '' },
+            { CustomerID: '002', Company: 'XYZ Ltd', Address: '456 Oak Ave', Phone: '555-0102', Route: 'Route A', Notes: '' },
+            { CustomerID: '003', Company: 'Smith Industries', Address: '789 Pine Rd', Phone: '555-0103', Route: 'Route B', Notes: '' }
+        ];
+        availableRoutes = ['Route A', 'Route B', 'Route C'];
+        productMap.water = ['18 Litre Bottles', '12 Litre Bottles', '500 ml'];
+        productMap.coffee = ['Original Roast', 'Dark Roast', 'Decaf'];
+        updateUI();
+        alert("📋 Using demo data. To connect to Google Sheets, update the SPREADSHEET_ID in the code.");
+    }
+
+    async function saveAllCustomersToSheets() {
+        const sheetData = [csvHeaders];
+        globalCustomers.forEach(cust => {
+            const row = csvHeaders.map(h => cust[h] || '');
+            sheetData.push(row);
+        });
+        const success = await updateEntireSheet(CONFIG.CUSTOMERS_SHEET_NAME, sheetData);
+        if (success) showSaveNotification();
+        return success;
+    }
+
+    function updateUI() {
+        const routeSelect = document.getElementById('routeDropdown');
+        routeSelect.innerHTML = '<option>-- Select Route --</option>' + availableRoutes.map(r => `<option>${r}</option>`).join('');
+        
+        const filterSelect = document.getElementById('tableRouteFilter');
+        if (filterSelect) filterSelect.innerHTML = '<option value="All">All Routes</option>' + availableRoutes.map(r => `<option>${r}</option>`).join('');
+        
+        renderCustomerTable();
+        populateProductSelects();
+    }
+
+    function renderCustomerTable() {
+        const filter = document.getElementById('tableRouteFilter')?.value || 'All';
+        const routeCol = csvHeaders.findIndex(h => h.toLowerCase() === 'route' || h.toLowerCase() === '__route');
+        let filtered = globalCustomers;
+        if (filter !== 'All' && routeCol >= 0) {
+            filtered = globalCustomers.filter(c => c[csvHeaders[routeCol]] === filter);
+        }
+        
+        const tbody = document.getElementById('custTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        filtered.slice(0, 100).forEach((cust, idx) => {
+            let row = '<tr>';
+            csvHeaders.forEach(h => row += `<td>${cust[h] || ''}</td>`);
+            row += `<td><button class="btn btn-primary" style="padding:0.2rem 0.6rem;" onclick="openEditCustomer(${globalCustomers.indexOf(cust)})">Edit</button></td>`;
+            row += '</tr>';
+            tbody.innerHTML += row;
+        });
+        
+        const thead = document.getElementById('custTableHead');
+        if (thead) thead.innerHTML = `<tr>${csvHeaders.map(h => `<th>${h}</th>`).join('')}<th>Action</th></tr>`;
+    }
+
+    window.openEditCustomer = function(idx) {
+        currentEditIndex = idx;
+        const cust = globalCustomers[idx];
+        const container = document.getElementById('editFieldsContainer');
+        container.innerHTML = '';
+        csvHeaders.forEach(header => {
+            container.innerHTML += `<div class="form-field"><label>${header}</label><input type="text" id="edit_${header.replace(/\s/g, '_')}" value="${escapeHtml(cust[header] || '')}"></div>`;
+        });
+        document.getElementById('editModal').style.display = 'flex';
+    };
+
+    document.getElementById('saveEditBtn').onclick = async () => {
+        if (currentEditIndex === null) return;
+        const cust = globalCustomers[currentEditIndex];
+        for (let h of csvHeaders) {
+            const inp = document.getElementById(`edit_${h.replace(/\s/g, '_')}`);
+            if (inp) cust[h] = inp.value;
+        }
+        await saveAllCustomersToSheets();
+        renderCustomerTable();
+        closeModal('editModal');
+    };
+
+    function populateProductSelects() {
+        const waterOpts = '<option value="">Select water</option>' + productMap.water.map(p => `<option>${p}</option>`).join('');
+        const coffeeOpts = '<option value="">Select coffee</option>' + productMap.coffee.map(p => `<option>${p}</option>`).join('');
+        document.querySelectorAll('#callinWaterProduct').forEach(sel => sel.innerHTML = waterOpts);
+        document.querySelectorAll('#callinCoffeeProduct').forEach(sel => sel.innerHTML = coffeeOpts);
+    }
+
+    window.openCallInModal = function() {
+        callInCart = [];
+        const container = document.getElementById('callinCustomerFields');
+        container.innerHTML = '';
+        ['CustomerID', 'Company', 'Address', 'Phone', 'Route', 'Notes'].forEach(field => {
+            container.innerHTML += `<div class="form-field"><label>${field}</label><input type="text" id="callin_${field}"></div>`;
+        });
+        document.getElementById('callinCartDisplay').innerHTML = '<em>No items</em>';
+        document.getElementById('cartCount').innerText = '0 items';
+        document.getElementById('callInModal').style.display = 'flex';
+    };
+
+    window.addCallInItem = function(type) {
+        let product = type === 'water' ? document.getElementById('callinWaterProduct').value : document.getElementById('callinCoffeeProduct').value;
+        let qty = type === 'water' ? document.getElementById('callinWaterQty').value : document.getElementById('callinCoffeeQty').value;
+        let unit = type === 'water' ? document.getElementById('callinWaterUnit').value : document.getElementById('callinCoffeeUnit').value;
+        if (!product) return alert("Select a product");
+        callInCart.push(`${qty} ${unit} - ${product}`);
+        document.getElementById('callinCartDisplay').innerHTML = callInCart.map(i => `<div class="cart-item">${i}</div>`).join('');
+        document.getElementById('cartCount').innerText = `${callInCart.length} items`;
+    };
+
+    document.getElementById('saveCallInBtn').onclick = async () => {
+        const newCust = {
+            CustomerID: document.getElementById('callin_CustomerID')?.value || `C${Date.now()}`,
+            Company: document.getElementById('callin_Company')?.value || 'New Customer',
+            Address: document.getElementById('callin_Address')?.value || '',
+            Phone: document.getElementById('callin_Phone')?.value || '',
+            Route: document.getElementById('callin_Route')?.value || availableRoutes[0] || 'Route A',
+            Notes: `Order: ${callInCart.join('; ')}`
+        };
+        
+        const newRow = csvHeaders.map(h => newCust[h] || '');
+        const success = await appendRowToSheet(CONFIG.CUSTOMERS_SHEET_NAME, newRow);
+        
+        if (success) {
+            globalCustomers.push(newCust);
+            showSaveNotification();
+            alert("Order saved to Google Sheets!");
+        } else {
+            alert("Failed to save to Google Sheets. Check your connection.");
+        }
+        closeModal('callInModal');
+        renderCustomerTable();
+    };
+
+    window.viewProducts = () => {
+        alert(`💧 Water Products:\n${productMap.water.join('\n')}\n\n☕ Coffee Products:\n${productMap.coffee.join('\n')}`);
+    };
+
+    window.exportToCSV = () => {
+        let csv = csvHeaders.join(',') + '\n';
+        globalCustomers.forEach(c => {
+            csv += csvHeaders.map(h => `"${(c[h] || '').replace(/"/g, '""')}"`).join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `logiflow_backup_${new Date().toISOString().slice(0,19)}.csv`;
+        link.click();
+        alert("Backup CSV downloaded. To restore, import into Google Sheets.");
+    };
+
+    // ========== MAP & ROUTE ==========
+    function initMap() { map = L.map('map').setView([55.17, -118.79], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
+    
+    document.getElementById('btnStartRoute').onclick = () => {
+        let route = document.getElementById('routeDropdown').value;
+        if (!route || route === '-- Select Route --') return alert("Select a route");
+        const routeCol = csvHeaders.findIndex(h => h.toLowerCase() === 'route' || h.toLowerCase() === '__route');
+        currentRouteStops = globalCustomers.filter(c => routeCol >= 0 && c[csvHeaders[routeCol]] === route);
+        if (!currentRouteStops.length) return alert("No stops on this route");
+        
+        const stopDiv = document.getElementById('stopList');
+        stopDiv.innerHTML = currentRouteStops.map((s, i) => `
+            <div class="route-stop-item" onclick="alert('Company: ${s.Company || 'N/A'}\\nAddress: ${s.Address || 'N/A'}\\nPhone: ${s.Phone || 'N/A'}')">
+                <b>${i+1}. ${s.Company || s.CustomerID || 'Stop'}</b>
+                <div style="font-size:0.7rem;color:gray;">${s.Address || 'No address'}</div>
+            </div>
+        `).join('');
+    };
+    
+    window.navigateStop = (d) => { let n = currentStopIndex + d; if(n >= 0 && n < currentRouteStops.length) { currentStopIndex = n; let s = currentRouteStops[n]; document.getElementById('navAddressBar').innerHTML = `<i class="fas fa-location-dot"></i> Address: ${s.Address || '---'}`; document.getElementById('navPhoneBar').innerHTML = `<i class="fas fa-phone"></i> Phone: ${s.Phone || '---'}`; } };
+    
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
 
     // ========== AUTH ==========
     function initAuth() {
@@ -205,7 +503,6 @@
             callback: async (resp) => {
                 if (resp.error) return alert("Auth Failed");
                 accessToken = resp.access_token;
-                await fetchUserInfo();
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('btnLogout').style.display = 'inline-block';
                 document.getElementById('userDisplay').style.display = 'flex';
@@ -214,128 +511,12 @@
         });
         tokenClient.requestAccessToken();
     }
-    async function fetchUserInfo() {
-        try {
-            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            currentUser = await res.json();
-            document.getElementById('userName').innerText = currentUser.name?.split(' ')[0] || 'User';
-            if (currentUser.picture) document.getElementById('userAvatar').src = currentUser.picture;
-        } catch(e) {}
-    }
-    async function loadFile(fileId) {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.text();
-    }
-    async function listRouteFiles() {
-        let url = `https://www.googleapis.com/drive/v3/files?q='${CONFIG.ROUTES_FOLDER_ID}'+in+parents+and+mimeType='text/csv'&fields=files(id,name)`;
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-        const data = await res.json();
-        return data.files || [];
-    }
-    async function loadAllData() {
-        try {
-            const waterRaw = await loadFile(CONFIG.WATER_PRODUCTS_FILE_ID);
-            const coffeeRaw = await loadFile(CONFIG.COFFEE_PRODUCTS_FILE_ID);
-            productMap.water = waterRaw.split('\n').filter(l => l.trim() && !l.startsWith(',')).map(l => l.split(',')[0]?.trim()).filter(p => p && p.length > 0 && !p.toLowerCase().includes('product') && p !== 'NOT DELIVERED');
-            productMap.coffee = coffeeRaw.split('\n').filter(l => l.trim()).map(l => l.split(',')[0]?.trim().replace(/^["']|["']$/g, '')).filter(p => p && p.length > 0 && !p.toLowerCase().includes('product') && !p.includes('NOT DELIVERED'));
-            
-            const routeFiles = await listRouteFiles();
-            availableRoutes = routeFiles.map(f => f.name.replace('.csv', ''));
-            document.getElementById('routeDropdown').innerHTML = '<option>-- Select Route --</option>' + availableRoutes.map(r => `<option>${r}</option>`).join('');
-            
-            globalCustomers = []; csvHeaders = [];
-            for (let file of routeFiles) {
-                const csvText = await loadFile(file.id);
-                const lines = csvText.split(/\r?\n/).filter(l => l.trim());
-                if (lines.length < 2) continue;
-                const headers = lines[0].split(',').map(h => h.trim());
-                if (csvHeaders.length === 0) csvHeaders = headers;
-                for (let i = 1; i < lines.length; i++) {
-                    let vals = lines[i].split(',').map(v => v.trim());
-                    let obj = { __route: file.name.replace('.csv', '') };
-                    headers.forEach((h, idx) => obj[h] = vals[idx] || '');
-                    globalCustomers.push(obj);
-                }
-            }
-            populateProductSelects();
-            alert(`✅ Loaded: ${globalCustomers.length} customers, ${availableRoutes.length} routes, ${productMap.water.length} waters, ${productMap.coffee.length} coffees`);
-        } catch(e) { console.error(e); alert("Load error: " + e.message); }
-    }
-    function populateProductSelects() {
-        let wOpt = '<option value="">Select water</option>' + productMap.water.map(p => `<option>${p}</option>`).join('');
-        let cOpt = '<option value="">Select coffee</option>' + productMap.coffee.map(p => `<option>${p}</option>`).join('');
-        document.querySelectorAll('#callinWaterProduct, .product-select').forEach(sel => { if(sel.id === 'callinWaterProduct') sel.innerHTML = wOpt; });
-        document.querySelectorAll('#callinCoffeeProduct').forEach(sel => sel.innerHTML = cOpt);
-    }
 
-    // ========== PROFESSIONAL CALL-IN MODAL FUNCTIONS ==========
-    window.openCallInModal = function() {
-        callInCart = [];
-        // Build customer fields
-        const container = document.getElementById('callinCustomerFields');
-        container.innerHTML = '';
-        const essentialFields = ['CustomerID', 'Company', 'Address', 'Phone', 'Email', 'Notes'];
-        const displayHeaders = csvHeaders.length ? csvHeaders : ['CustomerID', 'Company', 'Address', 'Phone', 'Email', 'Notes'];
-        displayHeaders.slice(0, 8).forEach(header => {
-            container.innerHTML += `<div class="form-field"><label><i class="fas fa-info-circle"></i> ${header}</label><input type="text" id="callin_${header.replace(/\s/g, '_')}" placeholder="Enter ${header}"></div>`;
-        });
-        // Add route selector
-        container.innerHTML += `<div class="form-field"><label><i class="fas fa-route"></i> Target Route</label><select id="callinRouteSelect">${availableRoutes.map(r => `<option>${r}</option>`).join('')}</select></div>`;
-        
-        document.getElementById('callinCartDisplay').innerHTML = '<div class="empty-cart">No items added yet</div>';
-        document.getElementById('cartCount').innerText = '0 items';
-        populateProductSelects();
-        document.getElementById('callInModal').style.display = 'flex';
-    };
-    window.addCallInItem = function(type) {
-        let product = type === 'water' ? document.getElementById('callinWaterProduct').value : document.getElementById('callinCoffeeProduct').value;
-        let qty = type === 'water' ? document.getElementById('callinWaterQty').value : document.getElementById('callinCoffeeQty').value;
-        let unit = type === 'water' ? document.getElementById('callinWaterUnit').value : document.getElementById('callinCoffeeUnit').value;
-        if (!product) return alert("Please select a product");
-        if (qty <= 0) return alert("Quantity must be greater than 0");
-        callInCart.push({ name: product, qty: qty, unit: unit, type: type });
-        renderCallInCart();
-    };
-    function renderCallInCart() {
-        const cartDiv = document.getElementById('callinCartDisplay');
-        if (callInCart.length === 0) { cartDiv.innerHTML = '<div class="empty-cart">No items added yet</div>'; document.getElementById('cartCount').innerText = '0 items'; return; }
-        cartDiv.innerHTML = callInCart.map((item, idx) => `<div class="cart-item"><i class="fas ${item.type === 'water' ? 'fa-tint' : 'fa-mug-hot'}"></i> ${item.qty} ${item.unit} - ${escapeHtml(item.name)} <button style="background:none; border:none; color:#b91c1c; cursor:pointer; margin-left:6px;" onclick="removeCartItem(${idx})"><i class="fas fa-trash-alt"></i></button></div>`).join('');
-        document.getElementById('cartCount').innerText = `${callInCart.length} item${callInCart.length !== 1 ? 's' : ''}`;
-    }
-    window.removeCartItem = function(idx) { callInCart.splice(idx, 1); renderCallInCart(); };
-    document.getElementById('saveCallInBtn').onclick = () => {
-        let newCust = { __route: document.getElementById('callinRouteSelect')?.value || availableRoutes[0] || '' };
-        csvHeaders.forEach(h => { newCust[h] = document.getElementById(`callin_${h.replace(/\s/g, '_')}`)?.value || ''; });
-        if (!newCust['Company'] && !newCust['Address']) return alert("Please fill at least Company or Address");
-        newCust['OrderItems'] = callInCart.map(i => `${i.qty} ${i.unit} ${i.name}`).join('; ');
-        globalCustomers.push(newCust);
-        alert(`✅ Order placed for ${newCust['Company'] || 'Customer'} with ${callInCart.length} items.`);
-        closeModal('callInModal');
-        if (typeof renderCustTable === 'function') renderCustTable();
-    };
-    window.managerCallInOrder = openCallInModal;
-
-    // ========== MAP & ROUTE ==========
-    function initMap() { map = L.map('map').setView([55.17, -118.79], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
-    document.getElementById('btnStartRoute').onclick = () => {
-        let route = document.getElementById('routeDropdown').value;
-        if (!route || route === '-- Select Route --') return alert("Select a route");
-        currentRouteStops = globalCustomers.filter(c => c.__route === route);
-        if (!currentRouteStops.length) return alert("No stops");
-        document.getElementById('stopList').innerHTML = currentRouteStops.map((s, i) => `<div class="route-stop-item" onclick="alert('Address: ${s['Address'] || 'N/A'}\\nPhone: ${s['Phone'] || 'N/A'}')"><div><b>${i+1}. ${s['Company'] || s['Customer Name'] || 'Stop'}</b></div><div style="font-size:0.75rem;color:gray;"><i class="fas fa-map-pin"></i> ${s['Address'] || 'No address'}</div></div>`).join('');
-        if (routeMarkers.length) routeMarkers.forEach(m => map.removeLayer(m));
-        routeMarkers = [];
-        currentRouteStops.forEach(s => { if(s.Latitude && s.Longitude) routeMarkers.push(L.marker([s.Latitude, s.Longitude]).addTo(map).bindPopup(s.Company)); });
-        currentStopIndex = 0;
-    };
-    window.navigateStop = (d) => { let n = currentStopIndex + d; if(n >= 0 && n < currentRouteStops.length) { currentStopIndex = n; let s = currentRouteStops[n]; document.getElementById('navAddressBar').innerHTML = `<i class="fas fa-location-dot"></i> Address: ${s['Address'] || '---'}`; document.getElementById('navPhoneBar').innerHTML = `<i class="fas fa-phone"></i> Phone: ${s['Phone'] || '---'}`; } };
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
-    document.getElementById('btnManager').onclick = () => { document.getElementById('mgrModal').style.display = 'flex'; };
-    document.getElementById('btnRefresh').onclick = () => { if(accessToken) loadAllData(); else initAuth(); };
     document.getElementById('googleSignInBtn').onclick = () => tokenClient.requestAccessToken();
+    document.getElementById('btnManager').onclick = () => { renderCustomerTable(); document.getElementById('mgrModal').style.display = 'flex'; };
+    document.getElementById('btnRefresh').onclick = () => { if(accessToken) loadAllData(); else initAuth(); };
     document.getElementById('btnLogout').onclick = () => { fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' }); location.reload(); };
+    
     window.addEventListener('load', () => { initMap(); initAuth(); });
 </script>
 </body>
