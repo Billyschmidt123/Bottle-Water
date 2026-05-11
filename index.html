@@ -75,7 +75,7 @@
             background: #f9fafb;
             border-radius: 16px;
         }
-        /* Force route dropdown text to be black */
+        /* Force route dropdown text to be black - ADDED INLINE STYLE OVERRIDE */
         #routeDropdown {
             color: #000000 !important;
             background: white !important;
@@ -85,6 +85,35 @@
         select {
             color: #1f2937;
             background-color: white;
+        }
+        /* ADDED: Product table styles */
+        .product-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .product-table th {
+            background: #f1f5f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #1e293b;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .product-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .product-table tr:hover {
+            background: #f8fafc;
         }
         /* ===== END OF ADDED STYLES ===== */
 
@@ -131,6 +160,7 @@
         .btn-primary:hover { background: var(--primary-dark); }
         .btn-secondary { background: var(--gray-200); color: var(--gray-800); }
         .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-container { background: white; border-radius: var(--radius-xl); width: 90%; max-width: 950px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; animation: fadeIn 0.2s ease; }
@@ -167,7 +197,7 @@
 <body>
 
 <header>
-    <div class="logo-area"><i class="fas fa-file-csv"></i><h1>LogiFlow Routes</h1><select id="routeDropdown" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem; min-width:200px;"><option>Loading routes from Drive...</option></select></div>
+    <div class="logo-area"><i class="fas fa-file-csv"></i><h1>LogiFlow Routes</h1><select id="routeDropdown" style="background:white; border:none; color:#000000 !important; padding:0.3rem 0.8rem; border-radius:2rem; margin-left:1rem; min-width:200px;"><option>Loading routes from Drive...</option></select></div>
     <div class="header-actions"><div id="userDisplay" style="display:none;" class="badge"><img id="userAvatar" style="width:24px;height:24px;border-radius:50%;"><span id="userName"></span></div><button id="btnManager" class="btn" style="background:#4b5563; color:white;">Manager</button><button id="btnRefresh" class="btn" style="background:#0d9488; color:white;"><i class="fas fa-sync-alt"></i> Sync</button><button id="btnLogout" class="btn" style="background:#6c757d; color:white; display:none;">Logout</button></div>
 </header>
 
@@ -245,6 +275,40 @@
     </div>
 </div>
 
+<!-- ADDED: Product Manager Modal (CRUD) -->
+<div id="productManagerModal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 900px;">
+        <div class="modal-header"><h2><i class="fas fa-boxes"></i> Product Manager</h2><button class="btn btn-secondary" onclick="closeProductManagerModal()">Close</button></div>
+        <div class="modal-body">
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="showAddProductForm()"><i class="fas fa-plus"></i> Add New Product</button>
+                <button class="btn btn-secondary" onclick="refreshProductTable()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
+            <div id="productEditForm" style="display: none; margin-bottom: 1.5rem;">
+                <div class="section-card">
+                    <div class="section-title" id="productFormTitle">Add Product</div>
+                    <div class="form-grid">
+                        <div class="form-field"><label>Type</label><select id="productType"><option value="water">Water</option><option value="coffee">Coffee</option></select></div>
+                        <div class="form-field"><label>Product Name</label><input type="text" id="productName" placeholder="Enter product name"></div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+                        <button class="btn btn-secondary" onclick="cancelProductForm()">Cancel</button>
+                        <button class="btn btn-success" id="saveProductBtn">Save Product</button>
+                    </div>
+                </div>
+            </div>
+            <div class="product-table-container">
+                <table class="product-table">
+                    <thead>
+                        <tr><th>Type</th><th>Product Name</th><th style="width: 100px;">Actions</th</tr>
+                    </thead>
+                    <tbody id="productTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Manager Modal -->
 <div id="mgrModal" class="modal-overlay">
     <div class="modal-container" style="max-width: 1100px;">
@@ -253,6 +317,7 @@
             <div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
                 <button class="btn btn-primary" onclick="openCallInModal()"><i class="fas fa-phone-alt"></i> Call-in Order</button>
                 <button class="btn btn-secondary" onclick="viewProducts()"><i class="fas fa-box"></i> Products</button>
+                <button class="btn btn-primary" onclick="openProductManagerModal()"><i class="fas fa-edit"></i> Edit Products</button>
                 <button class="btn btn-success" id="managerEndOfDayBtn"><i class="fas fa-file-pdf"></i> End of Day PDF</button>
             </div>
             <div style="margin-bottom:1rem;"><select id="tableRouteFilter" onchange="renderCustomerTable()" style="padding:0.5rem; border-radius:0.5rem;"></select></div>
@@ -295,6 +360,10 @@
     let currentStopIndex = 0;
     let map, routeMarkers = [];
     let currentEditIndex = null;
+
+    // ========== ADDED: Product CRUD variables ==========
+    let editingProductIndex = null;
+    let editingProductType = null;
 
     // ========== GOOGLE DRIVE API ==========
     async function listCSVFilesInFolder(folderId) {
@@ -547,7 +616,7 @@
             let row = '<tr>';
             headers.forEach(h => row += `<td>${escapeHtml(cust[h] || '')}</td>`);
             row += `<td><button class="btn btn-primary" style="padding:0.2rem 0.6rem;" onclick="openEditCustomer(${globalIdx})">Edit</button></td>`;
-            row += '<tr>';
+            row += '</tr>';
             tbody.innerHTML += row;
         });
         
@@ -679,9 +748,124 @@
         }
     };
 
+    // ===== ORIGINAL viewProducts() - KEPT INTACT =====
     window.viewProducts = () => {
         alert(`💧 Water Products:\n${productMap.water.join('\n')}\n\n☕ Coffee Products:\n${productMap.coffee.join('\n')}`);
     };
+
+    // ========== ADDED: Product Manager CRUD Functions ==========
+    window.openProductManagerModal = function() {
+        refreshProductTable();
+        document.getElementById('productManagerModal').style.display = 'flex';
+    };
+    
+    function closeProductManagerModal() {
+        document.getElementById('productManagerModal').style.display = 'none';
+        cancelProductForm();
+    }
+    
+    function refreshProductTable() {
+        const tbody = document.getElementById('productTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        // Add water products
+        productMap.water.forEach((product, idx) => {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerHTML = '<span class="badge" style="background:#e6f0fa;">Water</span>';
+            row.insertCell(1).innerHTML = escapeHtml(product);
+            row.insertCell(2).innerHTML = `<button class="btn btn-primary" style="padding:0.2rem 0.5rem; margin-right:0.3rem;" onclick="editProduct('water', ${idx})">Edit</button><button class="btn btn-danger" style="padding:0.2rem 0.5rem;" onclick="deleteProduct('water', ${idx})">Delete</button>`;
+        });
+        
+        // Add coffee products
+        productMap.coffee.forEach((product, idx) => {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerHTML = '<span class="badge" style="background:#fef3c7;">Coffee</span>';
+            row.insertCell(1).innerHTML = escapeHtml(product);
+            row.insertCell(2).innerHTML = `<button class="btn btn-primary" style="padding:0.2rem 0.5rem; margin-right:0.3rem;" onclick="editProduct('coffee', ${idx})">Edit</button><button class="btn btn-danger" style="padding:0.2rem 0.5rem;" onclick="deleteProduct('coffee', ${idx})">Delete</button>`;
+        });
+        
+        if (productMap.water.length === 0 && productMap.coffee.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:2rem;">No products available. Click "Add New Product" to get started.</td></tr>';
+        }
+    }
+    
+    window.showAddProductForm = function() {
+        editingProductIndex = null;
+        editingProductType = null;
+        document.getElementById('productFormTitle').innerHTML = '<i class="fas fa-plus"></i> Add New Product';
+        document.getElementById('productType').value = 'water';
+        document.getElementById('productName').value = '';
+        document.getElementById('productEditForm').style.display = 'block';
+        document.getElementById('saveProductBtn').onclick = saveNewProduct;
+    };
+    
+    window.editProduct = function(type, index) {
+        editingProductType = type;
+        editingProductIndex = index;
+        const productName = type === 'water' ? productMap.water[index] : productMap.coffee[index];
+        document.getElementById('productFormTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Product';
+        document.getElementById('productType').value = type;
+        document.getElementById('productType').disabled = true;
+        document.getElementById('productName').value = productName;
+        document.getElementById('productEditForm').style.display = 'block';
+        document.getElementById('saveProductBtn').onclick = saveEditedProduct;
+    };
+    
+    function saveNewProduct() {
+        const type = document.getElementById('productType').value;
+        const name = document.getElementById('productName').value.trim();
+        if (!name) {
+            alert("Please enter a product name.");
+            return;
+        }
+        if (type === 'water') {
+            productMap.water.push(name);
+        } else {
+            productMap.coffee.push(name);
+        }
+        refreshProductTable();
+        populateProductSelects();
+        cancelProductForm();
+        showSaveNotification('Product added');
+    }
+    
+    function saveEditedProduct() {
+        const name = document.getElementById('productName').value.trim();
+        if (!name) {
+            alert("Please enter a product name.");
+            return;
+        }
+        if (editingProductType === 'water' && editingProductIndex !== null) {
+            productMap.water[editingProductIndex] = name;
+        } else if (editingProductType === 'coffee' && editingProductIndex !== null) {
+            productMap.coffee[editingProductIndex] = name;
+        }
+        refreshProductTable();
+        populateProductSelects();
+        cancelProductForm();
+        showSaveNotification('Product updated');
+    }
+    
+    window.deleteProduct = function(type, index) {
+        if (confirm(`Are you sure you want to delete this product?`)) {
+            if (type === 'water') {
+                productMap.water.splice(index, 1);
+            } else {
+                productMap.coffee.splice(index, 1);
+            }
+            refreshProductTable();
+            populateProductSelects();
+            showSaveNotification('Product deleted');
+        }
+    };
+    
+    function cancelProductForm() {
+        document.getElementById('productEditForm').style.display = 'none';
+        document.getElementById('productType').disabled = false;
+        editingProductIndex = null;
+        editingProductType = null;
+    }
 
     // ========== PDF GENERATION ==========
     async function generateAndUploadPDF() {
