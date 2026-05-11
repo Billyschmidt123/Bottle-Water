@@ -8,6 +8,33 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        /* ===== ADDED: Hide the first Products button (no existing code removed) ===== */
+        /* This hides the original Products button that calls viewProducts() alert */
+        .manager-button-row .btn-secondary:first-of-type {
+            display: none !important;
+        }
+        /* More specific selector to ensure we hide ONLY the first Products button */
+        div[style*="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;"] .btn-secondary:first-child {
+            display: none !important;
+        }
+        
+        /* ===== ADDED: Ensure modals open IN FRONT of everything (higher z-index) ===== */
+        .modal-overlay {
+            z-index: 10000 !important;
+        }
+        .modal-container {
+            z-index: 10001 !important;
+        }
+        /* Ensure tables don't overlap modals */
+        .product-table-container,
+        .mgmt-table,
+        .data-table,
+        table {
+            position: relative;
+            z-index: 1;
+        }
+        /* ===== END OF ADDED STYLES ===== */
+
         /* ===== ADDED: CLEANER MODAL STYLES (no existing code removed) ===== */
         .modal-container {
             border-radius: 20px;
@@ -300,7 +327,7 @@
             <div class="product-table-container">
                 <table class="product-table">
                     <thead>
-                        <tr><th>Type</th><th>Product Name</th><th style="width: 100px;">Actions</th</tr>
+                        <tr><th>Type</th><th>Product Name</th><th style="width: 100px;">Actions</th></tr>
                     </thead>
                     <tbody id="productTableBody"></tbody>
                 </table>
@@ -884,7 +911,7 @@
         for (const route of routes) {
             htmlContent += `<h3>📁 ${escapeHtml(route.name)} (${route.customers.length} stops)</h3>`;
             htmlContent += `<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">`;
-            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th> </tr>`;
+            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th>  </tr>`;
             for (const cust of route.customers.slice(0, 50)) {
                 htmlContent += `<tr><td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Company || cust.CustomerID || '')}</td>`;
                 htmlContent += `<td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Address || '')}</td>`;
