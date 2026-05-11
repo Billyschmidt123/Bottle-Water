@@ -33,6 +33,82 @@
             position: relative;
             z-index: 1;
         }
+        
+        /* ===== ADDED: Professional Customer Table Styling ===== */
+        /* Style the customer table in Manager modal */
+        #mgrModal table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.8rem;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        #mgrModal table thead th {
+            background: linear-gradient(135deg, #0f5b9c 0%, #0a4b8a 100%);
+            color: white;
+            padding: 12px 10px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: none;
+        }
+        
+        #mgrModal table tbody tr {
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        #mgrModal table tbody tr:hover {
+            background-color: #f0f9ff;
+        }
+        
+        #mgrModal table tbody td {
+            padding: 10px 10px;
+            color: #1f2937;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: middle;
+        }
+        
+        /* Style the Edit buttons in customer table */
+        #mgrModal table tbody .btn-primary {
+            background: #0f5b9c;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        #mgrModal table tbody .btn-primary:hover {
+            background: #0a4b8a;
+            transform: translateY(-1px);
+        }
+        
+        /* Ensure the table container has proper scrolling */
+        #mgrModal .modal-body > div[style*="overflow-x:auto"] {
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        /* Style the filter dropdown */
+        #tableRouteFilter {
+            border: 1px solid #d1d5db;
+            border-radius: 2rem;
+            padding: 0.4rem 1rem;
+            font-size: 0.8rem;
+            background: white;
+            color: #1f2937;
+        }
+        
         /* ===== END OF ADDED STYLES ===== */
 
         /* ===== ADDED: CLEANER MODAL STYLES (no existing code removed) ===== */
@@ -911,7 +987,7 @@
         for (const route of routes) {
             htmlContent += `<h3>📁 ${escapeHtml(route.name)} (${route.customers.length} stops)</h3>`;
             htmlContent += `<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">`;
-            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th>  </tr>`;
+            htmlContent += `<tr style="background:#f0f0f0;"><th style="padding:8px; text-align:left;">Company</th><th style="padding:8px; text-align:left;">Address</th><th style="padding:8px; text-align:left;">Phone</th>  </td>`;
             for (const cust of route.customers.slice(0, 50)) {
                 htmlContent += `<tr><td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Company || cust.CustomerID || '')}</td>`;
                 htmlContent += `<td style="padding:6px; border-bottom:1px solid #ddd;">${escapeHtml(cust.Address || '')}</td>`;
